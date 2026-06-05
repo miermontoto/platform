@@ -1,0 +1,13 @@
+{
+  "name": "@platform/ui",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./http": "./src/http.ts"
+  },
+  "devDependencies": {
+    "@platform/config": "workspace:*",
+    "typescript": "^5.7.0"
+  }
+}
