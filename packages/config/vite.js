@@ -50,7 +50,7 @@ export function createPwaOptions({
       navigateFallback: '200.html',
       navigateFallbackDenylist: networkOnly.map((p) => new RegExp(`^${p.replace(/\/$/, '')}/`)),
       runtimeCaching: networkOnly.map((prefix) => ({
-        urlPattern: ({ url }) => url.pathname.startsWith(prefix),
+        urlPattern: (/** @type {{ url: URL }} */ ctx) => ctx.url.pathname.startsWith(prefix),
         handler: 'NetworkOnly',
       })),
     },
@@ -74,6 +74,7 @@ export function createWebConfig({ pwa, proxy = ['/api', '/auth'], envDir } = {})
     const env = loadEnv(mode, envDir ?? process.cwd() + '/../..', '');
     const apiUrl = `http://localhost:${env.PORT || 3000}`;
 
+    /** @type {import('vite').PluginOption[]} */
     const plugins = [sveltekit()];
     if (pwa) {
       const { SvelteKitPWA } = await import('@vite-pwa/sveltekit');
