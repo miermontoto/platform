@@ -1,0 +1,17 @@
+{
+  "name": "@platform/mobile",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "peerDependencies": {
+    "@capacitor/cli": "^7.0.0",
+    "@capacitor/core": "^7.0.0"
+  },
+  "devDependencies": {
+    "@platform/config": "workspace:*",
+    "typescript": "^5.7.0"
+  }
+}

@@ -13,6 +13,7 @@ packages/
   db/         factoría sqlite (wal + pragmas + unaccent + migraciones drizzle)
   auth/       tabla canónica de sesiones + servicio de ciclo de vida
   ui/         transporte http compartido de los clientes web
+  mobile/     shell capacitor (config factory; spa empaquetada + api remota via VITE_API_BASE)
 tooling/
   backup/     backup-sqlite.sh — copia segura + rotación recent/weekly (docker|local)
 ```
