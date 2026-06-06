@@ -15,6 +15,9 @@ export interface PlatformMobileOptions {
   appId: string;
   // nombre visible de la app
   appName: string;
+  // color de fondo de la app (hex): pinta el área de las system bars para que
+  // los márgenes de edge-to-edge se fundan con el tema (default '#000000')
+  backgroundColor?: string;
   // directorio del build estático de sveltekit (default 'build')
   webDir?: string;
   // overrides puntuales sobre los defaults
@@ -24,6 +27,7 @@ export interface PlatformMobileOptions {
 export function createCapacitorConfig({
   appId,
   appName,
+  backgroundColor = '#000000',
   webDir = 'build',
   overrides = {},
 }: PlatformMobileOptions): CapacitorConfig {
@@ -31,9 +35,16 @@ export function createCapacitorConfig({
     appId,
     appName,
     webDir,
+    backgroundColor,
     server: {
       // origen https://localhost: scheme seguro, cookies y storage estables
       androidScheme: 'https',
+    },
+    android: {
+      // android 15 (sdk 35) fuerza edge-to-edge: el webview dibujaría debajo de
+      // la status bar y la nav bar, y el webview android no expone
+      // env(safe-area-inset-*). márgenes nativos automáticos en su lugar.
+      adjustMarginsForEdgeToEdge: 'auto',
     },
     plugins: {
       // fetch/XHR via capa nativa: cookie jar nativo, sin CORS en llamadas a la api
