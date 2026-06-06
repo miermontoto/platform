@@ -4,14 +4,25 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./deep-link": "./src/deep-link.ts"
   },
   "peerDependencies": {
     "@capacitor/cli": "^7.0.0",
-    "@capacitor/core": "^7.0.0"
+    "@capacitor/core": "^7.0.0",
+    "@capacitor/app": "^7.0.0",
+    "@capacitor/browser": "^7.0.0"
   },
   "devDependencies": {
     "@platform/config": "workspace:*",
     "typescript": "^5.7.0"
+  },
+  "peerDependenciesMeta": {
+    "@capacitor/app": {
+      "optional": true
+    },
+    "@capacitor/browser": {
+      "optional": true
+    }
   }
 }
