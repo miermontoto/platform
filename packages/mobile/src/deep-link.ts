@@ -32,3 +32,24 @@ export async function onAuthDeepLink(
     void onCallback(new URL(url));
   });
 }
+
+/**
+ * registra el listener de app links https (android app links: dominio verificado
+ * via /.well-known/assetlinks.json). entrega path+query para que la spa navegue
+ * a la ruta del link en vez de abrirse en la home.
+ */
+export async function onAppLink(
+  host: string,
+  onNavigate: (pathWithQuery: string) => void,
+): Promise<void> {
+  await App.addListener('appUrlOpen', ({ url }) => {
+    let parsed: URL;
+    try {
+      parsed = new URL(url);
+    } catch {
+      return; // url no parseable (scheme custom de otros listeners): ignorar
+    }
+    if (parsed.protocol !== 'https:' || parsed.host !== host) return;
+    onNavigate(parsed.pathname + parsed.search);
+  });
+}
