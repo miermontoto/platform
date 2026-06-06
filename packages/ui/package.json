@@ -4,10 +4,20 @@
   "private": true,
   "type": "module",
   "exports": {
-    "./http": "./src/http.ts"
+    "./http": "./src/http.ts",
+    "./SettingsTabs.svelte": "./src/SettingsTabs.svelte",
+    "./SessionsPanel.svelte": "./src/SessionsPanel.svelte"
   },
   "devDependencies": {
     "@platform/config": "workspace:*",
     "typescript": "^5.7.0"
+  },
+  "peerDependencies": {
+    "svelte": "^5.0.0"
+  },
+  "peerDependenciesMeta": {
+    "svelte": {
+      "optional": true
+    }
   }
 }

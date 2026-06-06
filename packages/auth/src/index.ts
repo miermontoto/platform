@@ -14,3 +14,4 @@ export {
   type SessionSummary,
 } from './session-service.js';
 export { createOneTimeCodeStore, type OneTimeCodeStore } from './one-time-codes.js';
+export { toSessionInfos, type SessionInfo } from './session-info.js';
