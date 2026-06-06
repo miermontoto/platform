@@ -10,6 +10,14 @@
 // sistema + deep links; pendiente en el roadmap.
 import type { CapacitorConfig } from '@capacitor/cli';
 
+// luminancia relativa aproximada de un hex (#rgb o #rrggbb) → ¿tema oscuro?
+function isDarkColor(hex: string): boolean {
+  const h = hex.replace('#', '');
+  const full = h.length === 3 ? [...h].map((c) => c + c).join('') : h;
+  const [r, g, b] = [0, 2, 4].map((i) => parseInt(full.slice(i, i + 2), 16));
+  return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255 < 0.5;
+}
+
 export interface PlatformMobileOptions {
   // id de aplicación android/ios (dominio inverso, ej. 'es.carreterinas.app')
   appId: string;
@@ -18,6 +26,9 @@ export interface PlatformMobileOptions {
   // color de fondo de la app (hex): pinta el área de las system bars para que
   // los márgenes de edge-to-edge se fundan con el tema (default '#000000')
   backgroundColor?: string;
+  // estilo de la status bar ('DARK' = fondo oscuro → iconos claros). si se
+  // omite, se deriva de la luminancia de backgroundColor
+  statusBarStyle?: 'DARK' | 'LIGHT';
   // directorio del build estático de sveltekit (default 'build')
   webDir?: string;
   // overrides puntuales sobre los defaults
@@ -28,6 +39,7 @@ export function createCapacitorConfig({
   appId,
   appName,
   backgroundColor = '#000000',
+  statusBarStyle,
   webDir = 'build',
   overrides = {},
 }: PlatformMobileOptions): CapacitorConfig {
@@ -50,6 +62,13 @@ export function createCapacitorConfig({
       // fetch/XHR via capa nativa: cookie jar nativo, sin CORS en llamadas a la api
       CapacitorHttp: { enabled: true },
       CapacitorCookies: { enabled: true },
+      // contraste de los iconos de la status bar acorde al tema (requiere
+      // @capacitor/status-bar en la app). backgroundColor aplica en android < 15;
+      // en 15+ la barra es transparente y se ve el fondo de la ventana.
+      StatusBar: {
+        style: statusBarStyle ?? (isDarkColor(backgroundColor) ? 'DARK' : 'LIGHT'),
+        backgroundColor,
+      },
     },
     ...overrides,
   };
