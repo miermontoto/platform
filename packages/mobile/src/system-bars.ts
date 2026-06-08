@@ -82,26 +82,50 @@ export function resolveCssColor(value: string): string | null {
   return rgbToHex(computed);
 }
 
+// ¿color con alfa > 0? getComputedStyle devuelve 'rgba(0, 0, 0, 0)' para fondos
+// transparentes (sin background propio): los descartamos para caer al fallback.
+function isOpaque(color: string): boolean {
+  const m = color.match(/rgba?\([^)]*\)/);
+  if (!m) return color.trim() !== '' && color.trim() !== 'transparent';
+  const parts = color.match(/[\d.]+/g);
+  return !parts || parts.length < 4 || parseFloat(parts[3]) > 0;
+}
+
 export interface CssSyncOptions {
-  // custom property de la que leer el color de fondo (default '--ui-bg').
+  // custom property de la que leer el color de fondo (ej. '--bg'). si se omite,
+  // se usa el background-color computado de `element` (funciona con tailwind y
+  // con apps que no exponen una custom property de fondo).
   backgroundVar?: string;
-  // elemento del que leer las custom properties (default document.documentElement).
+  // elemento raíz del tema (default document.documentElement). de él se leen las
+  // custom properties / el background-color, y se observan sus atributos.
   element?: HTMLElement;
   // override explícito del contraste de iconos (si se omite, por luminancia).
   style?: 'DARK' | 'LIGHT';
 }
 
+// resuelve el color de fondo del tema actual a hex: custom property si se indica,
+// si no el background-color computado del elemento (con fallback a <body>).
+function readThemeBackground(options: CssSyncOptions): string | null {
+  const el = options.element ?? document.documentElement;
+  if (options.backgroundVar) {
+    return resolveCssColor(getComputedStyle(el).getPropertyValue(options.backgroundVar));
+  }
+  const fromEl = getComputedStyle(el).backgroundColor;
+  if (isOpaque(fromEl)) return resolveCssColor(fromEl);
+  // <html> sin fondo propio: el color visible suele estar en <body>.
+  const fromBody = document.body && getComputedStyle(document.body).backgroundColor;
+  return fromBody && isOpaque(fromBody) ? resolveCssColor(fromBody) : null;
+}
+
 /**
- * lee el color de fondo del tema actual desde una custom property CSS de la app
- * y lo aplica a las system bars. pensado para llamarse tras cada cambio de tema.
- * no-op fuera de plataforma nativa.
+ * lee el color de fondo del tema actual (custom property o background-color
+ * computado) y lo aplica a las system bars. pensado para llamarse tras cada
+ * cambio de tema. no-op fuera de plataforma nativa.
  */
 export async function syncSystemBarsFromCss(options: CssSyncOptions = {}): Promise<void> {
   if (!Capacitor.isNativePlatform()) return;
-  const el = options.element ?? document.documentElement;
-  const raw = getComputedStyle(el).getPropertyValue(options.backgroundVar ?? '--ui-bg');
-  const backgroundColor = resolveCssColor(raw);
-  if (!backgroundColor) return; // var no definida o no resoluble: nada que hacer.
+  const backgroundColor = readThemeBackground(options);
+  if (!backgroundColor) return; // fondo no resoluble: nada que hacer.
   await applySystemBars({ backgroundColor, style: options.style });
 }
 
