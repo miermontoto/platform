@@ -4,3 +4,4 @@ export { createPlatformApp, type PlatformAppOptions } from './create-app.js';
 export { sessionGate, type SessionGateOptions } from './session-gate.js';
 export { mountSpa, type MountSpaOptions } from './spa.js';
 export { startApiServer, type StartServerOptions } from './server.js';
+export { createWsHub, type WsHub, type WsHubOptions, type WsConnection } from './ws-hub.js';
