@@ -5,9 +5,11 @@
   "type": "module",
   "exports": {
     "./http": "./src/http.ts",
+    "./i18n": "./src/i18n.ts",
     "./SettingsTabs.svelte": "./src/SettingsTabs.svelte",
     "./SessionsPanel.svelte": "./src/SessionsPanel.svelte",
-    "./PrivacyPolicy.svelte": "./src/PrivacyPolicy.svelte"
+    "./PrivacyPolicy.svelte": "./src/PrivacyPolicy.svelte",
+    "./LanguageSwitcher.svelte": "./src/LanguageSwitcher.svelte"
   },
   "devDependencies": {
     "@platform/config": "workspace:*",

@@ -8,11 +8,15 @@
     "./vite": "./vite.js"
   },
   "peerDependencies": {
+    "@inlang/paraglide-js": ">=2",
     "@sveltejs/kit": "^2.16.0",
     "@vite-pwa/sveltekit": ">=0.6.0",
     "vite": ">=5"
   },
   "peerDependenciesMeta": {
+    "@inlang/paraglide-js": {
+      "optional": true
+    },
     "@vite-pwa/sveltekit": {
       "optional": true
     }
