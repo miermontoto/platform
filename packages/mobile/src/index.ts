@@ -9,14 +9,7 @@
 // oauth de terceros (sis/spotify, duckhunt/atlassian) hará falta browser del
 // sistema + deep links; pendiente en el roadmap.
 import type { CapacitorConfig } from '@capacitor/cli';
-
-// luminancia relativa aproximada de un hex (#rgb o #rrggbb) → ¿tema oscuro?
-function isDarkColor(hex: string): boolean {
-  const h = hex.replace('#', '');
-  const full = h.length === 3 ? [...h].map((c) => c + c).join('') : h;
-  const [r, g, b] = [0, 2, 4].map((i) => parseInt(full.slice(i, i + 2), 16));
-  return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255 < 0.5;
-}
+import { isDarkColor } from './color';
 
 export interface PlatformMobileOptions {
   // id de aplicación android/ios (dominio inverso, ej. 'es.carreterinas.app')
@@ -67,6 +60,13 @@ export function createCapacitorConfig({
       // en 15+ la barra es transparente y se ve el fondo de la ventana.
       StatusBar: {
         style: statusBarStyle ?? (isDarkColor(backgroundColor) ? 'DARK' : 'LIGHT'),
+        backgroundColor,
+      },
+      // color del área de ambas system bars desde el primer frame en android 15+
+      // (requiere @capawesome/capacitor-android-edge-to-edge-support en la app).
+      // el recoloreo posterior a la carga —y en cada cambio de tema— lo hace el
+      // helper de runtime: import desde '@platform/mobile/system-bars'.
+      EdgeToEdge: {
         backgroundColor,
       },
     },

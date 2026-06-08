@@ -5,14 +5,16 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./deep-link": "./src/deep-link.ts"
+    "./deep-link": "./src/deep-link.ts",
+    "./system-bars": "./src/system-bars.ts"
   },
   "peerDependencies": {
     "@capacitor/cli": "^7.0.0",
     "@capacitor/core": "^7.0.0",
     "@capacitor/app": "^7.0.0",
     "@capacitor/browser": "^7.0.0",
-    "@capacitor/status-bar": "^7.0.0"
+    "@capacitor/status-bar": "^7.0.0",
+    "@capawesome/capacitor-android-edge-to-edge-support": "^7.0.0"
   },
   "devDependencies": {
     "@platform/config": "workspace:*",
@@ -26,6 +28,9 @@
       "optional": true
     },
     "@capacitor/status-bar": {
+      "optional": true
+    },
+    "@capawesome/capacitor-android-edge-to-edge-support": {
       "optional": true
     }
   }
