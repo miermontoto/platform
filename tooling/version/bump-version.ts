@@ -3,12 +3,27 @@
 //
 // uso: tsx bump-version.ts [ruta/a/constants.ts]   (default: src/constants.ts
 // relativo a cwd — los scripts de app lo invocan desde packages/api).
-// misma semana iso → avanza la letra; semana nueva → resetea a 'a'.
+// misma semana iso → avanza la letra; semana nueva → resetea a 'a'. al agotarse la 'z'
+// la letra crece en longitud estilo columnas de hoja de cálculo (z→aa, az→ba, zz→aaa),
+// NO al siguiente codepoint ascii ('{'), que rompería el formato y el propio bump.
 import { readFileSync, writeFileSync } from 'fs';
 import { resolve } from 'path';
 
 const CONSTANTS_PATH = resolve(process.cwd(), process.argv[2] ?? 'src/constants.ts');
-const VERSION_RE = /export const VERSION = '(\d{2}w\d{2})([a-z])';/;
+const VERSION_RE = /export const VERSION = '(\d{2}w\d{2})([a-z]+)';/;
+
+// incrementa la(s) letra(s) con rollover: a→b … y→z → z→aa → aa→ab … az→ba … zz→aaa.
+function nextLetter(letters: string): string {
+  const chars = letters.split('');
+  for (let i = chars.length - 1; i >= 0; i--) {
+    if (chars[i] !== 'z') {
+      chars[i] = String.fromCharCode(chars[i].charCodeAt(0) + 1);
+      return chars.join('');
+    }
+    chars[i] = 'a'; // carry: esta posición vuelve a 'a' y seguimos con la anterior
+  }
+  return 'a' + chars.join(''); // todas eran 'z' → crece una posición
+}
 
 function isoWeekTag(): string {
   const d = new Date();
@@ -31,9 +46,7 @@ if (!match) {
 
 const [fullMatch, currentWeek, currentLetter] = match;
 const newWeek = isoWeekTag();
-const newLetter = newWeek === currentWeek
-  ? String.fromCharCode(currentLetter.charCodeAt(0) + 1)
-  : 'a';
+const newLetter = newWeek === currentWeek ? nextLetter(currentLetter) : 'a';
 const newVersion = `${newWeek}${newLetter}`;
 
 writeFileSync(CONSTANTS_PATH, src.replace(fullMatch, `export const VERSION = '${newVersion}';`));
