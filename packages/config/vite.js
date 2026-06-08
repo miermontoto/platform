@@ -68,14 +68,17 @@ export function createPwaOptions({
  * @param {object} [options.pwa]      opciones de createPwaOptions(); omitir para no generar pwa
  * @param {string[]} [options.proxy]  prefijos proxificados a la api en dev
  * @param {string} [options.envDir]   donde vive el .env de la app (default: raiz de la app, dos niveles sobre packages/web)
+ * @param {import('vite').PluginOption[]} [options.plugins]  plugins extra (ej. paraglide i18n); se anteponen a sveltekit()
  */
-export function createWebConfig({ pwa, proxy = ['/api', '/auth'], envDir } = {}) {
+export function createWebConfig({ pwa, proxy = ['/api', '/auth'], envDir, plugins: extraPlugins = [] } = {}) {
   return defineConfig(async ({ mode }) => {
     const env = loadEnv(mode, envDir ?? process.cwd() + '/../..', '');
     const apiUrl = `http://localhost:${env.PORT || 3000}`;
 
+    // los plugins extra (paraglide) deben ir ANTES que sveltekit() para emitir el runtime
+    // i18n antes de que kit procese los módulos.
     /** @type {import('vite').PluginOption[]} */
-    const plugins = [sveltekit()];
+    const plugins = [...extraPlugins, sveltekit()];
     if (pwa) {
       const { SvelteKitPWA } = await import('@vite-pwa/sveltekit');
       plugins.push(SvelteKitPWA(pwa));
