@@ -6,7 +6,8 @@
   "exports": {
     "./http": "./src/http.ts",
     "./SettingsTabs.svelte": "./src/SettingsTabs.svelte",
-    "./SessionsPanel.svelte": "./src/SessionsPanel.svelte"
+    "./SessionsPanel.svelte": "./src/SessionsPanel.svelte",
+    "./PrivacyPolicy.svelte": "./src/PrivacyPolicy.svelte"
   },
   "devDependencies": {
     "@platform/config": "workspace:*",

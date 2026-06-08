@@ -12,7 +12,8 @@ packages/
   core-api/   hono base, gate de sesión, spa estática, bootstrap del servidor, .env
   db/         factoría sqlite (wal + pragmas + unaccent + migraciones drizzle)
   auth/       tabla canónica de sesiones + servicio de ciclo de vida
-  ui/         transporte http compartido de los clientes web
+  ui/         componentes svelte + transporte http compartidos de los clientes web
+              (SettingsTabs, SessionsPanel, PrivacyPolicy)
   mobile/     shell capacitor (config factory; spa empaquetada + api remota via VITE_API_BASE)
 tooling/
   backup/     backup-sqlite.sh — copia segura + rotación recent/weekly (docker|local)
