@@ -13,6 +13,14 @@ import { defineConfig, loadEnv } from 'vite';
  * @param {string} [app.themeColor]   tambien usado como background_color
  * @param {Array<{name: string, url: string}>} [app.shortcuts]
  * @param {string[]} [app.networkOnly] prefijos de ruta que nunca se sirven de cache
+ * @param {Array<object>} [app.icons]  iconos del manifest (default: pwa-192/512.png). pasar
+ *        un svg (`{src,sizes:'any',type:'image/svg+xml',purpose:'any'}`) evita exigir pngs.
+ * @param {'generateSW'|'injectManifest'} [app.strategies]  default generateSW (sw autogenerado).
+ *        injectManifest = sw a mano (p.ej. para handlers de push). en sveltekit el sw DEBE vivir
+ *        en src/service-worker.ts (el plugin inyecta el manifest sobre el output compilado por kit);
+ *        srcDir/filename se omiten salvo override explícito.
+ * @param {string} [app.srcDir]   override del dir del sw (normalmente innecesario en sveltekit).
+ * @param {string} [app.filename] override del nombre del sw (normalmente innecesario en sveltekit).
  */
 export function createPwaOptions({
   name,
@@ -21,12 +29,17 @@ export function createPwaOptions({
   themeColor = '#080a0c',
   shortcuts = [],
   networkOnly = ['/api/', '/auth/'],
+  icons,
+  strategies = 'generateSW',
+  srcDir,
+  filename,
 }) {
   const icon192 = { src: 'pwa-192.png', sizes: '192x192', type: 'image/png' };
   const icon512 = { src: 'pwa-512.png', sizes: '512x512', type: 'image/png' };
-  return {
+  const manifestIcons = icons ?? [icon192, icon512, { ...icon512, purpose: 'maskable' }];
+  const base = {
     registerType: 'autoUpdate',
-    strategies: 'generateSW',
+    strategies,
     scope: '/',
     base: '/',
     manifest: {
@@ -38,13 +51,29 @@ export function createPwaOptions({
       display: 'standalone',
       scope: '/',
       start_url: '/',
-      icons: [icon192, icon512, { ...icon512, purpose: 'maskable' }],
+      icons: manifestIcons,
       shortcuts: shortcuts.map(({ name: n, url }) => ({
         name: n,
         url,
-        icons: [{ src: 'pwa-192.png', sizes: '192x192' }],
+        icons: [manifestIcons[0]],
       })),
     },
+    devOptions: { enabled: false },
+  };
+  // injectManifest: el sw lo escribe la app (handlers de push, etc.). vite-plugin-pwa solo
+  // inyecta el precache manifest (self.__WB_MANIFEST); el resto del routing lo decide el sw.
+  if (strategies === 'injectManifest') {
+    return {
+      ...base,
+      ...(srcDir ? { srcDir } : {}),
+      ...(filename ? { filename } : {}),
+      injectManifest: {
+        globPatterns: ['**/*.{js,css,html,png,svg,woff,woff2}'],
+      },
+    };
+  }
+  return {
+    ...base,
     workbox: {
       globPatterns: ['**/*.{js,css,html,png,svg,woff,woff2}'],
       navigateFallback: '200.html',
@@ -53,9 +82,6 @@ export function createPwaOptions({
         urlPattern: (/** @type {{ url: URL }} */ ctx) => ctx.url.pathname.startsWith(prefix),
         handler: 'NetworkOnly',
       })),
-    },
-    devOptions: {
-      enabled: false,
     },
   };
 }
