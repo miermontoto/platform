@@ -8,6 +8,12 @@
 // cookies de sesión viajan sin pelear con CORS/SameSite del webview. cuando haya
 // oauth de terceros (sis/spotify, duckhunt/atlassian) hará falta browser del
 // sistema + deep links; pendiente en el roadmap.
+//
+// plataformas: esta config es cross-platform. el bloque `android:` y el plugin
+// EdgeToEdge son android-scoped (no-op en ios, que sí expone env(safe-area-inset-*)
+// nativo en su webview, sin necesidad del hack de márgenes). ios usa su scheme
+// seguro por defecto (capacitor://localhost), así que no necesita iosScheme:'https'.
+// StatusBar y CapacitorHttp/Cookies aplican igual en ambas.
 import type { CapacitorConfig } from '@capacitor/cli';
 import { isDarkColor } from './color';
 
