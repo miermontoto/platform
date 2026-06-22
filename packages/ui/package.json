@@ -9,6 +9,7 @@
     "./SettingsTabs.svelte": "./src/SettingsTabs.svelte",
     "./SessionsPanel.svelte": "./src/SessionsPanel.svelte",
     "./PrivacyPolicy.svelte": "./src/PrivacyPolicy.svelte",
+    "./Support.svelte": "./src/Support.svelte",
     "./LanguageSwitcher.svelte": "./src/LanguageSwitcher.svelte"
   },
   "devDependencies": {
