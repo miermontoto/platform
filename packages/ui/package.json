@@ -10,7 +10,8 @@
     "./SessionsPanel.svelte": "./src/SessionsPanel.svelte",
     "./PrivacyPolicy.svelte": "./src/PrivacyPolicy.svelte",
     "./Support.svelte": "./src/Support.svelte",
-    "./LanguageSwitcher.svelte": "./src/LanguageSwitcher.svelte"
+    "./LanguageSwitcher.svelte": "./src/LanguageSwitcher.svelte",
+    "./Changelog.svelte": "./src/Changelog.svelte"
   },
   "devDependencies": {
     "@platform/config": "workspace:*",
