@@ -16,8 +16,10 @@ packages/
   changelog/  "novedades" compartido: tablas (entry + seen por usuario) + servicio
               (siembra entradas hand-curated, no vistas por usuario)
   ui/         componentes svelte + transporte http compartidos de los clientes web
-              (SettingsTabs, SessionsPanel, PrivacyPolicy, Changelog)
-  mobile/     shell capacitor (config factory; spa empaquetada + api remota via VITE_API_BASE)
+              (SettingsTabs, SessionsPanel, PrivacyPolicy, Changelog) + base.css
+              (primitivas css móvil/táctil: anti-zoom iOS, safe-area, reveal-en-táctil)
+  mobile/     shell capacitor (config factory; spa empaquetada + api remota via
+              VITE_API_BASE) + system-bars + compact (señal html.compact)
 tooling/
   backup/     backup-sqlite.sh — copia segura + rotación recent/weekly (docker|local)
   db/         db-sqlite.sh — acceso sqlite en caliente (docker|local), salida json
@@ -123,5 +125,53 @@ comandos: `query` · `exec` (multi-sentencia) · `tables` · `schema [tabla]` ·
 - node 22 (.nvmrc) + pnpm
 - pendiente (roadmap): billing/entitlements cuando exista pricing, shells
   capacitor, scaffolder de apps nuevas, migración de carreterinas
+
+### convenciones web (móvil/tablet)
+
+las apps con shell capacitor (spa empaquetada) comparten estas señales. NO las
+confundas: cada una responde a una pregunta distinta.
+
+**1. navegación → `html.compact`** (¿layout de navegación móvil?). compact =
+viewport estrecho (`<= breakpoint`) **O** app nativa (un tablet nativo es ancho pero
+queremos bottombar igualmente). lo gestiona `@platform/mobile/compact`:
+
+```ts
+// root +layout (post-hidratación): marca .native + mantiene .compact
+import { installCompact } from '@platform/mobile/compact';
+onMount(() => installCompact({ breakpoint: 720 }));
+```
+
+```html
+<!-- app.html <head> (pre-paint, evita FOUC en web estrecha). app.html es estático,
+     no puede importar el módulo: pegar el snippet con el MISMO breakpoint. -->
+<script>(function(){var r=document.documentElement;r.classList.toggle('compact',window.matchMedia('(max-width:720px)').matches);})();</script>
+```
+
+en css, la croma de navegación keya de `html.compact` (`html.compact .bottombar`, y
+en componentes svelte `:global(html.compact) .x`).
+
+**2. densidad de contenido → `@media`** (¿cuánto cabe?). por ancho/orientación real,
+NO por `html.compact` (un tablet apaisado es ancho de verdad → densidad de escritorio):
+
+```css
+@media (max-width: 720px), (orientation: portrait) and (max-width: 1024px) {
+  /* tarjetas en vez de tablas, modales fullscreen, etc. móvil o tablet en vertical. */
+}
+```
+
+el `1024px` inclusivo cubre el iPad Pro 12.9" en vertical; la orientación lo distingue
+del iPad apaisado (que se queda en desktop).
+
+**3. interacción táctil → `@media (hover: none)`** (¿hay hover?). en táctil no existe
+hover: los affordances que en desktop se revelan al pasar el ratón (acciones de fila,
+checks) deben ir siempre visibles. el hide-on-hover va dentro de `@media (hover: hover)`.
+
+**primitivas css compartidas** (`@platform/ui/base.css`, importar al principio del
+app.css): anti-zoom de iOS en inputs (`<16px` dispara zoom al enfocar), utilidad
+`.u-safe-px` (safe-area lateral en landscape) y `.u-touch-show` (reveal-en-táctil).
+
+**drag & drop**: el drag HTML5 (`draggable`/`dataTransfer`) **no existe en iOS
+Safari/WKWebView**. si una vista lo usa, dale una alternativa táctil (menú/acciones);
+no asumas que el drag funciona en la app nativa.
 
 † carreterinas pendiente de migrar (svelte 4 → 5, bun → node, split api/web).

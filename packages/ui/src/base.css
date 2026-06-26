@@ -1,0 +1,41 @@
+/* base.css — primitivas css compartidas de los clientes web de la plataforma.
+   importar UNA vez al principio del app.css de cada app:
+
+     @import '@platform/ui/base.css';
+
+   solo reglas GENÉRICAS y agnósticas de las clases de cada app (selectores de
+   elemento + utilidades `u-*`). los tokens, el layout y la densidad siguen siendo
+   propios de cada app. ver "convenciones web (móvil/tablet)" en el README. */
+
+/* anti-zoom de iOS: safari amplía el viewport al enfocar un campo de texto con
+   font-size < 16px. en modo compacto las apps reducen la tipografía de los
+   controles, así que en dispositivos TÁCTILES (hover:none) forzamos >=16px.
+   max(16px, 1em) respeta tamaños mayores y no afecta a ratón/desktop (donde el
+   zoom no ocurre y conviene la densidad menor). checkbox/radio no disparan zoom. */
+@media (hover: none) {
+  input:not([type='checkbox']):not([type='radio']),
+  select,
+  textarea {
+    font-size: max(16px, 1em);
+  }
+}
+
+/* utilidad safe-area lateral: padding interior que respeta el notch / home
+   indicator al rotar a landscape, conservando el padding base que la app pase via
+   --u-pad (default 0). aplicar a la croma a ancho completo (topbar, main, footer):
+     <header class="u-safe-px" style="--u-pad: var(--sp-4)"> … */
+.u-safe-px {
+  padding-left: max(var(--u-pad, 0px), env(safe-area-inset-left));
+  padding-right: max(var(--u-pad, 0px), env(safe-area-inset-right));
+}
+
+/* utilidad reveal-en-táctil: en desktop algunos controles aparecen al hover
+   (acciones de fila, checks de selección). sin hover no se pueden revelar, así que
+   en táctil van siempre visibles. marcar el control con `u-touch-show` y dejar el
+   hide-on-hover de la app dentro de @media (hover: hover). */
+@media (hover: none) {
+  .u-touch-show {
+    opacity: 1 !important;
+    pointer-events: auto !important;
+  }
+}

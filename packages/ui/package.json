@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "exports": {
+    "./base.css": "./src/base.css",
     "./http": "./src/http.ts",
     "./i18n": "./src/i18n.ts",
     "./SettingsTabs.svelte": "./src/SettingsTabs.svelte",
