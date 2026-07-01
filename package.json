@@ -2,6 +2,8 @@
   "name": "platform",
   "private": true,
   "type": "module",
+  "author": "Juan Mier",
+  "license": "CC-BY-NC-SA-4.0",
   "engines": {
     "node": ">=22"
   }

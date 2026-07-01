@@ -86,7 +86,7 @@ app.route('/api/changelog', changelogRoutes({ userId: (c) => c.get('userId'), ge
 
 ```bash
 tooling/backup/backup-sqlite.sh --app sis --mode docker --container sis-sis-1 \
-    --db /app/data/sis.db --dest /home/mier/dev/sis/data/backups
+    --db /app/data/sis.db --dest ~/dev/sis/data/backups
 ```
 
 rotación: `recent/` últimas 4 (cada 6h = 24h) + `weekly/` últimas 4 (1 mes).
@@ -175,3 +175,10 @@ Safari/WKWebView**. si una vista lo usa, dale una alternativa táctil (menú/acc
 no asumas que el drag funciona en la app nativa.
 
 † carreterinas pendiente de migrar (svelte 4 → 5, bun → node, split api/web).
+
+## licencia
+
+[CC BY-NC-SA 4.0](./LICENSE) (Creative Commons Attribution-NonCommercial-ShareAlike
+4.0 International). puedes usar, adaptar y redistribuir el código con fines **no
+comerciales**, citando la autoría y compartiendo las obras derivadas bajo la misma
+licencia. © Juan Mier.

@@ -8,7 +8,7 @@
 #
 # uso:
 #   backup-sqlite.sh --app sis --mode docker --container sis-sis-1 \
-#       --db /app/data/sis.db --dest /home/mier/dev/sis/data/backups
+#       --db /app/data/sis.db --dest ~/dev/sis/data/backups
 #   backup-sqlite.sh --app duckhunt --mode local \
 #       --db ./packages/api/data/duckhunt.db --dest ./data/backups
 #

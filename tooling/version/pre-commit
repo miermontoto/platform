@@ -3,6 +3,6 @@
 # instalar como .git/hooks/pre-commit en cada app (no se versiona con el repo).
 # fnm solo se inicializa en shells fish interactivas; los hooks de git corren bajo
 # /bin/sh sin esa init, así que cargamos fnm a mano para que lazygit/IDEs/etc.
-# encuentren node.
-export PATH="/etc/profiles/per-user/mier/bin:$HOME/.local/share/pnpm:$PATH"
+# encuentren node. ajusta las rutas a donde viva fnm en tu sistema si no lo detecta.
+command -v fnm >/dev/null 2>&1 || export PATH="/etc/profiles/per-user/$USER/bin:$HOME/.local/share/fnm:$HOME/.local/bin:$HOME/.local/share/pnpm:$PATH"
 fnm exec --using=default -- pnpm version:bump && git add packages/api/src/constants.ts
