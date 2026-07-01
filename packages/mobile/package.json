@@ -2,10 +2,12 @@
   "name": "@platform/mobile",
   "version": "0.1.0",
   "private": true,
+  "license": "CC-BY-NC-SA-4.0",
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
     "./compact": "./src/compact.ts",
+    "./connectivity": "./src/connectivity.ts",
     "./deep-link": "./src/deep-link.ts",
     "./system-bars": "./src/system-bars.ts"
   },
@@ -14,6 +16,7 @@
     "@capacitor/core": "^7.0.0",
     "@capacitor/app": "^7.0.0",
     "@capacitor/browser": "^7.0.0",
+    "@capacitor/network": "^7.0.0",
     "@capacitor/status-bar": "^7.0.0",
     "@capawesome/capacitor-android-edge-to-edge-support": "^7.0.0"
   },
@@ -26,6 +29,9 @@
       "optional": true
     },
     "@capacitor/browser": {
+      "optional": true
+    },
+    "@capacitor/network": {
       "optional": true
     },
     "@capacitor/status-bar": {

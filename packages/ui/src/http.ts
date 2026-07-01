@@ -11,6 +11,19 @@ export class ApiError extends Error {
   }
 }
 
+// error de red: el fetch ni siquiera obtuvo respuesta http (offline, dns caído, conexión
+// perdida). extiende ApiError con status 0 para ser retrocompatible — los callers que ya
+// filtran por `instanceof ApiError` lo siguen capturando (antes un fallo de red se colaba
+// como TypeError sin envolver) — mientras que el modo offline puede afinar con
+// `instanceof OfflineError`. clave: al NO pasar por la rama 401, un fallo de red nunca
+// dispara on401 ni el redirect a /login (no es una sesión inválida, es falta de red).
+export class OfflineError extends ApiError {
+  constructor(detail?: string) {
+    super(detail ? `sin conexión: ${detail}` : 'sin conexión', 0);
+    this.name = 'OfflineError';
+  }
+}
+
 export interface HttpOptions {
   // prefijo de url (default '' = urls absolutas del caller)
   base?: string;
@@ -29,12 +42,22 @@ export interface Http {
 
 export function createHttp({ base = '', on401 }: HttpOptions = {}): Http {
   async function req<T>(method: string, path: string, body?: unknown): Promise<T> {
-    const res = await fetch(`${base}${path}`, {
-      method,
-      headers: body ? { 'content-type': 'application/json' } : {},
-      credentials: 'include',
-      body: body ? JSON.stringify(body) : undefined,
-    });
+    let res: Response;
+    try {
+      res = await fetch(`${base}${path}`, {
+        method,
+        headers: body ? { 'content-type': 'application/json' } : {},
+        credentials: 'include',
+        body: body ? JSON.stringify(body) : undefined,
+      });
+    } catch (e) {
+      // fetch SOLO rechaza (sin llegar a una respuesta http) por fallo de red: offline,
+      // dns, conexión caída. lo normalizamos a OfflineError para que el caller lo distinga
+      // de un 401/4xx y NO dispare on401 ni el redirect a login. nota nativa: bajo
+      // CapacitorHttp el fallo puede no ser el TypeError del browser, por eso capturamos
+      // cualquier throw aquí en vez de comparar el tipo del error.
+      throw new OfflineError(e instanceof Error ? e.message : String(e));
+    }
     if (res.status === 401) {
       on401?.();
       throw new ApiError('no autorizado', 401);
