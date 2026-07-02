@@ -1,0 +1,204 @@
+# workflow REUTILIZABLE (workflow_call): build + firma del Android App Bundle (.aab)
+# en un runner linux, con subida opcional a Google Play. vive en el repo platform y lo
+# invocan las apps que usan platform como submódulo, desde un caller fino:
+#
+#   jobs:
+#     release:
+#       uses: miermontoto/platform/.github/workflows/android-release.yml@main
+#       with:
+#         app: duckhunt                    # slug: nombre del artifact y de <app>.properties
+#         package_name: info.duckhunt.app  # applicationId en Google Play
+#         upload: true                     # subir a Play (requiere service account)
+#         track: internal
+#       secrets: inherit
+#
+# el caller conserva sus triggers (workflow_dispatch / push de tag android-v*) y su
+# concurrency; la lógica de build vive aquí y se corrige UNA vez para todas las apps.
+#
+# SECRETS esperados en el repo de la app (Settings → Secrets and variables → Actions),
+# heredados con `secrets: inherit`:
+#   ANDROID_KEYSTORE_BASE64           ← base64 del upload keystore (~/Android/keystores/upload.jks)
+#   ANDROID_KEYSTORE_PASSWORD         ← storePassword
+#   ANDROID_KEY_ALIAS                 ← keyAlias
+#   ANDROID_KEY_PASSWORD              ← keyPassword
+#   ANDROID_GOOGLE_SERVICES_JSON      ← contenido de android/app/google-services.json (FCM; opcional)
+#   ANDROID_PLAY_SERVICE_ACCOUNT_JSON ← json íntegro de la key del service account de la Play
+#                                       Developer API (solo si upload=true; ver "SUBIDA A PLAY")
+#   SUBMODULES_PAT (opcional)         ← PAT con lectura del submódulo platform (solo si fuese privado)
+#
+# IMPORTANTE: la upload key es la MISMA que firma las publicaciones de Play. no la
+# cambies si la app ya está publicada (Play rechaza otra firma).
+#
+# VERSIONADO: el versionName sale de packages/web/android/app/build.gradle (committeado,
+# cosmético para Play, puede repetirse). el versionCode (entero con el que Play deduplica
+# las subidas: único y estrictamente creciente por aab) = base committeada + run_number del
+# caller, fijado en el paso "Fijar versionCode único"; así cada run produce un aab distinto
+# sin recommittear. mismo patrón que CFBundleVersion en ios-release.yml.
+#
+# SUBIDA A PLAY (r0adkll/upload-google-play, gated por el input `upload`): por defecto al
+# track `internal` — el paralelo a TestFlight: solo testers, nunca público.
+# SETUP DE UNA SOLA VEZ por app (linux/navegador):
+#  0. Google Play Console ($25 una vez). app creada con el applicationId. la PRIMERA subida
+#     debe ser MANUAL por la consola: Play bloquea la API hasta que una app nueva tiene su
+#     primer release a mano (usa el artifact de este workflow para esa vez).
+#  1. Google Cloud → un proyecto → APIs & Services → habilita "Google Play Android Developer API".
+#  2. IAM & Admin → Service Accounts → crea uno (sin roles GCP) → Keys → Add key → JSON → descarga.
+#  3. Play Console → Users and permissions → Invite new users → email del service account →
+#     permisos de la app "Release to testing tracks" (+ "Release to production" si usas ese track).
+#     (Play Console ↔ proyecto GCP se enlazan en Play Console → Setup → API access.)
+#  4. secret ANDROID_PLAY_SERVICE_ACCOUNT_JSON ← contenido ÍNTEGRO del .json de la key.
+
+name: Android release (reusable)
+
+on:
+  workflow_call:
+    inputs:
+      app:
+        description: 'slug de la app: nombra el artifact y el fichero <app>.properties que lee build.gradle'
+        required: true
+        type: string
+      package_name:
+        description: 'applicationId en Google Play (solo se usa si upload=true)'
+        required: true
+        type: string
+      upload:
+        description: 'subir el aab a Google Play (requiere ANDROID_PLAY_SERVICE_ACCOUNT_JSON)'
+        required: false
+        type: boolean
+        default: false
+      track:
+        description: 'track de Play donde publicar (internal | alpha | beta | production)'
+        required: false
+        type: string
+        default: internal
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout (con submódulo platform)
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          token: ${{ secrets.SUBMODULES_PAT || github.token }}
+
+      - name: Comprobar secrets de firma
+        env:
+          KS: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          if [ -z "$KS" ]; then
+            echo "::error::falta ANDROID_KEYSTORE_BASE64 — revisa la cabecera del workflow en platform"
+            exit 1
+          fi
+
+      - name: Comprobar secret de Play (solo si toca subir)
+        # falla rápido ANTES del build si se pidió upload sin la credencial, en vez de
+        # gastar ~minutos compilando para morir en el último paso.
+        if: ${{ inputs.upload }}
+        env:
+          SA: ${{ secrets.ANDROID_PLAY_SERVICE_ACCOUNT_JSON }}
+        run: |
+          if [ -z "$SA" ]; then
+            echo "::error::falta ANDROID_PLAY_SERVICE_ACCOUNT_JSON — necesario para subir a Play (ver cabecera). usa upload=false para solo generar el artifact"
+            exit 1
+          fi
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Setup JDK 21
+        # capacitor 7 (módulo capacitor-android) compila con source release 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Install deps
+        run: pnpm install --frozen-lockfile
+
+      - name: google-services.json (FCM, opcional)
+        env:
+          GS: ${{ secrets.ANDROID_GOOGLE_SERVICES_JSON }}
+        run: |
+          if [ -n "$GS" ]; then
+            printf '%s' "$GS" > packages/web/android/app/google-services.json
+            echo "google-services.json escrito (push habilitado)"
+          else
+            echo "sin google-services.json (build sin push)"
+          fi
+
+      - name: Keystore + signing properties
+        env:
+          KS_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KS_PASS: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASS: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          APP: ${{ inputs.app }}
+        run: |
+          # build.gradle lee la firma de ~/Android/keystores/<app>.properties → storeFile.
+          KS_DIR="$HOME/Android/keystores"
+          mkdir -p "$KS_DIR"
+          echo -n "$KS_B64" | base64 -d > "$KS_DIR/upload.jks"
+          {
+            printf 'storeFile=%s\n' "$KS_DIR/upload.jks"
+            printf 'storePassword=%s\n' "$KS_PASS"
+            printf 'keyAlias=%s\n' "$KEY_ALIAS"
+            printf 'keyPassword=%s\n' "$KEY_PASS"
+          } > "$KS_DIR/$APP.properties"
+          echo "keystore + properties listos en $KS_DIR/$APP.properties"
+
+      - name: Fijar versionCode único (evita colisión de aab en Play)
+        working-directory: packages/web/android
+        env:
+          RUN_NUMBER: ${{ github.run_number }}
+        run: |
+          # Play deduplica las subidas por versionCode (entero), que debe ser único y
+          # estrictamente creciente por aab; sin esto, dos builds del mismo commit chocan
+          # al subir. el versionCode committeado es el floor (bump manual junto al versionName);
+          # aquí le sumamos el run_number del workflow CALLER para garantizar un código único
+          # y monótono en cada run sin recommittear. cap sync no toca defaultConfig, así que
+          # el override persiste hasta bundleRelease.
+          GRADLE=app/build.gradle
+          BASE=$(grep -oP 'versionCode \K[0-9]+' "$GRADLE")
+          if [ -z "$BASE" ]; then
+            echo "::error::no se encontró versionCode en $GRADLE"; exit 1
+          fi
+          NEW=$((BASE + RUN_NUMBER))
+          sed -i "s/versionCode [0-9]\+/versionCode $NEW/" "$GRADLE"
+          echo "versionCode $BASE → $NEW (floor committeado + run_number $RUN_NUMBER)"
+
+      - name: Build AAB (firmado)
+        working-directory: packages/web
+        # mobile:aab = VITE_API_BASE=prod vite build + cap sync android + gradlew bundleRelease
+        run: pnpm run mobile:aab
+
+      - name: Subir AAB como artifact
+        # va ANTES del paso de Play: si la subida a Play falla, el aab queda igualmente
+        # disponible como artifact para subirlo a mano.
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.app }}-android-aab
+          path: packages/web/android/app/build/outputs/bundle/release/app-release.aab
+          if-no-files-found: error
+
+      - name: Subir a Google Play
+        # r0adkll envuelve la Play Developer API: crea un edit, sube el aab, lo asigna al
+        # track y commitea. status=completed = disponible ya para los testers del track.
+        # requiere la PRIMERA subida MANUAL de la app (ver cabecera).
+        if: ${{ inputs.upload }}
+        uses: r0adkll/upload-google-play@v1
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.ANDROID_PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: ${{ inputs.package_name }}
+          releaseFiles: packages/web/android/app/build/outputs/bundle/release/app-release.aab
+          track: ${{ inputs.track }}
+          status: completed

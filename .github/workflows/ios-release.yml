@@ -1,0 +1,448 @@
+# workflow REUTILIZABLE (workflow_call): build + firma + subida del ipa a App Store
+# Connect desde un runner macOS de github. objetivo: nunca tocar un mac — el runner es
+# una vm efímera; tú solo añades secrets. vive en el repo platform y lo invocan las
+# apps que usan platform como submódulo, desde un caller fino:
+#
+#   jobs:
+#     release:
+#       uses: miermontoto/platform/.github/workflows/ios-release.yml@main
+#       with:
+#         app: duckhunt                     # slug: artifact y nombre por defecto del perfil
+#         bundle_id: info.duckhunt.app
+#         icon_bg: '#0a0c0e'                # fondo del icono/splash generados
+#         deep_link_scheme: info.duckhunt.app   # opcional: oauth móvil por deep link
+#         sign_in_with_apple: true          # opcional: entitlement applesignin
+#         upload: true
+#       secrets: inherit
+#
+# el caller conserva sus triggers (workflow_dispatch / push de tag ios-v*) y su
+# concurrency; la lógica de build vive aquí y se corrige UNA vez para todas las apps.
+#
+# ────────────────────────────────────────────────────────────────────────────
+# SETUP DE UNA SOLA VEZ por app (todo desde linux, sin mac):
+#
+#  0. Apple Developer Program ($99/año). decide el bundle id (p.ej. info.duckhunt.app).
+#
+#  1. APP ID + APP RECORD
+#     - developer.apple.com → Certificates, IDs & Profiles → Identifiers → (+)
+#       → App IDs → App → tu bundle id (marca las capabilities que use la app:
+#       Push Notifications, Sign in with Apple, etc.)
+#     - si habilitas Sign in with Apple: tras añadir la capability al App ID, REGENERA
+#       el provisioning profile (ahora incluye el entitlement) y actualiza el secret
+#       IOS_PROVISIONING_PROFILE_BASE64; si el profile no lo permite, el export falla.
+#     - appstoreconnect.apple.com → Apps → (+) New App → platform iOS, tu bundle id
+#       y nombre. (crea el registro; aún sin builds.)
+#
+#  2. CERTIFICADO DE DISTRIBUCIÓN (desde linux con openssl):
+#       openssl genrsa -out ios_dist.key 2048
+#       openssl req -new -key ios_dist.key -out ios_dist.csr \
+#         -subj "/CN=<app> distribution/O=Juan Mier/C=ES"
+#     - developer.apple.com → Certificates → (+) → "Apple Distribution" → sube el
+#       .csr → descarga distribution.cer
+#       openssl x509 -in distribution.cer -inform DER -out ios_dist.pem -outform PEM
+#       openssl pkcs12 -export -out ios_dist.p12 -inkey ios_dist.key \
+#         -in ios_dist.pem -name "Apple Distribution" -passout pass:UNA_PASS_FUERTE
+#       base64 -w0 ios_dist.p12 > ios_dist.p12.b64   # → secret IOS_DIST_CERT_P12_BASE64
+#
+#  3. APP STORE CONNECT API KEY (para subir sin mac):
+#     - appstoreconnect.apple.com → Users and Access → Integrations → App Store
+#       Connect API → (+) Generate key, rol "App Manager". descarga AuthKey_XXXX.p8
+#       (solo se descarga una vez). anota Key ID e Issuer ID (arriba de la tabla).
+#
+#  4. TEAM ID: developer.apple.com → Membership details, 10 caracteres.
+#
+#  5. PROVISIONING PROFILE (App Store, firma manual):
+#     - developer.apple.com → Profiles → (+) → Distribution "App Store Connect" →
+#       tu App ID → cert de distribución del paso 2 → nómbralo "<app> App Store CI"
+#       (o pasa otro nombre en el input provisioning_profile) → descarga el
+#       .mobileprovision → base64 -w0 → secret IOS_PROVISIONING_PROFILE_BASE64
+#
+#  6. SECRETS del repo de la app (Settings → Secrets and variables → Actions),
+#     heredados con `secrets: inherit`:
+#       IOS_DIST_CERT_P12_BASE64        ← contenido de ios_dist.p12.b64
+#       IOS_DIST_CERT_PASSWORD          ← la pass que pusiste en -passout
+#       ASC_KEY_ID                      ← Key ID del paso 3
+#       ASC_ISSUER_ID                   ← Issuer ID del paso 3
+#       ASC_API_KEY_P8                  ← contenido íntegro del AuthKey_XXXX.p8
+#       APPLE_TEAM_ID                   ← Team ID del paso 4
+#       IOS_PROVISIONING_PROFILE_BASE64 ← contenido del .mobileprovision en base64 (paso 5)
+#       SUBMODULES_PAT (opcional)       ← PAT con lectura del submódulo platform (si fuese privado)
+#
+# VERSIONADO: CFBundleShortVersionString = input marketing_version; si viene vacío y el
+# trigger fue un tag ios-vX.Y.Z, se deriva del tag. CFBundleVersion = run_number del caller
+# (único y creciente por run, mismo patrón que versionCode en android-release.yml).
+# ────────────────────────────────────────────────────────────────────────────
+
+name: iOS release (reusable)
+
+on:
+  workflow_call:
+    inputs:
+      app:
+        description: 'slug de la app: nombra el artifact y el provisioning profile por defecto'
+        required: true
+        type: string
+      bundle_id:
+        description: 'bundle id de la app (CFBundleIdentifier / App ID)'
+        required: true
+        type: string
+      marketing_version:
+        description: 'CFBundleShortVersionString; vacío → derivada del tag ios-v* o 1.0.0'
+        required: false
+        type: string
+        default: ''
+      upload:
+        description: 'subir el ipa a App Store Connect (TestFlight)'
+        required: false
+        type: boolean
+        default: false
+      icon_bg:
+        description: 'color de fondo (#rrggbb) del app icon y el splash generados'
+        required: true
+        type: string
+      logo_path:
+        description: 'ruta del logo fuente relativa a la raíz del repo'
+        required: false
+        type: string
+        default: 'packages/web/assets/logo.png'
+      logo_has_background:
+        description: 'true si el logo ya trae fondo propio (no se rellena con icon_bg)'
+        required: false
+        type: boolean
+        default: false
+      deep_link_scheme:
+        description: 'custom URL scheme para la vuelta del oauth móvil; vacío → no se registra'
+        required: false
+        type: string
+        default: ''
+      sign_in_with_apple:
+        description: 'inyectar el entitlement com.apple.developer.applesignin (el profile debe permitirlo)'
+        required: false
+        type: boolean
+        default: false
+      provisioning_profile:
+        description: 'nombre del provisioning profile de App Store; vacío → "<app> App Store CI"'
+        required: false
+        type: string
+        default: ''
+
+jobs:
+  build:
+    # Apple exige construir con el SDK de iOS 26+ (Xcode 26) para subir a App Store
+    # Connect. macos-26 (Tahoe) trae Xcode 26 por defecto.
+    runs-on: macos-26
+    timeout-minutes: 60
+    steps:
+      - name: Checkout (con submódulo platform)
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          token: ${{ secrets.SUBMODULES_PAT || github.token }}
+
+      - name: Comprobar secrets de firma
+        env:
+          CERT: ${{ secrets.IOS_DIST_CERT_P12_BASE64 }}
+          KEY: ${{ secrets.ASC_API_KEY_P8 }}
+          TEAM: ${{ secrets.APPLE_TEAM_ID }}
+          PP: ${{ secrets.IOS_PROVISIONING_PROFILE_BASE64 }}
+        run: |
+          missing=""
+          [ -z "$CERT" ] && missing="$missing IOS_DIST_CERT_P12_BASE64"
+          [ -z "$KEY" ]  && missing="$missing ASC_API_KEY_P8"
+          [ -z "$TEAM" ] && missing="$missing APPLE_TEAM_ID"
+          [ -z "$PP" ]   && missing="$missing IOS_PROVISIONING_PROFILE_BASE64"
+          if [ -n "$missing" ]; then
+            echo "::error::faltan secrets:$missing — revisa la cabecera del workflow en platform"
+            exit 1
+          fi
+
+      - name: Resolver versión de marketing y provisioning profile
+        env:
+          INPUT_VERSION: ${{ inputs.marketing_version }}
+          INPUT_PROFILE: ${{ inputs.provisioning_profile }}
+          APP: ${{ inputs.app }}
+        run: |
+          # versión: input explícito > tag ios-vX.Y.Z > 1.0.0. se valida (solo dígitos
+          # y puntos) ANTES de usarla en comandos.
+          VER="$INPUT_VERSION"
+          if [ -z "$VER" ]; then
+            case "$GITHUB_REF_NAME" in
+              ios-v*) VER="${GITHUB_REF_NAME#ios-v}" ;;
+              *)      VER="1.0.0" ;;
+            esac
+          fi
+          case "$VER" in
+            ''|*[!0-9.]*) echo "::error::marketing_version inválida: '$VER' (solo dígitos y puntos)"; exit 1 ;;
+          esac
+          PROFILE="${INPUT_PROFILE:-$APP App Store CI}"
+          echo "MARKETING_VERSION=$VER" >> "$GITHUB_ENV"
+          echo "PROFILE_NAME=$PROFILE" >> "$GITHUB_ENV"
+          echo "versión $VER, perfil '$PROFILE'"
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install deps
+        run: pnpm install --frozen-lockfile
+
+      - name: Mostrar toolchain (Xcode más nuevo → SDK iOS 26+)
+        run: |
+          ls -d /Applications/Xcode_*.app 2>/dev/null || true
+          # selecciona el Xcode de mayor versión instalado (defensivo; en macos-26 ya es 26)
+          NEWEST=$(ls -d /Applications/Xcode_*.app 2>/dev/null | sort -V | tail -1)
+          [ -n "$NEWEST" ] && sudo xcode-select -s "$NEWEST"
+          xcodebuild -version
+          echo "iOS SDK: $(xcrun --sdk iphoneos --show-sdk-version)"
+          pod --version || sudo gem install cocoapods --no-document
+
+      - name: Scaffold proyecto iOS (cap add) si no existe
+        working-directory: packages/web
+        run: |
+          if [ ! -d ios ]; then
+            pnpm exec cap add ios
+          fi
+
+      - name: Build web (VITE_API_BASE=prod) + cap sync ios
+        working-directory: packages/web
+        # usa el script del repo de la app: VITE_API_BASE=<url prod> vite build
+        # + cp 200.html→index.html + cap sync ios
+        run: pnpm run mobile:build:ios
+
+      - name: Registrar el custom URL scheme (deep link oauth móvil)
+        # la vuelta del oauth en el browser del sistema llega por deep link
+        # <scheme>://oauth/login?code=… (MOBILE_SCHEME de la api). en android lo registra
+        # el intent-filter del AndroidManifest; en ios hay que declarar el scheme en
+        # CFBundleURLTypes del Info.plist o SFSafariViewController no puede abrir la url
+        # de vuelta. el proyecto ios/ se regenera en cada run (cap add), así que se
+        # inyecta aquí, igual que el entitlement y la versión.
+        if: ${{ inputs.deep_link_scheme != '' }}
+        working-directory: packages/web
+        env:
+          SCHEME: ${{ inputs.deep_link_scheme }}
+        run: |
+          PLIST=ios/App/App/Info.plist
+          # el Info.plist de capacitor no trae CFBundleURLTypes; lo creamos desde cero.
+          /usr/libexec/PlistBuddy -c "Add :CFBundleURLTypes array" "$PLIST"
+          /usr/libexec/PlistBuddy -c "Add :CFBundleURLTypes:0 dict" "$PLIST"
+          /usr/libexec/PlistBuddy -c "Add :CFBundleURLTypes:0:CFBundleURLName string $SCHEME" "$PLIST"
+          /usr/libexec/PlistBuddy -c "Add :CFBundleURLTypes:0:CFBundleURLSchemes array" "$PLIST"
+          /usr/libexec/PlistBuddy -c "Add :CFBundleURLTypes:0:CFBundleURLSchemes:0 string $SCHEME" "$PLIST"
+          echo "== CFBundleURLTypes inyectado =="
+          /usr/libexec/PlistBuddy -c "Print :CFBundleURLTypes" "$PLIST"
+
+      - name: Fijar firma manual en el target App (+ entitlement Sign in with Apple)
+        # el proyecto ios/ se regenera en cada run (cap add), así que la config de firma
+        # se inyecta aquí. el PROVISIONING_PROFILE_SPECIFIER va SOLO en el target App (no
+        # en los Pods de capacitor: "Capacitor does not support provisioning profiles" si
+        # el perfil se pasa global). si sign_in_with_apple=true se añade además el
+        # entitlement com.apple.developer.applesignin, que el sheet nativo exige embebido
+        # en el binario; el App ID y el profile deben tener la capability habilitada
+        # (ver cabecera, paso 1) o el export fallará al firmar.
+        working-directory: packages/web/ios/App
+        env:
+          SIWA: ${{ inputs.sign_in_with_apple }}
+        run: |
+          if [ "$SIWA" = "true" ]; then
+            cat > App/App.entitlements <<'PLIST'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0"><dict>
+            <key>com.apple.developer.applesignin</key>
+            <array><string>Default</string></array>
+          </dict></plist>
+          PLIST
+            echo "App.entitlements escrito (Sign in with Apple)"
+          fi
+          # el gem xcodeproj viene con cocoapods; defensivo por si falta.
+          gem list -i xcodeproj >/dev/null 2>&1 || sudo gem install xcodeproj --no-document
+          ruby -e '
+            require "xcodeproj"
+            project = Xcodeproj::Project.open("App.xcodeproj")
+            target = project.targets.find { |t| t.name == "App" } or abort("target App no encontrado")
+            target.build_configurations.each do |c|
+              c.build_settings["PROVISIONING_PROFILE_SPECIFIER"] = ENV["PROFILE_NAME"]
+              c.build_settings["CODE_SIGN_ENTITLEMENTS"] = "App/App.entitlements" if ENV["SIWA"] == "true"
+            end
+            project.save
+          '
+          echo "firma manual fijada en el target App (perfil '$PROFILE_NAME')"
+
+      - name: Generar app icon + splash
+        # el proyecto ios/ se regenera en cada run (cap add), así que el icono de marca
+        # hay que generarlo aquí desde el logo del repo con los generadores de @platform.
+        # si el pin del submódulo platform aún no los trae, se omite con warning y la app
+        # usa el icono por defecto de capacitor (build sigue siendo válido).
+        # sharp no es dependencia de las apps → entorno npm aislado en RUNNER_TEMP.
+        env:
+          ICON_BG: ${{ inputs.icon_bg }}
+          LOGO_PATH: ${{ inputs.logo_path }}
+          LOGO_HAS_BG: ${{ inputs.logo_has_background }}
+        run: |
+          WS="$GITHUB_WORKSPACE"
+          ICON_GEN="$WS/platform/tooling/mobile/generate-ios-icons.mjs"
+          SPLASH_GEN="$WS/platform/tooling/mobile/generate-ios-splash.mjs"
+          if [ ! -f "$ICON_GEN" ]; then
+            echo "::warning::$ICON_GEN no existe en este pin de platform — se omite el branding del icono iOS. bump del submódulo platform para habilitarlo."
+            exit 0
+          fi
+          ASSETS="$WS/packages/web/ios/App/App/Assets.xcassets"
+          LOGO="$WS/$LOGO_PATH"
+          SHARP_DIR="$RUNNER_TEMP/sharpenv"; mkdir -p "$SHARP_DIR"; cd "$SHARP_DIR"
+          npm init -y >/dev/null 2>&1
+          npm i sharp >/dev/null 2>&1
+          node "$ICON_GEN" "{\"assetsDir\":\"$ASSETS\",\"logo\":\"$LOGO\",\"bgColor\":\"$ICON_BG\",\"logoHasBackground\":$LOGO_HAS_BG}"
+          node "$SPLASH_GEN" "{\"assetsDir\":\"$ASSETS\",\"logo\":\"$LOGO\",\"bgColor\":\"$ICON_BG\"}"
+          # el App Store rechaza el marketing icon si tiene canal alfa: lo quitamos.
+          ICON="$ASSETS/AppIcon.appiconset/AppIcon-512@2x.png"
+          node -e "const s=require('sharp');s(process.argv[1]).removeAlpha().png().toBuffer().then(b=>require('fs').writeFileSync(process.argv[1],b))" "$ICON"
+          echo "icon generado:"; file "$ICON"
+
+      - name: Fijar versión y build number
+        working-directory: packages/web
+        env:
+          BUILD_NUMBER: ${{ github.run_number }}
+        run: |
+          # MARKETING_VERSION viene validada del paso "Resolver versión de marketing".
+          PLIST=ios/App/App/Info.plist
+          /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $MARKETING_VERSION" "$PLIST" \
+            || /usr/libexec/PlistBuddy -c "Add :CFBundleShortVersionString string $MARKETING_VERSION" "$PLIST"
+          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $BUILD_NUMBER" "$PLIST" \
+            || /usr/libexec/PlistBuddy -c "Add :CFBundleVersion string $BUILD_NUMBER" "$PLIST"
+          echo "version $MARKETING_VERSION ($BUILD_NUMBER)"
+
+      - name: Importar certificado de distribución a un keychain temporal
+        env:
+          CERT_B64: ${{ secrets.IOS_DIST_CERT_P12_BASE64 }}
+          CERT_PASS: ${{ secrets.IOS_DIST_CERT_PASSWORD }}
+        run: |
+          CERT_PATH="$RUNNER_TEMP/dist.p12"
+          KEYCHAIN="$RUNNER_TEMP/app-signing.keychain-db"
+          KC_PW="$(openssl rand -base64 24)"
+          echo -n "$CERT_B64" | base64 --decode -o "$CERT_PATH"
+          security create-keychain -p "$KC_PW" "$KEYCHAIN"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN"
+          security unlock-keychain -p "$KC_PW" "$KEYCHAIN"
+          security import "$CERT_PATH" -P "$CERT_PASS" -A -t cert -f pkcs12 -k "$KEYCHAIN"
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KC_PW" "$KEYCHAIN" >/dev/null
+          security list-keychains -d user -s "$KEYCHAIN" login.keychain-db
+          echo "KEYCHAIN=$KEYCHAIN" >> "$GITHUB_ENV"
+
+      - name: Preparar API key, provisioning profile y ExportOptions
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_API_KEY_P8: ${{ secrets.ASC_API_KEY_P8 }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          IOS_PROVISIONING_PROFILE_BASE64: ${{ secrets.IOS_PROVISIONING_PROFILE_BASE64 }}
+          BUNDLE_ID: ${{ inputs.bundle_id }}
+        run: |
+          # asc api key (la usa altool en el upload) en la ruta por defecto
+          mkdir -p "$HOME/.appstoreconnect/private_keys"
+          ASC_KEY_PATH="$HOME/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8"
+          printf '%s' "$ASC_API_KEY_P8" > "$ASC_KEY_PATH"
+          echo "ASC_KEY_PATH=$ASC_KEY_PATH" >> "$GITHUB_ENV"
+          # provisioning profile de App Store → firma MANUAL (sin cloud signing, que
+          # quiere gestionar cert/perfil en la nube).
+          PP="$RUNNER_TEMP/pp.mobileprovision"
+          echo -n "$IOS_PROVISIONING_PROFILE_BASE64" | base64 --decode -o "$PP"
+          PROF_DIR="$HOME/Library/MobileDevice/Provisioning Profiles"
+          mkdir -p "$PROF_DIR"
+          UUID=$(security cms -D -i "$PP" | plutil -extract UUID raw -)
+          cp "$PP" "$PROF_DIR/$UUID.mobileprovision"
+          echo "provisioning profile instalado UUID=$UUID"
+          # ExportOptions.plist — firma manual con el cert de distribución + el perfil.
+          cat > packages/web/ios/App/exportOptions.plist <<PLIST
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0"><dict>
+            <key>method</key><string>app-store-connect</string>
+            <key>teamID</key><string>${APPLE_TEAM_ID}</string>
+            <key>signingStyle</key><string>manual</string>
+            <key>signingCertificate</key><string>Apple Distribution</string>
+            <key>provisioningProfiles</key><dict>
+              <key>${BUNDLE_ID}</key><string>${PROFILE_NAME}</string>
+            </dict>
+            <key>uploadSymbols</key><true/>
+            <key>destination</key><string>export</string>
+          </dict></plist>
+          PLIST
+
+      - name: Archive
+        working-directory: packages/web/ios/App
+        env:
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          # firma MANUAL en el archive con el perfil de App Store (distribución: sin lista
+          # de devices, así que NO da "team has no devices" como el de development). hay que
+          # firmar AQUÍ para que los entitlements (p.ej. applesignin) queden embebidos en el
+          # binario — archivar sin firmar (CODE_SIGNING_ALLOWED=NO) salta el procesado de
+          # entitlements y el sheet nativo de Sign in with Apple falla con error 1000.
+          # el PROVISIONING_PROFILE_SPECIFIER NO va aquí (global) porque rompe los Pods de
+          # capacitor; se fija solo en el target App en el step "Fijar firma manual".
+          xcodebuild \
+            -workspace App.xcworkspace \
+            -scheme App \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath "$RUNNER_TEMP/App.xcarchive" \
+            CODE_SIGN_STYLE=Manual \
+            DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
+            CODE_SIGN_IDENTITY="Apple Distribution" \
+            archive
+
+      - name: Export IPA
+        working-directory: packages/web/ios/App
+        run: |
+          # firma manual: usa el cert del keychain + el perfil instalado (sin -allowProvisioningUpdates)
+          xcodebuild -exportArchive \
+            -archivePath "$RUNNER_TEMP/App.xcarchive" \
+            -exportPath "$RUNNER_TEMP/ipa" \
+            -exportOptionsPlist exportOptions.plist
+          IPA=$(ls "$RUNNER_TEMP"/ipa/*.ipa | head -1)
+          echo "IPA_PATH=$IPA" >> "$GITHUB_ENV"
+          echo "ipa generado: $IPA"
+
+      - name: Verificar entitlement Sign in with Apple en el IPA
+        # falla RUIDOSAMENTE si el entitlement no quedó embebido (causa del error 1000 del
+        # sheet nativo), en vez de descubrirlo en el dispositivo tras subir a TestFlight.
+        if: ${{ inputs.sign_in_with_apple }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/ipa-unz"
+          unzip -o "$IPA_PATH" -d "$RUNNER_TEMP/ipa-unz" >/dev/null
+          APP=$(find "$RUNNER_TEMP/ipa-unz/Payload" -maxdepth 1 -name '*.app' | head -1)
+          echo "== entitlements embebidos en $(basename "$APP") =="
+          codesign -d --entitlements :- "$APP" 2>/dev/null || true
+          if codesign -d --entitlements :- "$APP" 2>/dev/null | grep -q "com.apple.developer.applesignin"; then
+            echo "OK: com.apple.developer.applesignin embebido — el sheet nativo funcionará"
+          else
+            echo "::error::el IPA NO lleva com.apple.developer.applesignin → Sign in with Apple fallará (error 1000)"
+            exit 1
+          fi
+
+      - name: Subir a App Store Connect (TestFlight)
+        if: ${{ inputs.upload }}
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+        run: |
+          xcrun altool --upload-app -t ios -f "$IPA_PATH" \
+            --apiKey "$ASC_KEY_ID" --apiIssuer "$ASC_ISSUER_ID"
+
+      - name: Guardar IPA como artifact
+        if: always() && env.IPA_PATH != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.app }}-ios-ipa
+          path: ${{ env.IPA_PATH }}
+          if-no-files-found: warn
+
+      - name: Limpiar keychain
+        if: always()
+        run: security delete-keychain "$KEYCHAIN" || true
