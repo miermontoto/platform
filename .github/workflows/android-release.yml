@@ -29,11 +29,14 @@
 # IMPORTANTE: la upload key es la MISMA que firma las publicaciones de Play. no la
 # cambies si la app ya está publicada (Play rechaza otra firma).
 #
-# VERSIONADO: el versionName sale de packages/web/android/app/build.gradle (committeado,
-# cosmético para Play, puede repetirse). el versionCode (entero con el que Play deduplica
-# las subidas: único y estrictamente creciente por aab) = base committeada + run_number del
-# caller, fijado en el paso "Fijar versionCode único"; así cada run produce un aab distinto
-# sin recommittear. mismo patrón que CFBundleVersion en ios-release.yml.
+# VERSIONADO: el versionName se sincroniza en build time desde la versión de la app
+# (input `version_file`, por defecto packages/api/src/constants.ts con `export const
+# VERSION = '...'`, la fuente de verdad que bumpa el pre-commit hook de tooling/version);
+# el versionName committeado en build.gradle es solo fallback si el fichero/constante no
+# existen. el versionCode (entero con el que Play deduplica las subidas: único y
+# estrictamente creciente por aab) = base committeada + run_number del caller, fijado en
+# el paso "Fijar versionCode único"; así cada run produce un aab distinto sin
+# recommittear. mismo patrón que CFBundleVersion en ios-release.yml.
 #
 # SUBIDA A PLAY (r0adkll/upload-google-play, gated por el input `upload`): por defecto al
 # track `internal` — el paralelo a TestFlight: solo testers, nunca público.
@@ -71,6 +74,11 @@ on:
         required: false
         type: string
         default: internal
+      version_file:
+        description: 'fichero con la versión de la app (export const VERSION = ...); sincroniza el versionName del aab en build time'
+        required: false
+        type: string
+        default: packages/api/src/constants.ts
 
 jobs:
   build:
@@ -175,6 +183,29 @@ jobs:
           NEW=$((BASE + RUN_NUMBER))
           sed -i "s/versionCode [0-9]\+/versionCode $NEW/" "$GRADLE"
           echo "versionCode $BASE → $NEW (floor committeado + run_number $RUN_NUMBER)"
+
+      - name: Sincronizar versionName con la versión de la app
+        working-directory: packages/web/android
+        env:
+          VERSION_FILE: ${{ inputs.version_file }}
+        run: |
+          # el versionName committeado en build.gradle se queda obsoleto en cuanto el
+          # pre-commit hook bumpa la versión de la app; aquí se sincroniza en build time
+          # desde la fuente de verdad (version_file) para que cada aab lleve la versión
+          # real. si el fichero o la constante no existen se conserva el committeado
+          # (warning, no error: versionName es cosmético para Play).
+          SRC="$GITHUB_WORKSPACE/$VERSION_FILE"
+          if [ ! -f "$SRC" ]; then
+            echo "::warning::no existe $VERSION_FILE — se mantiene el versionName committeado"; exit 0
+          fi
+          VERSION=$(grep -oP "export const VERSION = '\K[^']+" "$SRC" | head -n1)
+          if [ -z "$VERSION" ]; then
+            echo "::warning::no hay 'export const VERSION' en $VERSION_FILE — se mantiene el versionName committeado"; exit 0
+          fi
+          GRADLE=app/build.gradle
+          OLD=$(grep -oP 'versionName "\K[^"]+' "$GRADLE")
+          sed -i "s/versionName \"[^\"]*\"/versionName \"$VERSION\"/" "$GRADLE"
+          echo "versionName $OLD → $VERSION (desde $VERSION_FILE)"
 
       - name: Build AAB (firmado)
         working-directory: packages/web
