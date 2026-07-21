@@ -8,21 +8,26 @@ su propio repo y consume este como **git submodule** en `platform/`, incluyendo
 
 ```
 packages/
-  config/     tsconfig base + presets de vite (pwa + proxy dev)
+  config/     tsconfig base + presets de vite (pwa + proxy dev + i18n paraglide)
   core-api/   hono base, gate de sesión, spa estática, bootstrap del servidor, .env,
-              changelogRoutes (GET / · POST /seen)
+              ws-hub (pub/sub por usuario) y changelogRoutes (GET / · POST /seen)
   db/         factoría sqlite (wal + pragmas + unaccent + migraciones drizzle)
   auth/       tabla canónica de sesiones + servicio de ciclo de vida
   changelog/  "novedades" compartido: tablas (entry + seen por usuario) + servicio
               (siembra entradas hand-curated, no vistas por usuario)
-  ui/         componentes svelte + transporte http compartidos de los clientes web
-              (SettingsTabs, SessionsPanel, PrivacyPolicy, Changelog) + base.css
-              (primitivas css móvil/táctil: anti-zoom iOS, safe-area, reveal-en-táctil)
+  ui/         componentes svelte compartidos (SettingsTabs, SessionsPanel,
+              PrivacyPolicy, Support, Changelog, LanguageSwitcher) + http + i18n +
+              base.css (primitivas css móvil/táctil)
   mobile/     shell capacitor (config factory; spa empaquetada + api remota via
-              VITE_API_BASE) + system-bars + compact (señal html.compact)
+              VITE_API_BASE) + compact + system-bars + connectivity + deep-link
 tooling/
   backup/     backup-sqlite.sh — copia segura + rotación recent/weekly (docker|local)
   db/         db-sqlite.sh — acceso sqlite en caliente (docker|local), salida json
+  mobile/     generadores de icons/splash android+ios desde el logo de la app
+  version/    bump snapshot (<yy>w<ww><letra>) + plantilla de hook pre-commit
+.github/workflows/
+              android-release.yml · ios-release.yml — releases móviles reutilizables
+              (workflow_call) que invocan las apps desde un caller fino
 ```
 
 ## consumo desde una app
@@ -123,8 +128,8 @@ comandos: `query` · `exec` (multi-sentencia) · `tables` · `schema [tabla]` ·
 
 - comentarios en español lowercase, código en inglés (igual que las apps)
 - node 22 (.nvmrc) + pnpm
-- pendiente (roadmap): billing/entitlements cuando exista pricing, shells
-  capacitor, scaffolder de apps nuevas, migración de carreterinas
+- pendiente (roadmap): billing/entitlements cuando exista pricing, scaffolder
+  de apps nuevas, migración de carreterinas
 
 ### convenciones web (móvil/tablet)
 

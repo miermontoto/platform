@@ -5,9 +5,9 @@
 // VITE_API_BASE (inyectada en el build móvil, ver scripts mobile:* de cada web).
 //
 // auth: CapacitorHttp parchea fetch a nivel nativo, con cookie jar nativo — las
-// cookies de sesión viajan sin pelear con CORS/SameSite del webview. cuando haya
-// oauth de terceros (sis/spotify, duckhunt/atlassian) hará falta browser del
-// sistema + deep links; pendiente en el roadmap.
+// cookies de sesión viajan sin pelear con CORS/SameSite del webview. el oauth de
+// terceros (sis/spotify, duckhunt/atlassian) usa browser del sistema + deep links:
+// ver deep-link.ts.
 //
 // plataformas: esta config es cross-platform. el bloque `android:` y el plugin
 // EdgeToEdge son android-scoped (no-op en ios, que sí expone env(safe-area-inset-*)

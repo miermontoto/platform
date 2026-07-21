@@ -8,23 +8,15 @@
 // - logoHasBackground=true: el logo ya trae su fondo (sis, carreterinas) y se
 //   usa tal cual como icono legacy; false: se compone sobre bgColor (duckhunt)
 // - adaptive foreground: logo al 60% centrado (safe zone de 66/108dp)
-import { createRequire } from 'node:module';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { hexToRgb, loadSharp } from './lib.mjs';
 
-const require = createRequire(`${process.cwd()}/`);
-const sharp = require('sharp');
-
-const cfg = JSON.parse(process.argv[2]);
-const { resDir, logo, bgColor, logoHasBackground } = cfg;
+const sharp = loadSharp();
+const { resDir, logo, bgColor, logoHasBackground } = JSON.parse(process.argv[2]);
 
 const LAUNCHER_SIZES = { mdpi: 48, hdpi: 72, xhdpi: 96, xxhdpi: 144, xxxhdpi: 192 };
 const FOREGROUND_SIZES = { mdpi: 108, hdpi: 162, xhdpi: 216, xxhdpi: 324, xxxhdpi: 432 };
-
-const hexToRgb = (hex) => {
-  const h = hex.replace('#', '');
-  return { r: parseInt(h.slice(0, 2), 16), g: parseInt(h.slice(2, 4), 16), b: parseInt(h.slice(4, 6), 16), alpha: 1 };
-};
 
 const circleMask = (size) =>
   Buffer.from(`<svg width="${size}" height="${size}"><circle cx="${size / 2}" cy="${size / 2}" r="${size / 2}" fill="#fff"/></svg>`);

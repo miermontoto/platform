@@ -194,6 +194,7 @@
 
 <script lang="ts">
   import type { Snippet } from 'svelte';
+  import { emailSegments } from './segments';
 
   let {
     appName,
@@ -239,16 +240,7 @@
       : new Intl.DateTimeFormat(lang, { dateStyle: 'long' }).format(d);
   });
 
-  // parte un párrafo en torno a {email}: se renderiza como enlace mailto. evita
-  // tener que meter html en el copy declarativo.
-  function segments(text: string): { kind: 'text' | 'email'; value: string }[] {
-    const out: { kind: 'text' | 'email'; value: string }[] = [];
-    for (const chunk of text.split(/(\{email\})/)) {
-      if (chunk === '') continue;
-      out.push(chunk === '{email}' ? { kind: 'email', value: contactEmail } : { kind: 'text', value: chunk });
-    }
-    return out;
-  }
+  const segments = (text: string) => emailSegments(text, contactEmail);
 </script>
 
 <article class="ui-privacy">

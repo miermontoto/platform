@@ -5,23 +5,16 @@
 //
 // uso (desde un cwd con sharp resolvible, ej. sis/packages/api):
 //   node generate-android-splash.mjs '{"appDir":".../packages/web/android/app/src/main","logo":"...","bgColor":"#0a0c0e"}'
-import { createRequire } from 'node:module';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { hexToRgb, loadSharp } from './lib.mjs';
 
-const require = createRequire(`${process.cwd()}/`);
-const sharp = require('sharp');
-
+const sharp = loadSharp();
 const { appDir, logo, bgColor } = JSON.parse(process.argv[2]);
 const resDir = join(appDir, 'res');
 
 // tamaños del template de capacitor (land = apaisado; port = espejo)
 const LAND = { mdpi: [480, 320], hdpi: [800, 480], xhdpi: [1280, 720], xxhdpi: [1600, 960], xxxhdpi: [1920, 1280] };
-
-const hexToRgb = (hex) => {
-  const h = hex.replace('#', '');
-  return { r: parseInt(h.slice(0, 2), 16), g: parseInt(h.slice(2, 4), 16), b: parseInt(h.slice(4, 6), 16), alpha: 1 };
-};
 
 async function splash(w, h) {
   const side = Math.round(Math.min(w, h) * 0.28);
