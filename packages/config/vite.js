@@ -117,7 +117,11 @@ export function createWebConfig({ pwa, proxy = ['/api', '/auth'], envDir, plugin
         paraglideVitePlugin({
           project: opts.project ?? './project.inlang',
           outdir: opts.outdir ?? './src/lib/paraglide',
-          strategy: opts.strategy ?? ['localStorage', 'preferredLanguage', 'baseLocale'],
+          // el jsdoc tipa strategy como string[]; paraglide espera una union cerrada.
+          // los valores por defecto pertenecen a esa union, así que se castea el arg.
+          strategy: /** @type {('url'|'cookie'|'baseLocale'|'globalVariable'|'preferredLanguage'|'localStorage')[]} */ (
+            opts.strategy ?? ['localStorage', 'preferredLanguage', 'baseLocale']
+          ),
         }),
       );
     }
