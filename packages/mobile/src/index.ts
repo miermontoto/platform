@@ -54,8 +54,14 @@ export function createCapacitorConfig({
     android: {
       // android 15 (sdk 35) fuerza edge-to-edge: el webview dibujaría debajo de
       // la status bar y la nav bar, y el webview android no expone
-      // env(safe-area-inset-*). márgenes nativos automáticos en su lugar.
-      adjustMarginsForEdgeToEdge: 'auto',
+      // env(safe-area-inset-*). el plugin capawesome (EdgeToEdge, abajo) aplica
+      // márgenes nativos al webview en su lugar. 'disable' apaga el gestor de
+      // insets del PROPIO capacitor: si no, ambos registran un
+      // OnApplyWindowInsetsListener sobre el mismo webview (el segundo reemplaza
+      // al primero, carrera de orden) y el del core no gestiona el inset del
+      // teclado (ime) mientras el de capawesome sí → teclado tapando inputs.
+      // capawesome queda como única autoridad de insets (incl. ime) y coloreado.
+      adjustMarginsForEdgeToEdge: 'disable',
     },
     plugins: {
       // fetch/XHR via capa nativa: cookie jar nativo, sin CORS en llamadas a la api
