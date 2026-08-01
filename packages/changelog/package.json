@@ -7,13 +7,9 @@
   "exports": {
     ".": "./src/index.ts"
   },
-  "peerDependencies": {
-    "drizzle-orm": "^0.38.0"
-  },
   "devDependencies": {
     "@platform/config": "workspace:*",
     "@types/node": "^22.0.0",
-    "drizzle-orm": "^0.38.0",
     "typescript": "^5.7.0"
   }
 }

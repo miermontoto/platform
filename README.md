@@ -10,11 +10,10 @@ su propio repo y consume este como **git submodule** en `platform/`, incluyendo
 packages/
   config/     tsconfig base + presets de vite (pwa + proxy dev + i18n paraglide)
   core-api/   hono base, gate de sesión, spa estática, bootstrap del servidor, .env,
-              ws-hub (pub/sub por usuario) y changelogRoutes (GET / · POST /seen)
+              ws-hub (pub/sub por usuario)
   db/         factoría sqlite (wal + pragmas + unaccent + migraciones drizzle)
   auth/       tabla canónica de sesiones + servicio de ciclo de vida
-  changelog/  "novedades" compartido: tablas (entry + seen por usuario) + servicio
-              (siembra entradas hand-curated, no vistas por usuario)
+  changelog/  "novedades" compartido: tipos del array hand-curated de cada app
   ui/         componentes svelte compartidos (SettingsTabs, SessionsPanel,
               PrivacyPolicy, Support, Changelog, LanguageSwitcher) + http + i18n +
               base.css (primitivas css móvil/táctil)
@@ -50,41 +49,32 @@ nuevo sha del submodule.
 
 ## changelog ("novedades")
 
-slice vertical estándar para enseñar al usuario qué ha cambiado. las entradas son
-**hand-curated** (array en el código de la app = fuente de verdad), se siembran en
-la tabla al arrancar y el estado por usuario (no vistas) sale de un join contra
-`changelog_seen`. mismo patrón que auth: tablas en `@platform/changelog`, ruta en
-`@platform/core-api`, componente en `@platform/ui`.
+enseñar al usuario qué ha cambiado, sin infraestructura: las entradas son
+**hand-curated** (array en el código de la app = única fuente de verdad) y se
+sirven tal cual. no hay tabla, ni seed, ni estado de "visto" por usuario: el modal
+se abre solo cuando el usuario lo pide. `@platform/changelog` es solo el contrato
+de tipos; el render lo hace `@platform/ui`.
 
 ```ts
-// 1. schema de la app (drizzle-kit ve las tablas aquí y genera la migración)
-import { defineChangelogTable, defineChangelogSeenTable } from '@platform/changelog';
-export const changelogEntry = defineChangelogTable();
-export const changelogSeen = defineChangelogSeenTable(() => users.id); // …Text() si el id es uuid
-
-// 2. entradas hand-curated (es/en). publishedAt ISO; ordena/compara por fecha
-export const CHANGELOG = [
+// 1. entradas hand-curated (es/en). publishedAt ISO; una línea por cambio
+import type { ChangelogEntry } from '@platform/changelog';
+export const CHANGELOG: ChangelogEntry[] = [
   { version: '1.4.0', publishedAt: '2026-06-25', changes: [
     { type: 'feature', es: 'Backups automáticos', en: 'Automatic backups' },
     { type: 'fix', es: 'Tema oscuro en móvil', en: 'Dark theme on mobile' },
   ] },
 ];
 
-// 3. servicio + seed al arrancar (tras migraciones)
-const changelog = createChangelogService({ getDb, entryTable: changelogEntry, seenTable: changelogSeen, entries: CHANGELOG });
-changelog.seed();
-
-// 4. ruta bajo el gate de sesión: el userId lo deja hydrate en el contexto
-app.route('/api/changelog', changelogRoutes({ userId: (c) => c.get('userId'), getState: changelog.getState, markSeen: changelog.markSeen }));
+// 2. ruta: datos estáticos, sin userId de por medio
+app.get('/api/changelog', (c) => c.json({ entries: CHANGELOG }));
 ```
 
 ```svelte
-<!-- 5. cliente: GET /api/changelog → { entries, unseen, lastSeenAt } -->
+<!-- 3. cliente: GET /api/changelog → { entries }, en respuesta al clic del usuario -->
 <script>
   import Changelog from '@platform/ui/Changelog.svelte';
-  // badge si unseen > 0; al cerrar el modal → POST /api/changelog/seen
 </script>
-{#if open}<Changelog {entries} lang="es" ondismiss={dismiss} />{/if}
+{#if open}<Changelog {entries} lang="es" ondismiss={() => open = false} />{/if}
 ```
 
 ## backups
