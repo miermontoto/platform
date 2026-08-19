@@ -125,6 +125,11 @@ on:
         required: false
         type: string
         default: ''
+      min_ios_version:
+        description: 'IPHONEOS_DEPLOYMENT_TARGET mínimo; apple exige >= 15.0 desde primavera 2027 (ITMS-90068)'
+        required: false
+        type: string
+        default: '15.0'
 
 jobs:
   build:
@@ -208,6 +213,33 @@ jobs:
         run: |
           if [ ! -d ios ]; then
             pnpm exec cap add ios
+          fi
+
+      - name: Subir el deployment target mínimo (ITMS-90068)
+        # capacitor 7 scaffolda con IPHONEOS_DEPLOYMENT_TARGET=14.0, y apple rechaza
+        # MinimumOSVersion < 15.0 desde primavera 2027. el proyecto ios/ se regenera en
+        # cada run (cap add), así que se inyecta aquí como el resto de la config.
+        # VA ANTES del cap sync a propósito: sync re-ejecuta pod install y así los pods
+        # se regeneran contra el target nuevo (sync solo reescribe el require_relative
+        # del Podfile, no la línea platform, así que la edición sobrevive).
+        working-directory: packages/web
+        env:
+          MIN_IOS: ${{ inputs.min_ios_version }}
+        run: |
+          PBX=ios/App/App.xcodeproj/project.pbxproj
+          PODFILE=ios/App/Podfile
+          # falla ruidosamente si el patrón no aparece: un no-op silencioso dejaría
+          # pasar un build con MinimumOSVersion viejo, que es justo el bug a evitar.
+          grep -q 'IPHONEOS_DEPLOYMENT_TARGET' "$PBX" || { echo "::error::no hay IPHONEOS_DEPLOYMENT_TARGET en $PBX"; exit 1; }
+          grep -q "platform :ios" "$PODFILE" || { echo "::error::no hay 'platform :ios' en $PODFILE"; exit 1; }
+          sed -i '' -E "s/IPHONEOS_DEPLOYMENT_TARGET = [0-9.]+;/IPHONEOS_DEPLOYMENT_TARGET = ${MIN_IOS};/g" "$PBX"
+          sed -i '' -E "s/platform :ios, '[0-9.]+'/platform :ios, '${MIN_IOS}'/" "$PODFILE"
+          echo "== deployment target =="
+          grep -o 'IPHONEOS_DEPLOYMENT_TARGET = [0-9.]*;' "$PBX" | sort -u
+          grep 'platform :ios' "$PODFILE"
+          # verificación dura: que no quede ninguna config por debajo del mínimo
+          if grep -oE 'IPHONEOS_DEPLOYMENT_TARGET = [0-9.]+;' "$PBX" | grep -vq "= ${MIN_IOS};"; then
+            echo "::error::quedan configs con un deployment target distinto de ${MIN_IOS}"; exit 1
           fi
 
       - name: Build web (VITE_API_BASE=prod) + cap sync ios
