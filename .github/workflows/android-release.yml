@@ -231,5 +231,7 @@ jobs:
           serviceAccountJsonPlainText: ${{ secrets.ANDROID_PLAY_SERVICE_ACCOUNT_JSON }}
           packageName: ${{ inputs.package_name }}
           releaseFiles: packages/web/android/app/build/outputs/bundle/release/app-release.aab
-          track: ${{ inputs.track }}
+          # 'track' quedó deprecada en r0adkll; 'tracks' es su sucesora (lista
+          # separada por comas, un solo track es una string normal).
+          tracks: ${{ inputs.track }}
           status: completed
