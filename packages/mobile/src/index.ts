@@ -67,9 +67,12 @@ export function createCapacitorConfig({
       // fetch/XHR via capa nativa: cookie jar nativo, sin CORS en llamadas a la api
       CapacitorHttp: { enabled: true },
       CapacitorCookies: { enabled: true },
-      // contraste de los iconos de la status bar acorde al tema (requiere
-      // @capacitor/status-bar en la app). backgroundColor aplica en android < 15;
-      // en 15+ la barra es transparente y se ve el fondo de la ventana.
+      // contraste de los iconos de la status bar acorde al tema. SOLO aplica a las
+      // apps que instalan @capacitor/status-bar; las que implementan su propio
+      // plugin 'SystemBars' (ver system-bars.ts) ignoran este bloque y fijan el
+      // estilo en runtime.
+      // backgroundColor aplica en android < 15; en 15+ la barra es transparente y
+      // se ve el fondo de la ventana.
       StatusBar: {
         style: statusBarStyle ?? (isDarkColor(backgroundColor) ? 'DARK' : 'LIGHT'),
         backgroundColor,

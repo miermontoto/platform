@@ -9,12 +9,42 @@
 // barras se quedaban con el color de build-time, y la nav bar no se tocaba nunca.
 //
 // solución: @capawesome/capacitor-android-edge-to-edge-support pinta el área de
-// ambas barras en runtime (setBackgroundColor, combinado en su línea 7.x);
-// @capacitor/status-bar.setStyle ajusta el contraste de los iconos. ambos
-// plugins son peers OPCIONALES: si la app no los instala, se degrada con gracia.
-// no-op en web.
-import { Capacitor } from '@capacitor/core';
+// ambas barras en runtime (setBackgroundColor, combinado en su línea 7.x); el
+// contraste de los iconos lo ajusta un plugin 'SystemBars' (ver abajo) o, si la
+// app no lo trae, @capacitor/status-bar. todo son piezas OPCIONALES: si la app no
+// las instala, se degrada con gracia. no-op en web.
+import { Capacitor, registerPlugin } from '@capacitor/core';
 import { isDarkColor, rgbToHex } from './color';
+
+// 'DARK' = fondo oscuro (iconos claros); 'LIGHT' = fondo claro (iconos oscuros).
+export type BarStyle = 'DARK' | 'LIGHT';
+
+// plugin nativo PROPIO de la app (android+ios), opcional. se resuelve por NOMBRE a
+// través del puente, no por import, para que este paquete compartido no dependa de
+// un paquete concreto de una app.
+//
+// existe por dos motivos. el primero: @capacitor/status-bar solo ajusta la STATUS
+// bar (setAppearanceLightStatusBars), nunca la de navegación, así que en tema claro
+// los iconos de navegación se quedaban claros sobre fondo claro. 'SystemBars' ajusta
+// ambas. el segundo: su bytecode arrastra apis deprecadas en sdk 35
+// (window.setStatusBarColor, View.setSystemUiVisibility) aunque solo llamemos a
+// setStyle.
+//
+// OJO — quitar status-bar NO silencia el aviso "apis obsoletas" de google play:
+// se verificó desensamblando el dex y las tres apis que play señala siguen ahí
+// desde androidx (androidx.activity.EdgeToEdgeApi23/26/29 — la implementación de
+// enableEdgeToEdge(), justo lo que el aviso recomienda llamar —, WindowCompat,
+// WindowInsetsControllerCompat$Impl20, splashscreen, cordova). es un falso positivo
+// conocido que solo se irá cuando google actualice sus librerías. no vuelvas a
+// intentar "arreglarlo" por aquí.
+//
+// una app que lo quiera implementa 'SystemBars' con un único método setStyle y deja
+// de depender de status-bar; el resto siguen con status-bar sin cambiar nada.
+interface SystemBarsAppearance {
+  setStyle(options: { style: BarStyle }): Promise<void>;
+}
+
+const SystemBars = registerPlugin<SystemBarsAppearance>('SystemBars');
 
 export interface SystemBarsTheme {
   // color de fondo de las barras (hex). en la línea 7.x del plugin de capawesome
@@ -22,7 +52,7 @@ export interface SystemBarsTheme {
   backgroundColor: string;
   // contraste de los iconos de la status bar ('DARK' = fondo oscuro → iconos
   // claros). si se omite, se deriva de la luminancia de backgroundColor.
-  style?: 'DARK' | 'LIGHT';
+  style?: BarStyle;
 }
 
 let warnedMissingEdgeToEdge = false;
@@ -39,13 +69,17 @@ export async function applySystemBars(theme: SystemBarsTheme): Promise<void> {
   const dark = theme.style ? theme.style === 'DARK' : isDarkColor(backgroundColor);
 
   // contraste de iconos de la status bar (sigue valiendo en android 15+).
-  try {
-    const { StatusBar, Style } = await import('@capacitor/status-bar');
-    await StatusBar.setStyle({ style: dark ? Style.Dark : Style.Light });
-    // color de la status bar para android < 15; en 15+ es no-op pero inofensivo.
-    await StatusBar.setBackgroundColor({ color: backgroundColor }).catch(() => undefined);
-  } catch {
-    // @capacitor/status-bar no instalado: sin contraste de iconos.
+  if (Capacitor.isPluginAvailable('SystemBars')) {
+    await SystemBars.setStyle({ style: dark ? 'DARK' : 'LIGHT' });
+  } else {
+    try {
+      const { StatusBar, Style } = await import('@capacitor/status-bar');
+      await StatusBar.setStyle({ style: dark ? Style.Dark : Style.Light });
+      // color de la status bar para android < 15; en 15+ es no-op pero inofensivo.
+      await StatusBar.setBackgroundColor({ color: backgroundColor }).catch(() => undefined);
+    } catch {
+      // ni 'SystemBars' ni @capacitor/status-bar: sin contraste de iconos.
+    }
   }
 
   // área real de ambas barras en android 15+ (la parte que de verdad funciona).
@@ -100,7 +134,7 @@ export interface CssSyncOptions {
   // custom properties / el background-color, y se observan sus atributos.
   element?: HTMLElement;
   // override explícito del contraste de iconos (si se omite, por luminancia).
-  style?: 'DARK' | 'LIGHT';
+  style?: BarStyle;
 }
 
 // resuelve el color de fondo del tema actual a hex: custom property si se indica,
