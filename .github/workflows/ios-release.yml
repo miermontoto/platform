@@ -78,7 +78,8 @@
 #       SUBMODULES_PAT (opcional)       ← PAT con lectura del submódulo platform (si fuese privado)
 #
 # VERSIONADO: CFBundleShortVersionString = input marketing_version; si viene vacío y el
-# trigger fue un tag ios-vX.Y.Z, se deriva del tag; si no, 1.0.0. CFBundleVersion =
+# trigger fue un tag ios-vX.Y.Z, se deriva del tag; si no, ERROR (el caller debe pasar
+# la versión real de la app: ver "TRENES" abajo). CFBundleVersion =
 # run_number del caller (único y creciente por run, mismo patrón que versionCode en
 # android-release.yml).
 # ojo: apple SOLO acepta dígitos y puntos en marketing_version, así que la versión
@@ -87,6 +88,13 @@
 # marketing_version FIJA y CFBundleVersion creciente: TestFlight muestra "1.0.0 (142)",
 # "1.0.0 (143)"… la marketing_version solo se bumpa a mano (input o tag ios-vX.Y.Z)
 # cuando toca una submission real a la App Store.
+#
+# TRENES: App Store Connect agrupa las subidas por marketing_version ("pre-release
+# train") y CIERRA el tren de una versión una vez publicada — a partir de ahí rechaza
+# cualquier build nuevo con ese número (error 90186, "Invalid Pre-Release Train"), y lo
+# hace en el upload, con el runner macOS ya gastado. por eso el caller pasa un default
+# explícito con la versión VIVA de la app: si un día ese tren se cierra, se sube el
+# número en esa línea del caller.
 # ────────────────────────────────────────────────────────────────────────────
 
 name: iOS release (reusable)
@@ -251,7 +259,12 @@ jobs:
           if [ -z "$VER" ]; then
             case "$GITHUB_REF_NAME" in
               ios-v*) VER="${GITHUB_REF_NAME#ios-v}" ;;
-              *)      VER="1.0.0" ;;
+              # antes se caía a un 1.0.0 hardcodeado, y eso es una trampa: cada app
+              # tiene su propia versión, así que 1.0.0 apunta a un tren que App Store
+              # Connect ya tiene CERRADO ("Invalid Pre-Release Train", 90186). el
+              # fallo llegaba al final, tras gastar el runner macOS entero en compilar
+              # y firmar. mejor morir aquí, en 2s, con el motivo claro.
+              *)      echo "::error::sin marketing_version y sin tag ios-v*: pásala desde el caller con la versión REAL de la app (un default fijo acaba en un tren cerrado)"; exit 1 ;;
             esac
           fi
           case "$VER" in
