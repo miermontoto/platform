@@ -12,8 +12,16 @@
 #         track: internal
 #       secrets: inherit
 #
-# el caller conserva sus triggers (workflow_dispatch / push de tag android-v*) y su
-# concurrency; la lógica de build vive aquí y se corrige UNA vez para todas las apps.
+# el caller conserva sus triggers (push a main / workflow_dispatch / push de tag
+# android-v*) y su concurrency; la lógica de build vive aquí y se corrige UNA vez
+# para todas las apps.
+#
+# BUILD AUTOMÁTICO (push a main): el job `guard` filtra los push a RAMA por el input
+# `path_filter` (pathspecs de git, uno por línea) para no lanzar un release por un
+# commit que solo toca la api — recuerda que el pre-commit hook bumpa VERSION en CADA
+# commit, así que sin filtro dispararía siempre. dispatch y push de tag NO se filtran
+# nunca: son acciones deliberadas. no se usa el `paths:` nativo de github a propósito,
+# porque en push de tag el evento no trae commits y saltaría el workflow entero.
 #
 # SECRETS esperados en el repo de la app (Settings → Secrets and variables → Actions),
 # heredados con `secrets: inherit`:
@@ -79,9 +87,69 @@ on:
         required: false
         type: string
         default: packages/api/src/constants.ts
+      path_filter:
+        description: 'pathspecs de git (uno por línea) que disparan el build en push a rama; vacío → siempre'
+        # el default deja fuera pnpm-lock.yaml y packages/api a propósito: el lockfile
+        # se mueve con cualquier bump de dependabot de la api (irrelevante para el
+        # binario móvil) y constants.ts lo bumpa el pre-commit hook en CADA commit. si
+        # una app quiere reconstruir también con el lockfile, se lo pasa desde su caller.
+        required: false
+        type: string
+        default: |
+          packages/web
+          platform
+          .github/workflows
 
 jobs:
+  guard:
+    # filtra los push a rama del build AUTOMÁTICO: un commit que solo toca la api no
+    # merece un release. NO se usa el filtro `paths` nativo de github porque en push
+    # de TAG el evento no trae commits y el workflow entero se saltaría, matando el
+    # release manual por tag. aquí en cambio dispatch y tag pasan siempre.
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      build: ${{ steps.decide.outputs.build }}
+    steps:
+      - name: Checkout (historia completa para diffear el push)
+        # solo hace falta clonar cuando de verdad se va a diffear: en dispatch y tag
+        # el paso siguiente sale por la rama de "sin filtro" sin tocar git.
+        if: github.event_name == 'push' && github.ref_type == 'branch'
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Decidir si el push toca el build móvil
+        id: decide
+        env:
+          FILTER: ${{ inputs.path_filter }}
+          BEFORE: ${{ github.event.before }}
+          EVENT: ${{ github.event_name }}
+          REF_TYPE: ${{ github.ref_type }}
+        run: |
+          # solo se filtra el push a rama; dispatch y tag son acciones deliberadas.
+          if [ "$EVENT" != "push" ] || [ "$REF_TYPE" != "branch" ] || [ -z "$FILTER" ]; then
+            echo "build=true" >> "$GITHUB_OUTPUT"; echo "sin filtro (evento $EVENT, ref_type $REF_TYPE)"; exit 0
+          fi
+          # primer push de la rama o force-push: el commit previo no existe → no se
+          # puede diffear, así que se construye (fail-open, nunca perder un release).
+          if [ -z "$BEFORE" ] || ! git cat-file -e "$BEFORE^{commit}" 2>/dev/null; then
+            echo "build=true" >> "$GITHUB_OUTPUT"; echo "sin commit previo diffeable ($BEFORE) → build"; exit 0
+          fi
+          # $FILTER SIN comillas a propósito: se apoya en el word splitting para
+          # pasar cada línea como un pathspec suelto a git.
+          CHANGED=$(git diff --name-only "$BEFORE" "$GITHUB_SHA" -- $FILTER)
+          if [ -n "$CHANGED" ]; then
+            echo "build=true" >> "$GITHUB_OUTPUT"
+            echo "cambios que afectan al build móvil:"; echo "$CHANGED"
+          else
+            echo "build=false" >> "$GITHUB_OUTPUT"
+            echo "el push no toca ninguno de estos pathspecs → se omite el release:"; echo "$FILTER"
+          fi
+
   build:
+    needs: guard
+    if: needs.guard.outputs.build == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:

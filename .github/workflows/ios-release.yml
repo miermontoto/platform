@@ -15,8 +15,17 @@
 #         upload: true
 #       secrets: inherit
 #
-# el caller conserva sus triggers (workflow_dispatch / push de tag ios-v*) y su
-# concurrency; la lógica de build vive aquí y se corrige UNA vez para todas las apps.
+# el caller conserva sus triggers (push a main / workflow_dispatch / push de tag
+# ios-v*) y su concurrency; la lógica de build vive aquí y se corrige UNA vez para
+# todas las apps.
+#
+# BUILD AUTOMÁTICO (push a main): el job `guard` filtra los push a RAMA por el input
+# `path_filter` (pathspecs de git, uno por línea) para no quemar un runner macOS
+# —facturado x10 en repos privados— por un commit que solo toca la api; recuerda que
+# el pre-commit hook bumpa VERSION en CADA commit, así que sin filtro dispararía
+# siempre. dispatch y push de tag NO se filtran nunca: son acciones deliberadas. no se
+# usa el `paths:` nativo de github a propósito, porque en push de tag el evento no
+# trae commits y saltaría el workflow entero.
 #
 # ────────────────────────────────────────────────────────────────────────────
 # SETUP DE UNA SOLA VEZ por app (todo desde linux, sin mac):
@@ -69,8 +78,15 @@
 #       SUBMODULES_PAT (opcional)       ← PAT con lectura del submódulo platform (si fuese privado)
 #
 # VERSIONADO: CFBundleShortVersionString = input marketing_version; si viene vacío y el
-# trigger fue un tag ios-vX.Y.Z, se deriva del tag. CFBundleVersion = run_number del caller
-# (único y creciente por run, mismo patrón que versionCode en android-release.yml).
+# trigger fue un tag ios-vX.Y.Z, se deriva del tag; si no, 1.0.0. CFBundleVersion =
+# run_number del caller (único y creciente por run, mismo patrón que versionCode en
+# android-release.yml).
+# ojo: apple SOLO acepta dígitos y puntos en marketing_version, así que la versión
+# snapshot de la plataforma (26w35af) NO sirve — de ahí que android sincronice su
+# versionName con VERSION y iOS no pueda. en los builds automáticos la convención es
+# marketing_version FIJA y CFBundleVersion creciente: TestFlight muestra "1.0.0 (142)",
+# "1.0.0 (143)"… la marketing_version solo se bumpa a mano (input o tag ios-vX.Y.Z)
+# cuando toca una submission real a la App Store.
 # ────────────────────────────────────────────────────────────────────────────
 
 name: iOS release (reusable)
@@ -130,9 +146,71 @@ on:
         required: false
         type: string
         default: '15.0'
+      path_filter:
+        description: 'pathspecs de git (uno por línea) que disparan el build en push a rama; vacío → siempre'
+        # el default deja fuera pnpm-lock.yaml y packages/api a propósito: el lockfile
+        # se mueve con cualquier bump de dependabot de la api (irrelevante para el
+        # binario móvil) y constants.ts lo bumpa el pre-commit hook en CADA commit. si
+        # una app quiere reconstruir también con el lockfile, se lo pasa desde su caller.
+        required: false
+        type: string
+        default: |
+          packages/web
+          platform
+          .github/workflows
 
 jobs:
+  guard:
+    # filtra los push a rama del build AUTOMÁTICO: un commit que solo toca la api no
+    # merece quemar un runner macOS (facturado x10 en repos privados). NO se usa el
+    # filtro `paths` nativo de github porque en push de TAG el evento no trae commits
+    # y el workflow entero se saltaría, matando el release manual por tag. aquí en
+    # cambio dispatch y tag pasan siempre. corre en ubuntu: ~20s frente a los ~5 min
+    # de macOS que evita.
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      build: ${{ steps.decide.outputs.build }}
+    steps:
+      - name: Checkout (historia completa para diffear el push)
+        # solo hace falta clonar cuando de verdad se va a diffear: en dispatch y tag
+        # el paso siguiente sale por la rama de "sin filtro" sin tocar git.
+        if: github.event_name == 'push' && github.ref_type == 'branch'
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Decidir si el push toca el build móvil
+        id: decide
+        env:
+          FILTER: ${{ inputs.path_filter }}
+          BEFORE: ${{ github.event.before }}
+          EVENT: ${{ github.event_name }}
+          REF_TYPE: ${{ github.ref_type }}
+        run: |
+          # solo se filtra el push a rama; dispatch y tag son acciones deliberadas.
+          if [ "$EVENT" != "push" ] || [ "$REF_TYPE" != "branch" ] || [ -z "$FILTER" ]; then
+            echo "build=true" >> "$GITHUB_OUTPUT"; echo "sin filtro (evento $EVENT, ref_type $REF_TYPE)"; exit 0
+          fi
+          # primer push de la rama o force-push: el commit previo no existe → no se
+          # puede diffear, así que se construye (fail-open, nunca perder un release).
+          if [ -z "$BEFORE" ] || ! git cat-file -e "$BEFORE^{commit}" 2>/dev/null; then
+            echo "build=true" >> "$GITHUB_OUTPUT"; echo "sin commit previo diffeable ($BEFORE) → build"; exit 0
+          fi
+          # $FILTER SIN comillas a propósito: se apoya en el word splitting para
+          # pasar cada línea como un pathspec suelto a git.
+          CHANGED=$(git diff --name-only "$BEFORE" "$GITHUB_SHA" -- $FILTER)
+          if [ -n "$CHANGED" ]; then
+            echo "build=true" >> "$GITHUB_OUTPUT"
+            echo "cambios que afectan al build móvil:"; echo "$CHANGED"
+          else
+            echo "build=false" >> "$GITHUB_OUTPUT"
+            echo "el push no toca ninguno de estos pathspecs → se omite el release:"; echo "$FILTER"
+          fi
+
   build:
+    needs: guard
+    if: needs.guard.outputs.build == 'true'
     # Apple exige construir con el SDK de iOS 26+ (Xcode 26) para subir a App Store
     # Connect. macos-26 (Tahoe) trae Xcode 26 por defecto.
     runs-on: macos-26
