@@ -13,9 +13,8 @@ packages/
               ws-hub (pub/sub por usuario)
   db/         factoría sqlite (wal + pragmas + unaccent + migraciones drizzle)
   auth/       tabla canónica de sesiones + servicio de ciclo de vida
-  changelog/  "novedades" compartido: tipos del array hand-curated de cada app
   ui/         componentes svelte compartidos (SettingsTabs, SessionsPanel,
-              PrivacyPolicy, Support, Changelog, LanguageSwitcher) + http + i18n +
+              PrivacyPolicy, Support, LanguageSwitcher) + http + i18n +
               base.css (primitivas css móvil/táctil)
   mobile/     shell capacitor (config factory; spa empaquetada + api remota via
               VITE_API_BASE) + compact + system-bars + connectivity + deep-link
@@ -46,36 +45,6 @@ packages:
 las apis bundlean los paquetes via tsup (`noExternal: [/^@platform\//]`); las webs
 via vite. actualizar la plataforma en una app = `git -C platform pull` + commit del
 nuevo sha del submodule.
-
-## changelog ("novedades")
-
-enseñar al usuario qué ha cambiado, sin infraestructura: las entradas son
-**hand-curated** (array en el código de la app = única fuente de verdad) y se
-sirven tal cual. no hay tabla, ni seed, ni estado de "visto" por usuario: el modal
-se abre solo cuando el usuario lo pide. `@platform/changelog` es solo el contrato
-de tipos; el render lo hace `@platform/ui`.
-
-```ts
-// 1. entradas hand-curated (es/en). publishedAt ISO; una línea por cambio
-import type { ChangelogEntry } from '@platform/changelog';
-export const CHANGELOG: ChangelogEntry[] = [
-  { version: '1.4.0', publishedAt: '2026-06-25', changes: [
-    { type: 'feature', es: 'Backups automáticos', en: 'Automatic backups' },
-    { type: 'fix', es: 'Tema oscuro en móvil', en: 'Dark theme on mobile' },
-  ] },
-];
-
-// 2. ruta: datos estáticos, sin userId de por medio
-app.get('/api/changelog', (c) => c.json({ entries: CHANGELOG }));
-```
-
-```svelte
-<!-- 3. cliente: GET /api/changelog → { entries }, en respuesta al clic del usuario -->
-<script>
-  import Changelog from '@platform/ui/Changelog.svelte';
-</script>
-{#if open}<Changelog {entries} lang="es" ondismiss={() => open = false} />{/if}
-```
 
 ## backups
 
