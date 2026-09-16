@@ -12,6 +12,10 @@
 #         track: internal
 #       secrets: inherit
 #
+# REQUISITO: el package.json raíz de la app declara `"packageManager": "pnpm@<v>"`.
+# de ahí saca la versión de pnpm el paso "Setup pnpm" (ver su comentario); sin ese
+# campo el workflow muere antes de instalar nada.
+#
 # el caller conserva sus triggers (push a main / workflow_dispatch / push de tag
 # android-v*) y su concurrency; la lógica de build vive aquí y se corrige UNA vez
 # para todas las apps.
@@ -181,9 +185,13 @@ jobs:
           fi
 
       - name: Setup pnpm
+        # sin `version:` a propósito: la acción lee el campo `packageManager` del
+        # package.json de la app, la MISMA fuente que usa el dev en local, así que CI y
+        # local no pueden separarse (antes: 9 aquí, 11 en local, nada que los atara).
+        # si se declaran los dos y no coinciden la acción muere con "Multiple versions
+        # of pnpm specified"; si no hay ninguno, con "No pnpm version is specified", así
+        # que toda app que use este workflow TIENE que declararlo.
         uses: pnpm/action-setup@v4
-        with:
-          version: 9
 
       - name: Setup Node 22
         uses: actions/setup-node@v4
