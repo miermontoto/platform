@@ -188,7 +188,7 @@ jobs:
         # solo hace falta clonar cuando de verdad se va a diffear: en dispatch y tag
         # el paso siguiente sale por la rama de "sin filtro" sin tocar git.
         if: github.event_name == 'push' && github.ref_type == 'branch'
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -229,7 +229,7 @@ jobs:
     timeout-minutes: 60
     steps:
       - name: Checkout (con submódulo platform)
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           submodules: recursive
           token: ${{ secrets.SUBMODULES_PAT || github.token }}
@@ -286,10 +286,10 @@ jobs:
         # si se declaran los dos y no coinciden la acción muere con "Multiple versions
         # of pnpm specified"; si no hay ninguno, con "No pnpm version is specified", así
         # que toda app que use este workflow TIENE que declararlo.
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@v6
 
       - name: Setup Node 22
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: pnpm
@@ -568,7 +568,7 @@ jobs:
 
       - name: Guardar IPA como artifact
         if: always() && env.IPA_PATH != ''
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ inputs.app }}-ios-ipa
           path: ${{ env.IPA_PATH }}
