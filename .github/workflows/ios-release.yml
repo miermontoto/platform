@@ -12,6 +12,8 @@
 #         icon_bg: '#0a0c0e'                # fondo del icono/splash generados
 #         deep_link_scheme: info.duckhunt.app   # opcional: oauth móvil por deep link
 #         sign_in_with_apple: true          # opcional: entitlement applesignin
+#         widget_extension_dir: ios-widgets  # opcional: extensión WidgetKit (ver SETUP, paso 7)
+#         app_group: group.info.duckhunt.app # obligatorio con widget_extension_dir
 #         upload: true
 #       secrets: inherit
 #
@@ -80,6 +82,20 @@
 #       APPLE_TEAM_ID                   ← Team ID del paso 4
 #       IOS_PROVISIONING_PROFILE_BASE64 ← contenido del .mobileprovision en base64 (paso 5)
 #       SUBMODULES_PAT (opcional)       ← PAT con lectura del submódulo platform (si fuese privado)
+#       IOS_WIDGET_PROVISIONING_PROFILE_BASE64 ← solo con widgets (paso 7)
+#
+#  7. WIDGETS (opcional, input widget_extension_dir + app_group): la extensión WidgetKit
+#     se genera en ci desde un dir de la app con fuentes swift + Info.plist +
+#     <nombre>.entitlements (ver duckhunt packages/web/ios-widgets). ops previas:
+#     - Identifiers → App ID nuevo "<bundle_id>.widgets" (explicit).
+#     - Identifiers → App Groups → (+) "group.<bundle_id>"; habilitar la capability App
+#       Groups en AMBOS App IDs (app y widgets) con ese group.
+#     - REGENERAR el perfil de la app (paso 5): al cambiar sus capabilities el perfil
+#       anterior deja de valer → actualizar IOS_PROVISIONING_PROFILE_BASE64.
+#     - crear el perfil App Store de la extensión "<app> Widgets App Store CI" (o pasa
+#       otro nombre en widget_provisioning_profile) → IOS_WIDGET_PROVISIONING_PROFILE_BASE64.
+#     el step "Verificar la extensión de widgets" comprueba el .appex y el app group en
+#     ambos binarios antes de subir.
 #
 # VERSIONADO: CFBundleShortVersionString = input marketing_version; si viene vacío y el
 # trigger fue un tag ios-vX.Y.Z, se deriva del tag; si no, ERROR (el caller debe pasar
@@ -158,6 +174,21 @@ on:
         required: false
         type: string
         default: '15.0'
+      widget_extension_dir:
+        description: 'dir (relativo a packages/web) con las fuentes swift + Info.plist + entitlements de una extensión WidgetKit; vacío → sin widgets'
+        required: false
+        type: string
+        default: ''
+      app_group:
+        description: 'app group (group.<bundle id>) compartido por la app y la extensión de widgets; obligatorio con widget_extension_dir'
+        required: false
+        type: string
+        default: ''
+      widget_provisioning_profile:
+        description: 'nombre del provisioning profile de App Store de la extensión; vacío → "<app> Widgets App Store CI"'
+        required: false
+        type: string
+        default: ''
       path_filter:
         description: 'pathspecs de git (uno por línea) que disparan el build en push a rama; vacío → siempre'
         # el default deja fuera pnpm-lock.yaml y packages/api a propósito: el lockfile
@@ -240,12 +271,17 @@ jobs:
           KEY: ${{ secrets.ASC_API_KEY_P8 }}
           TEAM: ${{ secrets.APPLE_TEAM_ID }}
           PP: ${{ secrets.IOS_PROVISIONING_PROFILE_BASE64 }}
+          WPP: ${{ secrets.IOS_WIDGET_PROVISIONING_PROFILE_BASE64 }}
+          WIDGET_DIR: ${{ inputs.widget_extension_dir }}
+          APP_GROUP: ${{ inputs.app_group }}
         run: |
           missing=""
           [ -z "$CERT" ] && missing="$missing IOS_DIST_CERT_P12_BASE64"
           [ -z "$KEY" ]  && missing="$missing ASC_API_KEY_P8"
           [ -z "$TEAM" ] && missing="$missing APPLE_TEAM_ID"
           [ -z "$PP" ]   && missing="$missing IOS_PROVISIONING_PROFILE_BASE64"
+          [ -n "$WIDGET_DIR" ] && [ -z "$WPP" ] && missing="$missing IOS_WIDGET_PROVISIONING_PROFILE_BASE64"
+          [ -n "$WIDGET_DIR" ] && [ -z "$APP_GROUP" ] && { echo "::error::widget_extension_dir requiere app_group"; exit 1; }
           if [ -n "$missing" ]; then
             echo "::error::faltan secrets:$missing — revisa la cabecera del workflow en platform"
             exit 1
@@ -255,6 +291,7 @@ jobs:
         env:
           INPUT_VERSION: ${{ inputs.marketing_version }}
           INPUT_PROFILE: ${{ inputs.provisioning_profile }}
+          INPUT_WIDGET_PROFILE: ${{ inputs.widget_provisioning_profile }}
           APP: ${{ inputs.app }}
         run: |
           # versión: input explícito > tag ios-vX.Y.Z > 1.0.0. se valida (solo dígitos
@@ -275,8 +312,10 @@ jobs:
             ''|*[!0-9.]*) echo "::error::marketing_version inválida: '$VER' (solo dígitos y puntos)"; exit 1 ;;
           esac
           PROFILE="${INPUT_PROFILE:-$APP App Store CI}"
+          WIDGET_PROFILE="${INPUT_WIDGET_PROFILE:-$APP Widgets App Store CI}"
           echo "MARKETING_VERSION=$VER" >> "$GITHUB_ENV"
           echo "PROFILE_NAME=$PROFILE" >> "$GITHUB_ENV"
+          echo "WIDGET_PROFILE_NAME=$WIDGET_PROFILE" >> "$GITHUB_ENV"
           echo "versión $VER, perfil '$PROFILE'"
 
       - name: Setup pnpm
@@ -449,6 +488,83 @@ jobs:
             || /usr/libexec/PlistBuddy -c "Add :CFBundleVersion string $BUILD_NUMBER" "$PLIST"
           echo "version $MARKETING_VERSION ($BUILD_NUMBER)"
 
+      - name: Añadir extensión WidgetKit (widgets de pantalla de inicio)
+        # el proyecto ios/ se regenera en cada run (cap add): la extensión se crea aquí con
+        # el gem xcodeproj a partir de las fuentes commiteadas en widget_extension_dir
+        # (swift + Info.plist + <nombre>.entitlements). target :app_extension "Widgets"
+        # (bundle <bundle_id>.widgets), firma manual con SU perfil, copy phase PlugIns en
+        # App y dependencia. el app group va en los entitlements de AMBOS targets: es el
+        # keychain access group / contenedor que comparten app y widget. va DESPUÉS del
+        # cap sync (pod install no toca este target: no está en el Podfile) y de fijar la
+        # versión (la extensión debe llevar la MISMA CFBundleShortVersionString/Version que
+        # la app o App Store Connect rechaza el binario).
+        if: ${{ inputs.widget_extension_dir != '' }}
+        working-directory: packages/web/ios/App
+        env:
+          WIDGET_SRC: ${{ inputs.widget_extension_dir }}
+          APP_GROUP: ${{ inputs.app_group }}
+          BUNDLE_ID: ${{ inputs.bundle_id }}
+          MIN_IOS: ${{ inputs.min_ios_version }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          BUILD_NUMBER: ${{ github.run_number }}
+        run: |
+          SRC="$GITHUB_WORKSPACE/packages/web/$WIDGET_SRC"
+          [ -d "$SRC" ] || { echo "::error::widget_extension_dir no existe: $SRC"; exit 1; }
+          rm -rf Widgets && mkdir Widgets && cp -R "$SRC"/. Widgets/
+          [ -f Widgets/Info.plist ] || { echo "::error::falta Info.plist en $WIDGET_SRC"; exit 1; }
+          ENT=$(ls Widgets/*.entitlements | head -1)
+          [ -n "$ENT" ] || { echo "::error::falta <nombre>.entitlements en $WIDGET_SRC"; exit 1; }
+          # versión = la de la app; app group en los entitlements de la extensión y de la app.
+          /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $MARKETING_VERSION" Widgets/Info.plist \
+            || /usr/libexec/PlistBuddy -c "Add :CFBundleShortVersionString string $MARKETING_VERSION" Widgets/Info.plist
+          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $BUILD_NUMBER" Widgets/Info.plist \
+            || /usr/libexec/PlistBuddy -c "Add :CFBundleVersion string $BUILD_NUMBER" Widgets/Info.plist
+          add_group() {
+            local f="$1"
+            [ -f "$f" ] || printf '<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n<plist version="1.0"><dict/></plist>\n' > "$f"
+            /usr/libexec/PlistBuddy -c "Delete :com.apple.security.application-groups" "$f" 2>/dev/null || true
+            /usr/libexec/PlistBuddy -c "Add :com.apple.security.application-groups array" "$f"
+            /usr/libexec/PlistBuddy -c "Add :com.apple.security.application-groups:0 string $APP_GROUP" "$f"
+          }
+          add_group "$ENT"
+          add_group App/App.entitlements
+          echo "== entitlements de la extensión =="; cat "$ENT"
+          gem list -i xcodeproj >/dev/null 2>&1 || sudo gem install xcodeproj --no-document
+          ENT_NAME=$(basename "$ENT") ruby -e '
+            require "xcodeproj"
+            project = Xcodeproj::Project.open("App.xcodeproj")
+            app = project.targets.find { |t| t.name == "App" } or abort("target App no encontrado")
+            ext = project.new_target(:app_extension, "Widgets", :ios, ENV["MIN_IOS"])
+            group = project.main_group.new_group("Widgets", "Widgets")
+            Dir.glob("Widgets/*.swift").sort.each { |f| ext.add_file_references([group.new_file(File.basename(f))]) }
+            group.new_file("Info.plist")
+            group.new_file(ENV["ENT_NAME"])
+            ext.build_configurations.each do |c|
+              c.build_settings["PRODUCT_BUNDLE_IDENTIFIER"] = "#{ENV["BUNDLE_ID"]}.widgets"
+              c.build_settings["INFOPLIST_FILE"] = "Widgets/Info.plist"
+              c.build_settings["GENERATE_INFOPLIST_FILE"] = "NO"
+              c.build_settings["CODE_SIGN_ENTITLEMENTS"] = "Widgets/#{ENV["ENT_NAME"]}"
+              c.build_settings["SWIFT_VERSION"] = "5.0"
+              c.build_settings["IPHONEOS_DEPLOYMENT_TARGET"] = ENV["MIN_IOS"]
+              c.build_settings["TARGETED_DEVICE_FAMILY"] = "1,2"
+              c.build_settings["SKIP_INSTALL"] = "YES"
+              c.build_settings["CODE_SIGN_STYLE"] = "Manual"
+              c.build_settings["DEVELOPMENT_TEAM"] = ENV["APPLE_TEAM_ID"]
+              c.build_settings["CODE_SIGN_IDENTITY"] = "Apple Distribution"
+              c.build_settings["PROVISIONING_PROFILE_SPECIFIER"] = ENV["WIDGET_PROFILE_NAME"]
+              c.build_settings["LD_RUNPATH_SEARCH_PATHS"] = ["$(inherited)", "@executable_path/Frameworks", "@executable_path/../../Frameworks"]
+            end
+            # la app también necesita el app group (sin SIWA no había fichero de entitlements).
+            app.build_configurations.each { |c| c.build_settings["CODE_SIGN_ENTITLEMENTS"] = "App/App.entitlements" }
+            app.add_dependency(ext)
+            phase = app.new_copy_files_build_phase("Embed Foundation Extensions")
+            phase.symbol_dst_subfolder_spec = :plug_ins
+            phase.dst_path = ""
+            phase.add_file_reference(ext.product_reference).settings = { "ATTRIBUTES" => ["RemoveHeadersOnCopy"] }
+            project.save
+          '
+          echo "extensión Widgets añadida (bundle $BUNDLE_ID.widgets, perfil '$WIDGET_PROFILE_NAME')"
+
       - name: Importar certificado de distribución a un keychain temporal
         env:
           CERT_B64: ${{ secrets.IOS_DIST_CERT_P12_BASE64 }}
@@ -472,6 +588,8 @@ jobs:
           ASC_API_KEY_P8: ${{ secrets.ASC_API_KEY_P8 }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           IOS_PROVISIONING_PROFILE_BASE64: ${{ secrets.IOS_PROVISIONING_PROFILE_BASE64 }}
+          IOS_WIDGET_PROVISIONING_PROFILE_BASE64: ${{ secrets.IOS_WIDGET_PROVISIONING_PROFILE_BASE64 }}
+          WIDGET_DIR: ${{ inputs.widget_extension_dir }}
           BUNDLE_ID: ${{ inputs.bundle_id }}
         run: |
           # asc api key (la usa altool en el upload) en la ruta por defecto
@@ -488,6 +606,16 @@ jobs:
           UUID=$(security cms -D -i "$PP" | plutil -extract UUID raw -)
           cp "$PP" "$PROF_DIR/$UUID.mobileprovision"
           echo "provisioning profile instalado UUID=$UUID"
+          # perfil de la extensión de widgets (bundle <bundle_id>.widgets), si hay widgets.
+          WIDGET_MAPPING=""
+          if [ -n "$WIDGET_DIR" ]; then
+            WPP="$RUNNER_TEMP/widget.mobileprovision"
+            echo -n "$IOS_WIDGET_PROVISIONING_PROFILE_BASE64" | base64 --decode -o "$WPP"
+            WUUID=$(security cms -D -i "$WPP" | plutil -extract UUID raw -)
+            cp "$WPP" "$PROF_DIR/$WUUID.mobileprovision"
+            echo "provisioning profile de widgets instalado UUID=$WUUID"
+            WIDGET_MAPPING="<key>${BUNDLE_ID}.widgets</key><string>${WIDGET_PROFILE_NAME}</string>"
+          fi
           # ExportOptions.plist — firma manual con el cert de distribución + el perfil.
           cat > packages/web/ios/App/exportOptions.plist <<PLIST
           <?xml version="1.0" encoding="UTF-8"?>
@@ -499,6 +627,7 @@ jobs:
             <key>signingCertificate</key><string>Apple Distribution</string>
             <key>provisioningProfiles</key><dict>
               <key>${BUNDLE_ID}</key><string>${PROFILE_NAME}</string>
+              ${WIDGET_MAPPING}
             </dict>
             <key>uploadSymbols</key><true/>
             <key>destination</key><string>export</string>
@@ -556,6 +685,26 @@ jobs:
             echo "::error::el IPA NO lleva com.apple.developer.applesignin → Sign in with Apple fallará (error 1000)"
             exit 1
           fi
+
+      - name: Verificar la extensión de widgets en el IPA
+        # falla aquí, y no en App Store Connect o en el dispositivo, si el .appex no quedó
+        # embebido o app/extensión no llevan el app group en sus entitlements.
+        if: ${{ inputs.widget_extension_dir != '' }}
+        env:
+          APP_GROUP: ${{ inputs.app_group }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/ipa-unz-w"
+          unzip -o "$IPA_PATH" -d "$RUNNER_TEMP/ipa-unz-w" >/dev/null
+          APP=$(find "$RUNNER_TEMP/ipa-unz-w/Payload" -maxdepth 1 -name '*.app' | head -1)
+          APPEX="$APP/PlugIns/Widgets.appex"
+          [ -d "$APPEX" ] || { echo "::error::el IPA no lleva PlugIns/Widgets.appex"; exit 1; }
+          for bin in "$APP" "$APPEX"; do
+            echo "== entitlements de $(basename "$bin") =="
+            codesign -d --entitlements :- "$bin" 2>/dev/null || true
+            codesign -d --entitlements :- "$bin" 2>/dev/null | grep -q "$APP_GROUP" \
+              || { echo "::error::$(basename "$bin") no lleva el app group $APP_GROUP"; exit 1; }
+          done
+          echo "OK: extensión de widgets embebida con app group $APP_GROUP en app y extensión"
 
       - name: Subir a App Store Connect (TestFlight)
         if: ${{ inputs.upload }}
