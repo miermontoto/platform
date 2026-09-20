@@ -24,11 +24,19 @@ interface NetworkPlugin {
 }
 
 // carga perezosa del plugin nativo; null si no es plataforma nativa o no está instalado.
-async function loadNetwork(): Promise<NetworkPlugin | null> {
-  if (!Capacitor.isNativePlatform()) return null;
+//
+// dos guardas que importan: (1) el paquete js puede resolverse aunque la app NO lleve el
+// plugin nativo (hoisting del monorepo) → se comprueba isPluginAvailable antes de tocarlo;
+// (2) el proxy de un plugin de capacitor NUNCA se devuelve desde una función async: al
+// resolver la promesa el runtime lee `.then`, el proxy lo toma por un método nativo y lanza
+// '"Network.then()" is not implemented' (uncaught, sin log). por eso va envuelto en un objeto.
+const NETWORK_PLUGIN = 'Network';
+
+async function loadNetwork(): Promise<{ plugin: NetworkPlugin } | null> {
+  if (!Capacitor.isNativePlatform() || !Capacitor.isPluginAvailable(NETWORK_PLUGIN)) return null;
   try {
     const mod = (await import('@capacitor/network')) as { Network: NetworkPlugin };
-    return mod.Network;
+    return { plugin: mod.Network };
   } catch {
     // plugin no instalado: sin señal nativa, se cae a navigator.onLine en isOnline().
     return null;
@@ -47,7 +55,7 @@ function navigatorOnline(): boolean {
  */
 export async function isOnline(): Promise<boolean> {
   const net = await loadNetwork();
-  if (net) return (await net.getStatus()).connected;
+  if (net) return (await net.plugin.getStatus()).connected;
   return navigatorOnline();
 }
 
@@ -62,7 +70,7 @@ export function observeConnectivity(onChange: (online: boolean) => void): () => 
     let cancelled = false;
     void loadNetwork().then((net) => {
       if (cancelled || !net) return;
-      void net
+      void net.plugin
         .addListener('networkStatusChange', (status) => onChange(status.connected))
         .then((handle) => {
           if (cancelled) void handle.remove();
