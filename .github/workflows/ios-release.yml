@@ -189,11 +189,11 @@ on:
         description: 'nombre del provisioning profile de App Store de la extensión; vacío → "<app> Widgets App Store CI"'
         required: false
         type: string
+        default: ''
       widget_min_ios_version:
         description: 'deployment target de la extensión de widgets (puede ser mayor que el de la app: en un ios anterior la app instala sin widgets); vacío → min_ios_version'
         required: false
         type: string
-        default: ''
         default: ''
       path_filter:
         description: 'pathspecs de git (uno por línea) que disparan el build en push a rama; vacío → siempre'
