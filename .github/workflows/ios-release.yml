@@ -540,6 +540,9 @@ jobs:
             group.new_file("Info.plist")
             group.new_file(ENV["ENT_NAME"])
             ext.build_configurations.each do |c|
+              # explícito: sin PRODUCT_NAME el producto sale como ".appex" (nombre vacío) y el
+              # archive muere con "Multiple commands produce .../.appex".
+              c.build_settings["PRODUCT_NAME"] = "Widgets"
               c.build_settings["PRODUCT_BUNDLE_IDENTIFIER"] = "#{ENV["BUNDLE_ID"]}.widgets"
               c.build_settings["INFOPLIST_FILE"] = "Widgets/Info.plist"
               c.build_settings["GENERATE_INFOPLIST_FILE"] = "NO"
