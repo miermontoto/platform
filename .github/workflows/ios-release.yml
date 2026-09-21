@@ -14,6 +14,7 @@
 #         sign_in_with_apple: true          # opcional: entitlement applesignin
 #         widget_extension_dir: ios-widgets  # opcional: extensión WidgetKit (ver SETUP, paso 7)
 #         app_group: group.info.duckhunt.app # obligatorio con widget_extension_dir
+#         widget_min_ios_version: '17.0'     # opcional: target de la extensión (AppIntents = 17)
 #         upload: true
 #       secrets: inherit
 #
@@ -188,6 +189,11 @@ on:
         description: 'nombre del provisioning profile de App Store de la extensión; vacío → "<app> Widgets App Store CI"'
         required: false
         type: string
+      widget_min_ios_version:
+        description: 'deployment target de la extensión de widgets (puede ser mayor que el de la app: en un ios anterior la app instala sin widgets); vacío → min_ios_version'
+        required: false
+        type: string
+        default: ''
         default: ''
       path_filter:
         description: 'pathspecs de git (uno por línea) que disparan el build en push a rama; vacío → siempre'
@@ -504,7 +510,7 @@ jobs:
           WIDGET_SRC: ${{ inputs.widget_extension_dir }}
           APP_GROUP: ${{ inputs.app_group }}
           BUNDLE_ID: ${{ inputs.bundle_id }}
-          MIN_IOS: ${{ inputs.min_ios_version }}
+          MIN_IOS: ${{ inputs.widget_min_ios_version || inputs.min_ios_version }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           BUILD_NUMBER: ${{ github.run_number }}
         run: |
