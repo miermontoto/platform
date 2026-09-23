@@ -1,6 +1,8 @@
 // gestión de la clase html.compact: la señal compartida de "layout móvil" de los
 // clientes web de la plataforma. compact = viewport estrecho (<= breakpoint) O app
-// nativa (un tablet nativo es ancho pero queremos layout móvil igualmente).
+// nativa, salvo un tablet en horizontal (ahí hay espacio de escritorio de verdad y el
+// layout móvil lo desperdicia: bottombar, una sola columna). un tablet nativo en
+// vertical sigue compacto, igual que la señal de densidad.
 //
 // la NAVEGACIÓN (bottombar, topbar colapsado, drill-down de ajustes) keya de
 // html.compact en css. la DENSIDAD de contenido es una señal aparte, por @media de
@@ -18,6 +20,12 @@ import { Capacitor } from '@capacitor/core';
 // ancho (px) por defecto bajo el cual el layout web pasa a compacto.
 export const COMPACT_BREAKPOINT_DEFAULT = 720;
 
+// tablet apaisado: el único caso nativo con layout de escritorio. el alto mínimo descarta
+// al móvil en horizontal (ancho de hasta ~960px pero ~430px de alto); el ancho cubre desde
+// el iPad de 10.2" (1080px) y la orientación deja al iPad Pro 13" vertical (1024px) en
+// compacto. split view estrecha el viewport y vuelve a compacto sola.
+export const TABLET_LANDSCAPE_QUERY = '(orientation: landscape) and (min-width: 1024px) and (min-height: 600px)';
+
 export interface InstallCompactOptions {
   // ancho (px) bajo el cual el layout web pasa a compacto. default 720.
   breakpoint?: number;
@@ -25,19 +33,22 @@ export interface InstallCompactOptions {
 
 /**
  * instala la gestión de html.compact: marca .native en plataforma nativa y mantiene
- * .compact = (<= breakpoint O .native), reaccionando a cambios de viewport. seguro
- * de llamar una vez en el boot del root layout; devuelve una función de limpieza.
+ * .compact = (<= breakpoint O nativo que no es tablet apaisado), reaccionando a cambios
+ * de viewport y de orientación. seguro de llamar una vez en el boot del root layout;
+ * devuelve una función de limpieza.
  */
 export function installCompact(options: InstallCompactOptions = {}): () => void {
   const breakpoint = options.breakpoint ?? COMPACT_BREAKPOINT_DEFAULT;
   const root = document.documentElement;
-  // nativo: el webview puede ser ancho (tablet) y aun así queremos layout móvil.
-  if (Capacitor.isNativePlatform()) root.classList.add('native');
-  const mq = window.matchMedia(`(max-width: ${breakpoint}px)`);
-  const apply = () => root.classList.toggle('compact', mq.matches || root.classList.contains('native'));
+  const native = Capacitor.isNativePlatform();
+  if (native) root.classList.add('native');
+  const narrow = window.matchMedia(`(max-width: ${breakpoint}px)`);
+  const tabletLandscape = window.matchMedia(TABLET_LANDSCAPE_QUERY);
+  const apply = () => root.classList.toggle('compact', narrow.matches || (native && !tabletLandscape.matches));
+  const queries = [narrow, tabletLandscape];
   apply();
-  mq.addEventListener('change', apply);
-  return () => mq.removeEventListener('change', apply);
+  queries.forEach((mq) => mq.addEventListener('change', apply));
+  return () => queries.forEach((mq) => mq.removeEventListener('change', apply));
 }
 
 /**

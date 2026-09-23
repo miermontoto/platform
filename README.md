@@ -96,8 +96,10 @@ las apps con shell capacitor (spa empaquetada) comparten estas señales. NO las
 confundas: cada una responde a una pregunta distinta.
 
 **1. navegación → `html.compact`** (¿layout de navegación móvil?). compact =
-viewport estrecho (`<= breakpoint`) **O** app nativa (un tablet nativo es ancho pero
-queremos bottombar igualmente). lo gestiona `@platform/mobile/compact`:
+viewport estrecho (`<= breakpoint`) **O** app nativa, salvo un tablet en horizontal
+(`TABLET_LANDSCAPE_QUERY`: apaisado, ≥1024px de ancho y ≥600px de alto — el alto deja
+al móvil en horizontal en compacto). el tablet nativo en vertical se queda compacto (con
+bottombar), igual que la densidad. lo gestiona `@platform/mobile/compact`:
 
 ```ts
 // root +layout (post-hidratación): marca .native + mantiene .compact
