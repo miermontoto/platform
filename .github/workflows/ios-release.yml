@@ -200,7 +200,7 @@ on:
         type: string
         default: ''
       app_sources_dir:
-        description: 'dir (relativo a packages/web) con fuentes swift + .xcstrings que se añaden al target App; vacío → ninguna'
+        description: 'dir (relativo a packages/web) con fuentes swift + .xcstrings + <lang>.lproj/*.strings que se añaden al target App; vacío → ninguna'
         required: false
         type: string
         default: ''
@@ -588,7 +588,7 @@ jobs:
 
       - name: Añadir fuentes nativas al target App
         # el proyecto ios/ se regenera en cada run (cap add): las fuentes swift y los string
-        # catalogs commiteados en app_sources_dir se copian a App/<dir> y se añaden al target
+        # catalogs (+ <lang>.lproj/*.strings) commiteados en app_sources_dir se copian a App/<dir> y se añaden al target
         # App (sources y resources) con el gem xcodeproj. los catálogos solo compilan los
         # idiomas de knownRegions, así que se registran los que traigan (el de desarrollo va
         # siempre). va tras el cap sync: pod install no toca estos ficheros.
@@ -611,10 +611,20 @@ jobs:
             catalogs = Dir.glob("#{ENV["DEST"]}/*.xcstrings").sort
             app.add_file_references(swift.map { |f| group.new_file(File.basename(f)) })
             app.add_resources(catalogs.map { |f| group.new_file(File.basename(f)) })
-            langs = catalogs.flat_map { |f| JSON.parse(File.read(f))["strings"].values.flat_map { |v| (v["localizations"] || {}).keys } }
+            # <lang>.lproj/<nombre>.strings → un variant group por nombre (p.ej.
+            # AppShortcuts.strings, cuyo .xcstrings exige deployment target 17).
+            strings = Dir.glob("#{ENV["DEST"]}/*.lproj/*.strings").sort
+            variants = strings.group_by { |f| File.basename(f) }.map do |name, files|
+              variant = group.new_variant_group(name)
+              files.each { |f| variant.new_file("#{File.basename(File.dirname(f))}/#{name}").name = File.basename(File.dirname(f), ".lproj") }
+              variant
+            end
+            variants.each { |v| app.resources_build_phase.add_file_reference(v, true) }
+            langs = catalogs.flat_map { |f| JSON.parse(File.read(f))["strings"].values.flat_map { |v| (v["localizations"] || {}).keys } } +
+              strings.map { |f| File.basename(File.dirname(f), ".lproj") }
             project.root_object.known_regions = (project.root_object.known_regions + langs).uniq
             project.save
-            puts "target App: #{swift.size} swift, #{catalogs.size} catálogos, regiones #{project.root_object.known_regions.join(",")}"
+            puts "target App: #{swift.size} swift, #{catalogs.size} catálogos, #{strings.size} .strings, regiones #{project.root_object.known_regions.join(",")}"
           '
 
       - name: Añadir extensión WidgetKit (widgets de pantalla de inicio)
