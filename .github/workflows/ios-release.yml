@@ -15,6 +15,7 @@
 #         widget_extension_dir: ios-widgets  # opcional: extensión WidgetKit (ver SETUP, paso 7)
 #         app_group: group.info.duckhunt.app # obligatorio con widget_extension_dir
 #         widget_min_ios_version: '17.0'     # opcional: target de la extensión (AppIntents = 17)
+#         app_sources_dir: ios-intents       # opcional: swift + .xcstrings extra del target App (ver paso 8)
 #         upload: true
 #       secrets: inherit
 #
@@ -97,6 +98,11 @@
 #       otro nombre en widget_provisioning_profile) → IOS_WIDGET_PROVISIONING_PROFILE_BASE64.
 #     el step "Verificar la extensión de widgets" comprueba el .appex y el app group en
 #     ambos binarios antes de subir.
+#
+#  8. FUENTES NATIVAS DE LA APP (opcional, input app_sources_dir): swift + string catalogs
+#     (.xcstrings) que se compilan DENTRO del target App (p.ej. app intents + app shortcuts de
+#     siri, que solo se registran desde el binario de la app, no desde una extensión widgetkit).
+#     sin ops en apple: no añade capabilities ni perfiles.
 #
 # VERSIONADO: CFBundleShortVersionString = input marketing_version > tag ios-vX.Y.Z >
 # AUTOMÁTICA (la pregunta el job `guard` a App Store Connect, ver "TRENES").
@@ -190,6 +196,11 @@ on:
         default: ''
       widget_provisioning_profile:
         description: 'nombre del provisioning profile de App Store de la extensión; vacío → "<app> Widgets App Store CI"'
+        required: false
+        type: string
+        default: ''
+      app_sources_dir:
+        description: 'dir (relativo a packages/web) con fuentes swift + .xcstrings que se añaden al target App; vacío → ninguna'
         required: false
         type: string
         default: ''
@@ -574,6 +585,37 @@ jobs:
           /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $BUILD_NUMBER" "$PLIST" \
             || /usr/libexec/PlistBuddy -c "Add :CFBundleVersion string $BUILD_NUMBER" "$PLIST"
           echo "version $MARKETING_VERSION ($BUILD_NUMBER)"
+
+      - name: Añadir fuentes nativas al target App
+        # el proyecto ios/ se regenera en cada run (cap add): las fuentes swift y los string
+        # catalogs commiteados en app_sources_dir se copian a App/<dir> y se añaden al target
+        # App (sources y resources) con el gem xcodeproj. los catálogos solo compilan los
+        # idiomas de knownRegions, así que se registran los que traigan (el de desarrollo va
+        # siempre). va tras el cap sync: pod install no toca estos ficheros.
+        if: ${{ inputs.app_sources_dir != '' }}
+        working-directory: packages/web/ios/App
+        env:
+          APP_SRC: ${{ inputs.app_sources_dir }}
+        run: |
+          SRC="$GITHUB_WORKSPACE/packages/web/$APP_SRC"
+          [ -d "$SRC" ] || { echo "::error::app_sources_dir no existe: $SRC"; exit 1; }
+          DEST="App/$(basename "$APP_SRC")"
+          rm -rf "$DEST" && mkdir -p "$DEST" && cp -R "$SRC"/. "$DEST"/
+          gem list -i xcodeproj >/dev/null 2>&1 || sudo gem install xcodeproj --no-document
+          DEST="$DEST" ruby -rjson -e '
+            require "xcodeproj"
+            project = Xcodeproj::Project.open("App.xcodeproj")
+            app = project.targets.find { |t| t.name == "App" } or abort("target App no encontrado")
+            group = project.main_group.find_subpath("App", true).new_group(File.basename(ENV["DEST"]), File.basename(ENV["DEST"]))
+            swift = Dir.glob("#{ENV["DEST"]}/*.swift").sort
+            catalogs = Dir.glob("#{ENV["DEST"]}/*.xcstrings").sort
+            app.add_file_references(swift.map { |f| group.new_file(File.basename(f)) })
+            app.add_resources(catalogs.map { |f| group.new_file(File.basename(f)) })
+            langs = catalogs.flat_map { |f| JSON.parse(File.read(f))["strings"].values.flat_map { |v| (v["localizations"] || {}).keys } }
+            project.root_object.known_regions = (project.root_object.known_regions + langs).uniq
+            project.save
+            puts "target App: #{swift.size} swift, #{catalogs.size} catálogos, regiones #{project.root_object.known_regions.join(",")}"
+          '
 
       - name: Añadir extensión WidgetKit (widgets de pantalla de inicio)
         # el proyecto ios/ se regenera en cada run (cap add): la extensión se crea aquí con
