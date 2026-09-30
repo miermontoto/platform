@@ -40,6 +40,11 @@ export type BarStyle = 'DARK' | 'LIGHT';
 //
 // una app que lo quiera implementa 'SystemBars' con un único método setStyle y deja
 // de depender de status-bar; el resto siguen con status-bar sin cambiar nada.
+//
+// capacitor 8 trae un plugin CORE con ese mismo nombre y el mismo contrato
+// (setStyle({ style: 'DARK' | 'LIGHT' }) sin `bar` = ambas barras), así que en una app
+// sobre la 8 este camino lo sirve el core y el plugin propio sobra (dos plugins con el
+// mismo jsName chocan en el puente). en la 7 sigue haciendo falta el propio.
 interface SystemBarsAppearance {
   setStyle(options: { style: BarStyle }): Promise<void>;
 }

@@ -34,6 +34,19 @@ export interface PlatformMobileOptions {
   overrides?: Partial<CapacitorConfig>;
 }
 
+// android 15 (sdk 35) fuerza edge-to-edge: el webview dibujaría debajo de la status bar y la
+// nav bar, y el webview android no expone env(safe-area-inset-*). el plugin capawesome
+// (EdgeToEdge, abajo) aplica márgenes nativos al webview en su lugar. 'disable' apaga el
+// gestor de insets del PROPIO capacitor: si no, ambos registran un
+// OnApplyWindowInsetsListener sobre el mismo webview (el segundo reemplaza al primero,
+// carrera de orden) y el del core no gestiona el inset del teclado (ime) mientras el de
+// capawesome sí → teclado tapando inputs. capawesome queda como única autoridad de insets
+// (incl. ime) y coloreado.
+// clave SOLO de capacitor 7: la 8 la quitó (su equivalente es SystemBars.insetsHandling, en
+// plugins) y su tipo ya no la conoce. va aparte y sin tipo cerrado para que el factory sirva a
+// apps en ambas majors; cada una ignora la clave de la otra.
+const CAP7_ANDROID: Record<string, unknown> = { adjustMarginsForEdgeToEdge: 'disable' };
+
 export function createCapacitorConfig({
   appId,
   appName,
@@ -51,19 +64,14 @@ export function createCapacitorConfig({
       // origen https://localhost: scheme seguro, cookies y storage estables
       androidScheme: 'https',
     },
-    android: {
-      // android 15 (sdk 35) fuerza edge-to-edge: el webview dibujaría debajo de
-      // la status bar y la nav bar, y el webview android no expone
-      // env(safe-area-inset-*). el plugin capawesome (EdgeToEdge, abajo) aplica
-      // márgenes nativos al webview en su lugar. 'disable' apaga el gestor de
-      // insets del PROPIO capacitor: si no, ambos registran un
-      // OnApplyWindowInsetsListener sobre el mismo webview (el segundo reemplaza
-      // al primero, carrera de orden) y el del core no gestiona el inset del
-      // teclado (ime) mientras el de capawesome sí → teclado tapando inputs.
-      // capawesome queda como única autoridad de insets (incl. ime) y coloreado.
-      adjustMarginsForEdgeToEdge: 'disable',
-    },
+    android: CAP7_ANDROID as CapacitorConfig['android'],
     plugins: {
+      // capacitor 8: el plugin core SystemBars gestiona los insets en android y por defecto
+      // ('css') deja el webview edge-to-edge con env(safe-area-inset-*) rellenos, que se
+      // SUMARÍAN a los márgenes nativos de capawesome (doble padding). 'disable' mantiene a
+      // capawesome como única autoridad, igual que adjustMarginsForEdgeToEdge en la 7 (que
+      // ignora este bloque). su setStyle sí se usa: ver system-bars.ts.
+      SystemBars: { insetsHandling: 'disable' },
       // fetch/XHR via capa nativa: cookie jar nativo, sin CORS en llamadas a la api
       CapacitorHttp: { enabled: true },
       CapacitorCookies: { enabled: true },
