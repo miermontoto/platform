@@ -16,8 +16,19 @@
 #         app_group: group.info.duckhunt.app # obligatorio con widget_extension_dir
 #         widget_min_ios_version: '17.0'     # opcional: target de la extensión (AppIntents = 17)
 #         app_sources_dir: ios-intents       # opcional: swift + .xcstrings extra del target App (ver paso 8)
+#         runner: xcode-27                   # opcional: imagen del runner (default macos-26, ver "XCODE")
+#         xcode_version: '27.0'              # opcional: Xcode fijo (default: el más nuevo instalado)
 #         upload: true
 #       secrets: inherit
+#
+# XCODE: el runner y el Xcode son inputs porque cada app migra a su ritmo. macos-26 trae
+# Xcode 26.x; Xcode 27 (sdk ios 27, el que da pantalla completa en el iPhone Duo) vive en
+# la imagen `xcode-27` (preview en github), que además instala betas (27.1_beta, 27.2_beta).
+# con xcode_version vacío se escoge el Xcode más nuevo, que ahí sería una BETA: App Store
+# Connect rechaza builds de betas, así que en esa imagen fija siempre xcode_version.
+# compilar con el sdk ios 27+ EXIGE el ciclo de vida UIScene (TN3187: sin él la app no
+# arranca): la plantilla de capacitor >= 8.5 lo trae, así que una app en capacitor 7 debe
+# quedarse en macos-26 hasta migrar.
 #
 # REQUISITO: el package.json raíz de la app declara `"packageManager": "pnpm@<v>"`.
 # de ahí saca la versión de pnpm el paso "Setup pnpm" (ver su comentario); sin ese
@@ -209,6 +220,16 @@ on:
         required: false
         type: string
         default: ''
+      runner:
+        description: 'imagen del runner macOS (macos-26 = Xcode 26; xcode-27 = Xcode 27, exige UIScene / capacitor >= 8.5)'
+        required: false
+        type: string
+        default: 'macos-26'
+      xcode_version:
+        description: 'versión de Xcode a seleccionar (/Applications/Xcode_<v>.app, p.ej. 27.0); vacío → la más nueva instalada (en xcode-27 sería una beta)'
+        required: false
+        type: string
+        default: ''
       path_filter:
         description: 'pathspecs de git (uno por línea) que disparan el build en push a rama; vacío → siempre'
         # el default deja fuera pnpm-lock.yaml y packages/api a propósito: el lockfile
@@ -365,8 +386,9 @@ jobs:
     needs: guard
     if: needs.guard.outputs.build == 'true'
     # Apple exige construir con el SDK de iOS 26+ (Xcode 26) para subir a App Store
-    # Connect. macos-26 (Tahoe) trae Xcode 26 por defecto.
-    runs-on: macos-26
+    # Connect. macos-26 (Tahoe) trae Xcode 26 por defecto; xcode-27 trae Xcode 27 (ver
+    # "XCODE" en la cabecera).
+    runs-on: ${{ inputs.runner }}
     timeout-minutes: 60
     steps:
       - name: Checkout (con submódulo platform)
@@ -434,12 +456,22 @@ jobs:
       - name: Install deps
         run: pnpm install --frozen-lockfile
 
-      - name: Mostrar toolchain (Xcode más nuevo → SDK iOS 26+)
+      - name: Seleccionar Xcode (fijo o el más nuevo)
+        env:
+          XCODE_VERSION: ${{ inputs.xcode_version }}
+          RUNNER: ${{ inputs.runner }}
         run: |
           ls -d /Applications/Xcode_*.app 2>/dev/null || true
-          # selecciona el Xcode de mayor versión instalado (defensivo; en macos-26 ya es 26)
-          NEWEST=$(ls -d /Applications/Xcode_*.app 2>/dev/null | sort -V | tail -1)
-          [ -n "$NEWEST" ] && sudo xcode-select -s "$NEWEST"
+          if [ -n "$XCODE_VERSION" ]; then
+            # versión fija: muere si la imagen no la trae, en vez de caer a otra en silencio
+            XCODE="/Applications/Xcode_${XCODE_VERSION}.app"
+            [ -d "$XCODE" ] || { echo "::error::no hay $XCODE en $RUNNER"; exit 1; }
+            sudo xcode-select -s "$XCODE"
+          else
+            # el de mayor versión instalado (defensivo; en macos-26 ya es 26)
+            NEWEST=$(ls -d /Applications/Xcode_*.app 2>/dev/null | sort -V | tail -1)
+            [ -n "$NEWEST" ] && sudo xcode-select -s "$NEWEST"
+          fi
           xcodebuild -version
           echo "iOS SDK: $(xcrun --sdk iphoneos --show-sdk-version)"
           pod --version || sudo gem install cocoapods --no-document
@@ -447,8 +479,10 @@ jobs:
       - name: Scaffold proyecto iOS (cap add) si no existe
         working-directory: packages/web
         run: |
+          # CocoaPods explícito: capacitor 8 scaffolda con SPM por defecto y todo lo de abajo
+          # (Podfile, pod install, .xcworkspace, podspecs de plugins locales) asume pods.
           if [ ! -d ios ]; then
-            pnpm exec cap add ios
+            pnpm exec cap add ios --packagemanager CocoaPods
           fi
 
       - name: Subir el deployment target mínimo (ITMS-90068)
