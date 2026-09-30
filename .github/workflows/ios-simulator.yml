@@ -1,0 +1,158 @@
+# workflow REUTILIZABLE (workflow_call): build de SIMULADOR (sin firma, sin subir) + arranque en
+# un dispositivo del simulador + capturas como artifact. sirve para validar en ci lo que no se
+# puede probar sin mac: que la app arranca con un sdk nuevo (p.ej. el ciclo de vida UIScene que
+# exige el sdk ios 27) y cómo pinta en un dispositivo nuevo (iPhone Duo). no toca App Store
+# Connect ni necesita secrets. caller fino:
+#
+#   on: workflow_dispatch
+#   jobs:
+#     preview:
+#       uses: miermontoto/platform/.github/workflows/ios-simulator.yml@main
+#       with:
+#         bundle_id: info.duckhunt.app
+#         device: iPhone Duo            # subcadena del nombre del device type
+#         xcode_version: '27.1'         # el simulador del Duo llega con xcode 27.1
+#
+# un Xcode beta vale aquí (no se sube nada). el job falla si no hay device type que case con
+# `device`, si la app no se instala o si no sigue viva tras arrancar (crash al lanzar); lo
+# demás (displays del dispositivo, subcomandos de simctl para posturas) solo se registra en el
+# log para la siguiente iteración.
+
+name: iOS simulator (reusable)
+
+on:
+  workflow_call:
+    inputs:
+      bundle_id:
+        description: 'bundle id de la app (para lanzarla en el simulador)'
+        required: true
+        type: string
+      device:
+        description: 'subcadena del nombre del device type del simulador (p.ej. "iPhone Duo")'
+        required: true
+        type: string
+      runner:
+        description: 'imagen del runner macOS'
+        required: false
+        type: string
+        default: 'xcode-27'
+      xcode_version:
+        description: 'versión de Xcode a seleccionar (/Applications/Xcode_<v>.app)'
+        required: true
+        type: string
+      settle_seconds:
+        description: 'segundos de espera tras lanzar antes de comprobar y capturar'
+        required: false
+        type: number
+        default: 25
+
+jobs:
+  simulator:
+    runs-on: ${{ inputs.runner }}
+    timeout-minutes: 60
+    steps:
+      - name: Checkout (con submódulo platform)
+        uses: actions/checkout@v7
+        with:
+          submodules: recursive
+          token: ${{ secrets.SUBMODULES_PAT || github.token }}
+
+      - name: Setup pnpm
+        # misma fuente de versión que ios-release.yml: el campo packageManager del package.json
+        uses: pnpm/action-setup@v6
+
+      - name: Setup Node 22
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install deps
+        run: pnpm install --frozen-lockfile
+
+      - name: Seleccionar Xcode
+        env:
+          XCODE_VERSION: ${{ inputs.xcode_version }}
+          RUNNER: ${{ inputs.runner }}
+        run: |
+          XCODE="/Applications/Xcode_${XCODE_VERSION}.app"
+          [ -d "$XCODE" ] || { ls -d /Applications/Xcode_*.app; echo "::error::no hay $XCODE en $RUNNER"; exit 1; }
+          sudo xcode-select -s "$XCODE"
+          xcodebuild -version
+          pod --version || sudo gem install cocoapods --no-document
+
+      - name: Scaffold proyecto iOS + build web + cap sync
+        # mismo scaffold que ios-release.yml (CocoaPods explícito: capacitor 8 usa SPM por
+        # defecto); sin firma, iconos, widgets ni intents: solo hace falta que la app arranque.
+        working-directory: packages/web
+        run: |
+          [ -d ios ] || pnpm exec cap add ios --packagemanager CocoaPods
+          pnpm run mobile:build:ios
+
+      - name: Build para el simulador (sin firma)
+        working-directory: packages/web/ios/App
+        run: |
+          xcodebuild -workspace App.xcworkspace -scheme App -configuration Debug \
+            -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath "$RUNNER_TEMP/sim" CODE_SIGNING_ALLOWED=NO build | tail -20
+          test -d "$RUNNER_TEMP/sim/Build/Products/Debug-iphonesimulator/App.app"
+
+      - name: Crear y arrancar el dispositivo
+        id: device
+        env:
+          DEVICE: ${{ inputs.device }}
+        run: |
+          xcrun simctl list runtimes
+          xcrun simctl list devicetypes | grep -i "iphone" || true
+          # device type cuyo nombre contiene DEVICE + el runtime ios más nuevo que lo soporta
+          # (una llamada por tipo: el segundo argumento de `simctl list` es un filtro, no otro tipo)
+          read -r TYPE RUNTIME < <(python3 -c '
+          import json, os, subprocess, sys
+          def listing(kind): return json.loads(subprocess.check_output(["xcrun", "simctl", "list", "-j", kind]))[kind]
+          want = os.environ["DEVICE"].lower()
+          d = {"devicetypes": listing("devicetypes"), "runtimes": listing("runtimes")}
+          types = [t for t in d["devicetypes"] if want in t["name"].lower()]
+          if not types: sys.exit("no hay device type que contenga " + repr(want))
+          ids = {t["identifier"] for t in types}
+          rts = [r for r in d["runtimes"] if r.get("isAvailable") and r["name"].startswith("iOS")
+                 and ids & {s["identifier"] for s in r.get("supportedDeviceTypes", [])}]
+          if not rts: sys.exit("ningún runtime ios disponible soporta " + ", ".join(sorted(ids)))
+          rt = max(rts, key=lambda r: [int(p) for p in r["version"].split(".")])
+          tid = next(t["identifier"] for t in types if t["identifier"] in {s["identifier"] for s in rt["supportedDeviceTypes"]})
+          print(tid, rt["identifier"])
+          ') || { echo "::error::sin dispositivo '$DEVICE' en el simulador (ver runtimes y device types arriba)"; exit 1; }
+          echo "device type $TYPE, runtime $RUNTIME"
+          UDID=$(xcrun simctl create preview "$TYPE" "$RUNTIME")
+          xcrun simctl boot "$UDID"
+          xcrun simctl bootstatus "$UDID" -b
+          echo "udid=$UDID" >> "$GITHUB_OUTPUT"
+
+      - name: Instalar, lanzar y capturar
+        env:
+          UDID: ${{ steps.device.outputs.udid }}
+          BUNDLE_ID: ${{ inputs.bundle_id }}
+          SETTLE: ${{ inputs.settle_seconds }}
+        run: |
+          OUT="$RUNNER_TEMP/shots"; mkdir -p "$OUT"
+          xcrun simctl install "$UDID" "$RUNNER_TEMP/sim/Build/Products/Debug-iphonesimulator/App.app"
+          xcrun simctl launch "$UDID" "$BUNDLE_ID"
+          sleep "$SETTLE"
+          # displays del dispositivo (el Duo tiene dos) y subcomandos disponibles: diagnóstico
+          # para capturar cada pantalla y cada postura en la siguiente iteración.
+          xcrun simctl io "$UDID" enumerate > "$OUT/displays.txt" 2>&1 || true
+          xcrun simctl help > "$OUT/simctl-help.txt" 2>&1 || true
+          xcrun simctl io "$UDID" screenshot "$OUT/launch.png"
+          xcrun simctl spawn "$UDID" log show --last 3m --style compact \
+            --predicate "process == \"App\" OR eventMessage CONTAINS \"$BUNDLE_ID\"" > "$OUT/app.log" 2>&1 || true
+          # un crash al lanzar (p.ej. el assert de UIScene del sdk 27) deja la app fuera de launchctl
+          if ! xcrun simctl spawn "$UDID" launchctl list | grep -q "$BUNDLE_ID"; then
+            echo "::error::la app no sigue viva tras ${SETTLE}s: ver app.log en el artifact"; exit 1
+          fi
+
+      - name: Guardar capturas y logs
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ios-simulator-${{ inputs.device }}
+          path: ${{ runner.temp }}/shots
+          if-no-files-found: warn
