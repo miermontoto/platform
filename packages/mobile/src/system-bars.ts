@@ -49,7 +49,25 @@ interface SystemBarsAppearance {
   setStyle(options: { style: BarStyle }): Promise<void>;
 }
 
-const SystemBars = registerPlugin<SystemBarsAppearance>('SystemBars');
+// capacitor 8 exporta su SystemBars desde el core y lo registra al importarse: registrarlo
+// otra vez por nombre funciona pero avisa por consola ("already registered"). se toma el suyo
+// si existe y, si no (la 7), se registra por nombre. lectura dinámica a propósito: en la 7 ese
+// export no existe y un acceso estático haría avisar al build. memo: un solo registro.
+// FOOTGUN: el proxy de un plugin NUNCA puede resolver una promesa (ni volver de un async ni de
+// un .then): la promesa lee su `.then`, el proxy lo toma por un método nativo y revienta con
+// "SystemBars.then() is not implemented". por el await solo pasa el módulo; el proxy se elige
+// después, en síncrono (así dos llamadas concurrentes tampoco lo registran dos veces).
+let coreModule: Promise<Record<string, unknown>> | null = null;
+let systemBars: SystemBarsAppearance | null = null;
+
+async function setSystemBarsStyle(style: BarStyle): Promise<void> {
+  coreModule ??= import('@capacitor/core');
+  const core = await coreModule;
+  systemBars ??=
+    (core.SystemBars as SystemBarsAppearance | undefined) ??
+    registerPlugin<SystemBarsAppearance>('SystemBars');
+  await systemBars.setStyle({ style });
+}
 
 export interface SystemBarsTheme {
   // color de fondo de las barras (hex). en la línea 7.x del plugin de capawesome
@@ -75,7 +93,7 @@ export async function applySystemBars(theme: SystemBarsTheme): Promise<void> {
 
   // contraste de iconos de la status bar (sigue valiendo en android 15+).
   if (Capacitor.isPluginAvailable('SystemBars')) {
-    await SystemBars.setStyle({ style: dark ? 'DARK' : 'LIGHT' });
+    await setSystemBarsStyle(dark ? 'DARK' : 'LIGHT');
   } else {
     try {
       const { StatusBar, Style } = await import('@capacitor/status-bar');
