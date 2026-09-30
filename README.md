@@ -1,6 +1,6 @@
 # platform
 
-paquetes compartidos de las apps (sis, duckhunt, carreterinas†). cada app vive en
+paquetes compartidos de las apps (sis, duckhunt, carreterinas). cada app vive en
 su propio repo y consume este como **git submodule** en `platform/`, incluyendo
 `platform/packages/*` en su pnpm-workspace (deps `workspace:*`, fuente ts sin build).
 
@@ -88,7 +88,7 @@ comandos: `query` · `exec` (multi-sentencia) · `tables` · `schema [tabla]` ·
 - comentarios en español lowercase, código en inglés (igual que las apps)
 - node 22 (.nvmrc) + pnpm
 - pendiente (roadmap): billing/entitlements cuando exista pricing, scaffolder
-  de apps nuevas, migración de carreterinas
+  de apps nuevas
 
 ### convenciones web (móvil/tablet)
 
@@ -139,8 +139,6 @@ app.css): anti-zoom de iOS en inputs (`<16px` dispara zoom al enfocar), utilidad
 **drag & drop**: el drag HTML5 (`draggable`/`dataTransfer`) **no existe en iOS
 Safari/WKWebView**. si una vista lo usa, dale una alternativa táctil (menú/acciones);
 no asumas que el drag funciona en la app nativa.
-
-† carreterinas pendiente de migrar (svelte 4 → 5, bun → node, split api/web).
 
 ## licencia
 
