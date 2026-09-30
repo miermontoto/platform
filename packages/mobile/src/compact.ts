@@ -20,11 +20,14 @@ import { Capacitor } from '@capacitor/core';
 // ancho (px) por defecto bajo el cual el layout web pasa a compacto.
 export const COMPACT_BREAKPOINT_DEFAULT = 720;
 
-// tablet apaisado: el único caso nativo con layout de escritorio. el alto mínimo descarta
-// al móvil en horizontal (ancho de hasta ~960px pero ~430px de alto); el ancho cubre desde
-// el iPad de 10.2" (1080px) y la orientación deja al iPad Pro 13" vertical (1024px) en
-// compacto. split view estrecha el viewport y vuelve a compacto sola.
-export const TABLET_LANDSCAPE_QUERY = '(orientation: landscape) and (min-width: 1024px) and (min-height: 600px)';
+// tablet apaisado: el único caso nativo con layout de escritorio. el alto mínimo es el que
+// descarta al móvil en horizontal (ancho de hasta ~960px pero ~440px de alto); el ancho
+// mínimo baja a 800 para cubrir la pantalla interior de los plegables en horizontal
+// (iPhone Duo ~890x626, menos la columna lateral de la status bar con el sdk 27.0; pixel
+// fold / galaxy z fold ~820-840 de ancho y ~700 de alto) además de todos los iPads. la
+// orientación deja a cualquier tablet vertical en compacto y split view estrecha el
+// viewport y vuelve a compacto sola.
+export const TABLET_LANDSCAPE_QUERY = '(orientation: landscape) and (min-width: 800px) and (min-height: 600px)';
 
 export interface InstallCompactOptions {
   // ancho (px) bajo el cual el layout web pasa a compacto. default 720.
