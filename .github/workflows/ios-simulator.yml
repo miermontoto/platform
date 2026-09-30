@@ -97,6 +97,20 @@ jobs:
             -derivedDataPath "$RUNNER_TEMP/sim" CODE_SIGNING_ALLOWED=NO build | tail -20
           test -d "$RUNNER_TEMP/sim/Build/Products/Debug-iphonesimulator/App.app"
 
+      - name: Descargar el runtime del simulador si falta
+        # la imagen trae el sdk de simulador de cada Xcode pero no siempre su RUNTIME: en xcode-27
+        # (2026-09-30) Xcode 27.1 conoce el device type "iPhone Duo" y solo estaba instalado el
+        # runtime ios 27.0, que no lo soporta. se baja el del Xcode seleccionado (varios GB).
+        run: |
+          SDK=$(xcrun --sdk iphonesimulator --show-sdk-version)
+          if xcrun simctl list runtimes | grep -E "^iOS ${SDK//./\\.} " | grep -v unavailable | grep -q .; then
+            echo "runtime ios $SDK ya instalado"
+          else
+            echo "falta el runtime ios $SDK: descargando"
+            xcodebuild -downloadPlatform iOS
+          fi
+          xcrun simctl list runtimes
+
       - name: Crear y arrancar el dispositivo
         id: device
         env:
