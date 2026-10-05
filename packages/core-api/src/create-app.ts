@@ -16,6 +16,8 @@ export interface PlatformAppOptions {
 }
 
 const log = createLogger('api');
+// el origin por defecto de cors(); explícito porque hasta hono 4.12.6 es obligatorio en las opciones
+const ANY_ORIGIN = '*';
 
 /**
  * crea el hono base con el middleware estándar. las rutas, el gate de sesión
@@ -26,7 +28,7 @@ export function createPlatformApp<E extends Env>(opts: PlatformAppOptions = {}):
 
   app.use('*', httpTelemetry(opts.quietPaths ?? DEFAULT_QUIET_PATHS));
   // x-trace-id expuesto a los clientes cross-origin (app nativa contra la api remota)
-  app.use('/api/*', cors({ exposeHeaders: [TRACE_HEADER] }));
+  app.use('/api/*', cors({ origin: ANY_ORIGIN, exposeHeaders: [TRACE_HEADER] }));
 
   // traduce errores no capturados a respuestas estructuradas en /api/*, con el trace id
   // para saltar a la traza. fuera de /api responde como el handler por defecto de hono
