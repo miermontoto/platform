@@ -4,7 +4,7 @@
 // y, con el export otlp activo, un log record otlp que hereda el trace_id/span_id del
 // contexto. LOG_LEVEL filtra ambas salidas. info/debug van a stdout y warn/error a
 // stderr, igual que console.*.
-import { format } from 'node:util';
+import { format, inspect } from 'node:util';
 import { isSpanContextValid, trace } from '@opentelemetry/api';
 import { logs, SeverityNumber, type AnyValueMap, type Logger as OtlpLogger } from '@opentelemetry/api-logs';
 
@@ -77,16 +77,33 @@ const isPlainObject = (v: unknown): v is LogAttrs => {
   return proto === Object.prototype || proto === null;
 };
 
+// inspect en una línea: tolera bigint y referencias circulares (un log nunca debe lanzar)
+const INSPECT_OPTIONS = { breakLength: Infinity, depth: 3 } as const;
+
 // `k=v` legible; los strings con espacios van entre comillas para no partir el par
 const formatAttr = ([k, v]: [string, unknown]): string =>
-  ` ${k}=${typeof v === 'string' && !/\s/.test(v) ? v : JSON.stringify(v)}`;
+  ` ${k}=${typeof v !== 'string' ? inspect(v, INSPECT_OPTIONS) : /\s/.test(v) ? JSON.stringify(v) : v}`;
 
-function write(level: EmitLevel, scope: string, args: unknown[]): void {
+// json de una línea con bigint como string; si aun así falla (circular), el registro inspeccionado
+const toJson = (record: Record<string, unknown>): string => {
+  try {
+    return JSON.stringify(record, (_, v) => (typeof v === 'bigint' ? v.toString() : v));
+  } catch {
+    return JSON.stringify(inspect(record, INSPECT_OPTIONS));
+  }
+};
+
+/**
+ * `structured`: el último argumento, si es un objeto plano tras el mensaje, pasa a ser
+ * atributos (columnas en el backend). solo para llamadas deliberadas del logger: el bridge
+ * de console lo desactiva para que un `console.log('[x]', respuesta)` no convierta cada
+ * clave de un json ajeno en una columna.
+ */
+function write(level: EmitLevel, scope: string, args: unknown[], structured = true): void {
   const cfg = (config ??= resolveConfig());
   if (LEVELS[level] < cfg.threshold) return;
 
-  // atributos estructurados: el último argumento, si es un objeto plano tras el mensaje
-  const attrs = args.length > 1 && isPlainObject(args.at(-1)) ? (args.at(-1) as LogAttrs) : undefined;
+  const attrs = structured && args.length > 1 && isPlainObject(args.at(-1)) ? (args.at(-1) as LogAttrs) : undefined;
   const parts = attrs ? args.slice(0, -1) : args;
   const error = parts.find((a): a is Error => a instanceof Error);
   // mensaje sin stack (json/otlp lo llevan aparte en exception.*); el pretty lo conserva
@@ -95,7 +112,7 @@ function write(level: EmitLevel, scope: string, args: unknown[]): void {
   const traced = spanContext && isSpanContextValid(spanContext) ? spanContext : undefined;
 
   const line = cfg.json
-    ? JSON.stringify({
+    ? toJson({
         time: new Date().toISOString(),
         level,
         service: cfg.service,
@@ -144,9 +161,9 @@ export function installConsoleBridge(): void {
     (...args: unknown[]): void => {
       const [first, ...rest] = args;
       const match = typeof first === 'string' ? SCOPE_PREFIX.exec(first) : null;
-      if (!match) return write(level, CONSOLE_SCOPE, args);
+      if (!match) return write(level, CONSOLE_SCOPE, args, false);
       const tail = (first as string).slice(match[0].length);
-      write(level, match[1], tail ? [tail, ...rest] : rest);
+      write(level, match[1], tail ? [tail, ...rest] : rest, false);
     };
   console.debug = route('debug');
   console.log = console.info = route('info');
