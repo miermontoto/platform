@@ -6,7 +6,7 @@ import { cors } from 'hono/cors';
 import { HTTPException } from 'hono/http-exception';
 import { trace } from '@opentelemetry/api';
 import { createLogger, currentTraceId } from '@platform/observability';
-import { DEFAULT_QUIET_PATHS, TRACE_HEADER, httpTelemetry } from './http-telemetry.js';
+import { DEFAULT_QUIET_PATHS, TRACE_HEADER, httpTelemetry, loggablePath } from './http-telemetry.js';
 
 export interface PlatformAppOptions {
   // prefijos de mensaje que indican fallo de config/dependencia externa → 503 en vez de 500
@@ -37,7 +37,7 @@ export function createPlatformApp<E extends Env>(opts: PlatformAppOptions = {}):
     if (err instanceof HTTPException) return err.getResponse();
     const msg = err instanceof Error ? err.message : String(err);
     trace.getActiveSpan()?.recordException(err);
-    log.error(`${c.req.method} ${c.req.path}:`, err);
+    log.error(`${c.req.method} ${loggablePath(c)}:`, err);
     if (!c.req.path.startsWith('/api/')) return c.text('Internal Server Error', 500);
     const isConfig = opts.configErrorPrefixes?.test(msg) ?? false;
     return c.json({ error: msg, traceId: currentTraceId() }, isConfig ? 503 : 500);

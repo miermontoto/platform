@@ -4,7 +4,7 @@
 // la pestaña de red) salte de una respuesta fallida a su traza. el traceparent entrante
 // es dato del cliente: solo decide a qué traza se une el span (así los servicios propios
 // encadenan sus trazas), nunca si se registra.
-import type { MiddlewareHandler } from 'hono';
+import type { Context, MiddlewareHandler } from 'hono';
 import { routePath } from 'hono/route';
 import {
   context,
@@ -29,8 +29,25 @@ const DEFAULT_SLOW_MS = 1000;
 const SERVER_ERROR_STATUS = 500;
 // rutas comodín (middlewares, fallback de la spa): no identifican el endpoint
 const CATCH_ALL_ROUTES = new Set(['', '*', '/*']);
+// parámetros de ruta cuyo valor es un secreto (enlaces de share, secretos de webhook en el
+// path): no deben llegar ni al access log ni al backend. la query nunca se registra.
+const SENSITIVE_PARAM = /token|secret|code|pass|sig|credential|session/i;
+const REDACTED = 'REDACTED';
 
 const log = createLogger('http');
+
+/**
+ * path de la request apto para logs y trazas: los parámetros de ruta sensibles (por su
+ * nombre) salen como REDACTED. depende del match de rutas: llamar tras el routing.
+ */
+export function loggablePath(c: Context): string {
+  return Object.entries(c.req.param() as Record<string, string>)
+    .filter(([name, value]) => value && SENSITIVE_PARAM.test(name))
+    .reduce(
+      (path, [, value]) => path.replaceAll(encodeURIComponent(value), REDACTED).replaceAll(value, REDACTED),
+      c.req.path,
+    );
+}
 
 const headerGetter: TextMapGetter<Headers> = {
   get: (headers, key) => headers.get(key) ?? undefined,
@@ -58,7 +75,6 @@ export function httpTelemetry(quietPaths: RegExp): MiddlewareHandler {
         kind: SpanKind.SERVER,
         attributes: {
           'http.request.method': method,
-          'url.path': path,
           'user_agent.original': c.req.header('user-agent'),
           // ip real tras nginx-proxy, que sobrescribe x-real-ip con $remote_addr (x-forwarded-for
           // no: lo arrastra del cliente). informativo; un acceso directo al puerto puede falsearlo
@@ -79,6 +95,9 @@ export function httpTelemetry(quietPaths: RegExp): MiddlewareHandler {
         const { status } = c.res;
         const route = routePath(c);
         const ms = Math.round(performance.now() - start);
+        // tras el routing: hasta aquí no se sabe qué segmentos son parámetros sensibles
+        const safePath = loggablePath(c);
+        span.setAttribute('url.path', safePath);
         span.setAttribute('http.response.status_code', status);
         if (!CATCH_ALL_ROUTES.has(route)) {
           span.setAttribute('http.route', route);
@@ -93,7 +112,7 @@ export function httpTelemetry(quietPaths: RegExp): MiddlewareHandler {
           } catch {}
         }
         const level = status >= SERVER_ERROR_STATUS ? 'error' : ms >= slowMs! ? 'warn' : 'info';
-        log[level](`${method} ${path} ${status} ${ms}ms`);
+        log[level](`${method} ${safePath} ${status} ${ms}ms`);
         span.end();
       }
     });
