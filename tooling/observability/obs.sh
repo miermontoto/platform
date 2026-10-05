@@ -29,7 +29,7 @@
 #
 # flags:
 #   --since DUR       ventana hacia atrás: 45s, 30m, 6h, 2d (default 1h; trace: 7d)
-#   --service NAME    filtra por service.name (sis, duckhunt, carreterinas, mier-id, fantasy)
+#   --service NAME    filtra por service.name (sis, duckhunt, carreterinas, mier.info, fantasy)
 #   --limit N         máximo de filas (default 50)
 #   --level LVL       logs: debug|info|warn|error
 #   --scope NAME      logs: scope del logger (el [scope] de la línea)

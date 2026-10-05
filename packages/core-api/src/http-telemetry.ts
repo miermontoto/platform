@@ -6,7 +6,15 @@
 // encadenan sus trazas), nunca si se registra.
 import type { MiddlewareHandler } from 'hono';
 import { routePath } from 'hono/route';
-import { context, propagation, SpanKind, SpanStatusCode, trace, type TextMapGetter } from '@opentelemetry/api';
+import {
+  context,
+  isSpanContextValid,
+  propagation,
+  SpanKind,
+  SpanStatusCode,
+  trace,
+  type TextMapGetter,
+} from '@opentelemetry/api';
 import { createLogger, tracer } from '@platform/observability';
 
 /** header de respuesta con el trace id de la request. */
@@ -59,9 +67,10 @@ export function httpTelemetry(quietPaths: RegExp): MiddlewareHandler {
       },
       parent,
     );
-    const { traceId } = span.spanContext();
+    // sin sdk (tests, OTEL_SDK_DISABLED) el span es no-op y su trace id son ceros: sin header
+    const traceId = isSpanContextValid(span.spanContext()) ? span.spanContext().traceId : undefined;
     const start = performance.now();
-    c.header(TRACE_HEADER, traceId);
+    if (traceId) c.header(TRACE_HEADER, traceId);
 
     await context.with(trace.setSpan(parent, span), async () => {
       try {
@@ -78,7 +87,7 @@ export function httpTelemetry(quietPaths: RegExp): MiddlewareHandler {
         if (status >= SERVER_ERROR_STATUS) span.setStatus({ code: SpanStatusCode.ERROR });
         // las respuestas construidas a mano (new Response) no heredan el header preparado.
         // un 101 de websocket no admite re-crear la respuesta: se queda sin header.
-        if (!c.res.headers.has(TRACE_HEADER)) {
+        if (traceId && !c.res.headers.has(TRACE_HEADER)) {
           try {
             c.header(TRACE_HEADER, traceId);
           } catch {}
