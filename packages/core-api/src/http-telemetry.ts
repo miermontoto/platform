@@ -5,7 +5,7 @@
 // es dato del cliente: solo decide a qué traza se une el span (así los servicios propios
 // encadenan sus trazas), nunca si se registra.
 import type { Context, MiddlewareHandler } from 'hono';
-import { routePath } from 'hono/route';
+import { matchedRoutes, routePath } from 'hono/route';
 import {
   context,
   isSpanContextValid,
@@ -33,20 +33,40 @@ const CATCH_ALL_ROUTES = new Set(['', '*', '/*']);
 // path): no deben llegar ni al access log ni al backend. la query nunca se registra.
 const SENSITIVE_PARAM = /token|secret|code|pass|sig|credential|session/i;
 const REDACTED = 'REDACTED';
+// segmento de plantilla que es un parámetro: `:name`, con patrón `{...}` u opcional `?`
+const PARAM_SEGMENT = /^:(\w+)/;
+// red de seguridad para segmentos que ninguna plantilla declara como parámetro (404, url de
+// webhook mal escrita): uno largo con alfabeto de token se trata como secreto. 32 cubre los
+// tokens de las apps (48 hex, 43 base64url) y deja pasar ids de spotify (22); los uuid son ids
+const TOKEN_LIKE_SEGMENT = /^[\w\-.~%]{32,}$/;
+const UUID_SEGMENT = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const log = createLogger('http');
 
 /**
- * path de la request apto para logs y trazas: los parámetros de ruta sensibles (por su
- * nombre) salen como REDACTED. depende del match de rutas: llamar tras el routing.
+ * path de la request apto para logs y trazas. redacta por POSICIÓN de segmento, no por
+ * sustitución de texto (el valor decodificado de un parámetro no tiene por qué coincidir con
+ * el codificado que mandó el cliente): se parte el mismo path sobre el que casó el router y
+ * se tapan los segmentos que alguna plantilla declara como parámetro sensible. se usan todas
+ * las rutas que casan, no solo la que respondió, porque un middleware puede cortar antes del
+ * handler (el 401 del gate). fuera de los parámetros declarados no sensibles (`:id`), un
+ * segmento con pinta de token también se tapa.
  */
 export function loggablePath(c: Context): string {
-  return Object.entries(c.req.param() as Record<string, string>)
-    .filter(([name, value]) => value && SENSITIVE_PARAM.test(name))
-    .reduce(
-      (path, [, value]) => path.replaceAll(encodeURIComponent(value), REDACTED).replaceAll(value, REDACTED),
-      c.req.path,
-    );
+  const params = matchedRoutes(c).flatMap((route) =>
+    route.path.split('/').flatMap((segment, i) => {
+      const name = PARAM_SEGMENT.exec(segment)?.[1];
+      return name ? [{ i, sensitive: SENSITIVE_PARAM.test(name) }] : [];
+    }),
+  );
+  const sensitive = new Set(params.filter((p) => p.sensitive).map((p) => p.i));
+  const declared = new Set(params.map((p) => p.i));
+  const tokenLike = (segment: string, i: number) =>
+    !declared.has(i) && TOKEN_LIKE_SEGMENT.test(segment) && !UUID_SEGMENT.test(segment);
+  return c.req.path
+    .split('/')
+    .map((segment, i) => (sensitive.has(i) || tokenLike(segment, i) ? REDACTED : segment))
+    .join('/');
 }
 
 const headerGetter: TextMapGetter<Headers> = {
