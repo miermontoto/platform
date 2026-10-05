@@ -9,7 +9,7 @@ import { OTLPLogExporter } from '@opentelemetry/exporter-logs-otlp-http';
 import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-http';
 import { resourceFromAttributes } from '@opentelemetry/resources';
 import { BatchLogRecordProcessor, LoggerProvider } from '@opentelemetry/sdk-logs';
-import { BatchSpanProcessor, NodeTracerProvider } from '@opentelemetry/sdk-trace-node';
+import { AlwaysOnSampler, BatchSpanProcessor, NodeTracerProvider } from '@opentelemetry/sdk-trace-node';
 import { instrumentFetch } from './fetch.js';
 import { configureLogger, createLogger, installConsoleBridge } from './logger.js';
 
@@ -51,6 +51,10 @@ export function initTelemetry({ service, version, bridgeConsole = true }: Teleme
   });
   const tracerProvider = new NodeTracerProvider({
     resource,
+    // siempre muestrea, ignorando el flag `sampled` del traceparent entrante: con el
+    // ParentBased por defecto cualquier cliente podría sacar sus requests de las trazas
+    // mandando `traceparent: ...-00`. el volumen de estas apps no necesita muestreo.
+    sampler: new AlwaysOnSampler(),
     spanLimits: { attributeValueLengthLimit: ATTRIBUTE_MAX_LENGTH },
     spanProcessors: exporting ? [new BatchSpanProcessor(new OTLPTraceExporter())] : [],
   });

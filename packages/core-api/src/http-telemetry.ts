@@ -1,7 +1,9 @@
 // telemetría http: un span SERVER por request (continúa el traceparent entrante, se
 // nombra con la ruta plantilla y lleva el status) y una línea de access log con duración
 // y trace id. el trace id viaja en `x-trace-id` para que el cliente (o un agente mirando
-// la pestaña de red) salte de una respuesta fallida a su traza.
+// la pestaña de red) salte de una respuesta fallida a su traza. el traceparent entrante
+// es dato del cliente: solo decide a qué traza se une el span (así los servicios propios
+// encadenan sus trazas), nunca si se registra.
 import type { MiddlewareHandler } from 'hono';
 import { routePath } from 'hono/route';
 import { context, propagation, SpanKind, SpanStatusCode, trace, type TextMapGetter } from '@opentelemetry/api';
@@ -50,8 +52,9 @@ export function httpTelemetry(quietPaths: RegExp): MiddlewareHandler {
           'http.request.method': method,
           'url.path': path,
           'user_agent.original': c.req.header('user-agent'),
-          // ip real tras nginx-proxy
-          'client.address': c.req.header('x-real-ip') ?? c.req.header('x-forwarded-for')?.split(',')[0]?.trim(),
+          // ip real tras nginx-proxy, que sobrescribe x-real-ip con $remote_addr (x-forwarded-for
+          // no: lo arrastra del cliente). informativo; un acceso directo al puerto puede falsearlo
+          'client.address': c.req.header('x-real-ip'),
         },
       },
       parent,
