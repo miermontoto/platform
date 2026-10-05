@@ -4,6 +4,9 @@ import dotenv from 'dotenv';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { existsSync } from 'fs';
+import { createLogger } from '@platform/observability';
+
+const log = createLogger('env');
 
 /**
  * carga el .env de la app. `metaUrl` es el import.meta.url del entrypoint;
@@ -20,6 +23,6 @@ export function loadAppEnv(metaUrl: string, { levelsUp = 3 }: { levelsUp?: numbe
   const envLocalPath = envPath.replace(/\.env$/, '.env.local');
   if (existsSync(envLocalPath)) {
     dotenv.config({ path: envLocalPath, override: true });
-    console.log(`[env] override desde ${envLocalPath}`);
+    log.info(`override desde ${envLocalPath}`);
   }
 }

@@ -1,6 +1,7 @@
-// arranque del servidor http con shutdown graceful (SIGINT/SIGTERM)
+// arranque del servidor http con shutdown graceful (SIGINT/SIGTERM) y flush de telemetría
 import { serve, type ServerType } from '@hono/node-server';
 import type { Env, Hono } from 'hono';
+import { createLogger, shutdownTelemetry } from '@platform/observability';
 
 export interface StartServerOptions {
   // tag de logs (nombre de la app)
@@ -22,17 +23,20 @@ export function startApiServer<E extends Env>(
   app: Hono<E>,
   { name, version, port, injectWebSocket, onShutdown, afterClose }: StartServerOptions,
 ) {
+  const log = createLogger(name);
   const resolvedPort = port ?? parseInt(process.env.PORT || '3000');
   const server = serve({ fetch: app.fetch, port: resolvedPort }, (info) => {
-    console.log(`[${name}${version ? ` ${version}` : ''}] escuchando en http://localhost:${info.port}`);
+    log.info(`${version ? `${version} ` : ''}escuchando en http://localhost:${info.port}`);
   });
   injectWebSocket?.(server);
 
   const shutdown = async () => {
-    console.log(`\n[${name}] cerrando...`);
+    log.info('cerrando...');
     await onShutdown?.();
     await new Promise<void>((res) => server.close(() => res()));
     await afterClose?.();
+    // último paso: los logs del propio cierre también salen en el flush
+    await shutdownTelemetry();
     process.exit(0);
   };
 

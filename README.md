@@ -10,8 +10,12 @@ su propio repo y consume este como **git submodule** en `platform/`, incluyendo
 packages/
   config/     tsconfig base + presets de vite (pwa + proxy dev + i18n paraglide)
   core-api/   hono base, gate de sesión, spa estática, bootstrap del servidor, .env,
-              ws-hub (pub/sub por usuario)
-  db/         factoría sqlite (wal + pragmas + unaccent + migraciones drizzle)
+              ws-hub (pub/sub por usuario), telemetría http (span + access log)
+  db/         factoría sqlite (wal + pragmas + unaccent + migraciones drizzle +
+              spans por query y log de queries lentas)
+  observability/
+              opentelemetry: trazas + logs estructurados, logger con scope,
+              bridge de console.*, fetch saliente con traceparent, withSpan
   auth/       tabla canónica de sesiones + servicio de ciclo de vida
   ui/         componentes svelte compartidos (SettingsTabs, SessionsPanel,
               PrivacyPolicy, Support, LanguageSwitcher) + http + i18n +
@@ -21,6 +25,9 @@ packages/
 tooling/
   backup/     backup-sqlite.sh — copia segura + rotación recent/weekly (docker|local)
   db/         db-sqlite.sh — acceso sqlite en caliente (docker|local), salida json
+  observability/
+              compose de openobserve (backend otlp) + obs.sh — consulta de trazas
+              y logs desde terminal, salida json
   mobile/     generadores de icons/splash android+ios desde el logo de la app
   version/    bump snapshot (<yy>w<ww><letra>) + plantilla de hook pre-commit
 .github/workflows/
@@ -45,6 +52,43 @@ packages:
 las apis bundlean los paquetes via tsup (`noExternal: [/^@platform\//]`); las webs
 via vite. actualizar la plataforma en una app = `git -C platform pull` + commit del
 nuevo sha del submodule.
+
+## trazas y logs
+
+cada api llama a `initTelemetry` justo después de `loadAppEnv` (los deps
+`@opentelemetry/*` que lista el `package.json` de `@platform/observability` van
+también en el de la api: tsup los deja externos). con eso, sin más código:
+
+- **http**: span por request (`GET /api/albums/:id`, status, `user.id` vía el gate de
+  sesión) + access log `[http] GET /api/x 200 12ms trace=<id>`. la respuesta lleva
+  `x-trace-id` y los 500 de `/api` devuelven `{ error, traceId }`.
+- **sqlite**: span hijo por sentencia dentro de una traza; las que pasan de
+  `DB_SLOW_QUERY_MS` (100) se loguean siempre como `[db] query lenta`.
+- **fetch saliente**: span hijo + `traceparent`, así la traza sigue en el servicio
+  destino (p.ej. el login oidc contra mier.info). query params sensibles redactados.
+- **logs**: `createLogger(scope)` y los `console.*` existentes (bridge: el `[scope]`
+  manual pasa a ser el scope) salen con trace id; `LOG_LEVEL`, `LOG_FORMAT=json`.
+- **background**: los ticks de pollers/jobs se envuelven en
+  `withSpan(name, fn, { root: true })` para tener traza propia.
+
+el export solo se activa con `OTEL_EXPORTER_OTLP_ENDPOINT`; sin él las trazas viven en
+proceso (trace id en logs y respuestas) y no salen de la máquina.
+
+```bash
+# backend (una vez): openobserve en 172.17.0.1:5080, retención 14 días
+cp tooling/observability/.env.example tooling/observability/.env   # rellenar password
+docker compose -f tooling/observability/docker-compose.yml up -d
+
+# en el .env de cada app
+OTEL_EXPORTER_OTLP_ENDPOINT=http://172.17.0.1:5080/api/default
+OTEL_EXPORTER_OTLP_HEADERS=Authorization=Basic <base64 de email:password>
+
+# consultas (json): errores, lo más lento, sql por tiempo total, una traza entera
+tooling/observability/obs.sh errors --service duckhunt --since 6h
+tooling/observability/obs.sh slow --kind http --min-ms 500
+tooling/observability/obs.sh queries --service sis
+tooling/observability/obs.sh trace <trace_id>
+```
 
 ## backups
 

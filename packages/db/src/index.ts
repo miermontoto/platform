@@ -1,10 +1,15 @@
 // factoría de conexiones sqlite (better-sqlite3 + drizzle) con los defaults de la
-// plataforma: wal, tuning de pragmas, unaccent() y migraciones de drizzle al abrir.
+// plataforma: wal, tuning de pragmas, unaccent(), instrumentación (spans + queries
+// lentas) y migraciones de drizzle al abrir.
 import Database from 'better-sqlite3';
 import { drizzle, type BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import { migrate } from 'drizzle-orm/better-sqlite3/migrator';
 import { dirname, resolve } from 'path';
 import { existsSync, mkdirSync } from 'fs';
+import { createLogger } from '@platform/observability';
+import { instrumentSqlite } from './instrument.js';
+
+export { DEFAULT_SLOW_QUERY_MS, instrumentSqlite } from './instrument.js';
 
 export interface SqliteDbOptions<TSchema extends Record<string, unknown>> {
   schema: TSchema;
@@ -21,6 +26,8 @@ export interface SqliteDbOptions<TSchema extends Record<string, unknown>> {
   afterOpen?: (sqlite: Database.Database) => void;
   // tag de logs (default 'db')
   logTag?: string;
+  // umbral de query lenta en ms (default: env DB_SLOW_QUERY_MS o 100)
+  slowQueryMs?: number;
 }
 
 export interface SqliteDbHandle<TSchema extends Record<string, unknown>> {
@@ -32,7 +39,7 @@ export interface SqliteDbHandle<TSchema extends Record<string, unknown>> {
 export function createSqliteDb<TSchema extends Record<string, unknown>>(
   opts: SqliteDbOptions<TSchema>,
 ): SqliteDbHandle<TSchema> {
-  const tag = opts.logTag ?? 'db';
+  const log = createLogger(opts.logTag ?? 'db');
 
   // ruta relativa a cwd (raíz de la app en dev, /app/packages/api en docker)
   const rawPath = process.env.DATABASE_PATH || opts.defaultPath;
@@ -56,6 +63,9 @@ export function createSqliteDb<TSchema extends Record<string, unknown>>(
     sqlite.function(name, fn as (...params: unknown[]) => unknown);
   }
 
+  // antes de migrar: las migraciones lentas también salen en el log
+  instrumentSqlite(sqlite, { slowQueryMs: opts.slowQueryMs });
+
   const db = drizzle(sqlite, { schema: opts.schema });
 
   // migrate() es idempotente; en modo throw el error sube al borde del boot
@@ -64,25 +74,25 @@ export function createSqliteDb<TSchema extends Record<string, unknown>>(
     if (opts.migrationErrorMode === 'warn') {
       try {
         migrate(db, { migrationsFolder });
-        console.log(`[${tag}] migraciones aplicadas`);
+        log.info('migraciones aplicadas');
       } catch {
-        console.log(`[${tag}] sin migraciones pendientes`);
+        log.info('sin migraciones pendientes');
       }
     } else {
       migrate(db, { migrationsFolder });
-      console.log(`[${tag}] migraciones aplicadas`);
+      log.info('migraciones aplicadas');
     }
   }
 
   opts.afterOpen?.(sqlite);
 
-  console.log(`[${tag}] conectado a ${dbPath} (wal)`);
+  log.info(`conectado a ${dbPath} (wal)`);
   return {
     db,
     sqlite,
     close: () => {
       sqlite.close();
-      console.log(`[${tag}] cerrado`);
+      log.info('cerrado');
     },
   };
 }

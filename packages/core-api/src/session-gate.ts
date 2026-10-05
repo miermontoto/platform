@@ -2,6 +2,7 @@
 // la inyección de contexto específica de cada app (userId, role, workspace...).
 import type { Context, Env, MiddlewareHandler, Next } from 'hono';
 import { getCookie } from 'hono/cookie';
+import { trace } from '@opentelemetry/api';
 
 export interface SessionGateOptions<E extends Env, S> {
   cookieName: string;
@@ -21,6 +22,10 @@ export function sessionGate<E extends Env, S>(opts: SessionGateOptions<E, S>): M
     const token = getCookie(c, opts.cookieName);
     const session = token ? opts.validate(token) : null;
     if (!session) return c.json({ error: 'no autorizado' }, 401);
+    // usuario en el span de la request (user.id) para filtrar trazas por usuario. las
+    // sesiones de @platform/auth llevan userId; otra forma de sesión simplemente no lo pone.
+    const userId = (session as { userId?: unknown }).userId;
+    if (userId !== undefined) trace.getActiveSpan()?.setAttribute('user.id', String(userId));
     return opts.hydrate(c, session, next);
   };
 }

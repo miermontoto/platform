@@ -1,0 +1,25 @@
+# backend de trazas + logs de las apps (openobserve: un solo binario, otlp/http nativo,
+# ui con waterfall de trazas y búsqueda sql). las apis exportan con
+#   OTEL_EXPORTER_OTLP_ENDPOINT=http://172.17.0.1:5080/api/default
+#   OTEL_EXPORTER_OTLP_HEADERS=Authorization=Basic <base64(email:password)>
+# escucha en la ip de docker0: alcanzable desde los contenedores de cualquier proyecto
+# compose (igual que nginx-proxy → 172.17.0.1:<puerto>) y desde el host, pero no desde
+# la interfaz pública. consultas desde terminal: ./obs.sh (lee el .env de aquí).
+services:
+  openobserve:
+    image: openobserve/openobserve:v1.0.4
+    container_name: openobserve
+    restart: unless-stopped
+    # ZO_ROOT_USER_EMAIL / ZO_ROOT_USER_PASSWORD (ver .env.example)
+    env_file: .env
+    environment:
+      ZO_DATA_DIR: /data
+      ZO_COMPACT_DATA_RETENTION_DAYS: ${O2_RETENTION_DAYS:-14}
+      ZO_TELEMETRY: "false"
+    ports:
+      - "172.17.0.1:5080:5080"
+    volumes:
+      - openobserve-data:/data
+
+volumes:
+  openobserve-data:

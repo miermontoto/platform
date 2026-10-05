@@ -2,10 +2,16 @@
 // con json, credenciales de sesión y hook de 401 por app (throw, redirect a login...).
 // los TIPOS de cada api NO viven aquí: cada app define los suyos junto a sus endpoints.
 
+// header con el trace id de la request (el mismo TRACE_HEADER de @platform/core-api;
+// duplicado a propósito para no arrastrar dependencias de node al bundle del navegador)
+const TRACE_HEADER = 'x-trace-id';
+
 export class ApiError extends Error {
   constructor(
     message: string,
     public status: number,
+    // trace id de la respuesta fallida: con él se encuentra la traza en el backend
+    public traceId?: string,
   ) {
     super(message);
   }
@@ -58,11 +64,12 @@ export function createHttp({ base = '', on401 }: HttpOptions = {}): Http {
       // cualquier throw aquí en vez de comparar el tipo del error.
       throw new OfflineError(e instanceof Error ? e.message : String(e));
     }
+    const traceId = res.headers.get(TRACE_HEADER) ?? undefined;
     if (res.status === 401) {
       on401?.();
-      throw new ApiError('no autorizado', 401);
+      throw new ApiError('no autorizado', 401, traceId);
     }
-    if (!res.ok) throw new ApiError(await res.text(), res.status);
+    if (!res.ok) throw new ApiError(await res.text(), res.status, traceId);
     if (res.status === 204) return undefined as T;
     return res.json() as Promise<T>;
   }
