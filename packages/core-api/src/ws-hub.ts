@@ -8,6 +8,10 @@
 // heartbeat: cada heartbeatMs envía un frame de keep-alive {"type":"ping"} a cada
 // conexión y descarta las que ya no están abiertas. el cliente lo usa para no
 // reciclar el socket por inactividad (su watchdog espera ese ping).
+//
+// shutdown: stop() cierra todas las conexiones con 1012 (service restart). un ws abierto
+// mantiene vivo el http.Server y server.close() no termina nunca sin ese cierre; el código
+// le dice al cliente que reconecte en cuanto el servicio vuelva.
 
 // readyState OPEN del estándar WebSocket (0 CONNECTING, 1 OPEN, 2 CLOSING, 3 CLOSED).
 // literal para no acoplar core-api a ninguna implementación de ws.
@@ -17,12 +21,20 @@ const WS_OPEN = 1;
 // cliente lo reconoce y lo ignora (solo refresca su watchdog).
 const PING_FRAME = '{"type":"ping"}';
 
+// cierre por reinicio del servicio (rfc 6455 1012): el cliente reconecta en cuanto vuelva
+const WS_CLOSE_SERVICE_RESTART = 1012;
+const WS_CLOSE_SERVICE_RESTART_REASON = 'service restart';
+
 /** conexión ws mínima que el hub necesita. la app la adapta sobre su ws nativo. */
 export interface WsConnection {
   // envía un frame de texto (el hub serializa los mensajes a json antes de llamar)
   send: (data: string) => void;
   // readyState del estándar WebSocket; el hub solo envía si es OPEN
   readonly readyState: number;
+  // cierra la conexión con código y motivo. opcional por compatibilidad, pero sin él stop() no
+  // puede cerrarla: el corte de conexiones del servidor no alcanza a un socket con upgrade y el
+  // shutdown espera a su tope duro (SHUTDOWN_TIMEOUT_MS de server.ts)
+  close?: (code: number, reason: string) => void;
 }
 
 export interface WsHubOptions {
@@ -36,7 +48,7 @@ export interface WsHub<T> {
   add(key: string, conn: WsConnection): () => void;
   /** publica un mensaje a todas las conexiones OPEN de la clave. */
   publish(key: string, msg: T): void;
-  /** detiene el heartbeat. llamar en el shutdown del servidor. */
+  /** detiene el heartbeat y cierra todas las conexiones con 1012. llamar en el shutdown del servidor. */
   stop(): void;
 }
 
@@ -97,11 +109,20 @@ export function createWsHub<T>({ heartbeatMs = 25_000 }: WsHubOptions = {}): WsH
     timer.unref?.();
   }
 
+  // cierra todas las conexiones y vacía el hub. se toma la lista antes de cerrar: el onClose
+  // de la app llama a la baja de add() y no debe mutar lo que se está recorriendo
+  const closeAll = (code: number, reason: string) => {
+    const all = [...conns.values()].flatMap((set) => [...set]);
+    conns.clear();
+    all.forEach((conn) => conn.close?.(code, reason));
+  };
+
   const stop: WsHub<T>['stop'] = () => {
     if (timer) {
       clearInterval(timer);
       timer = null;
     }
+    closeAll(WS_CLOSE_SERVICE_RESTART, WS_CLOSE_SERVICE_RESTART_REASON);
   };
 
   return { add, publish, stop };
