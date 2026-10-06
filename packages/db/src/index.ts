@@ -1,6 +1,6 @@
 // factoría de conexiones sqlite (better-sqlite3 + drizzle) con los defaults de la
 // plataforma: wal, tuning de pragmas, unaccent(), instrumentación (spans + queries
-// lentas), migraciones de drizzle y estadísticas del planner (pragma optimize) al abrir.
+// lentas), migraciones de drizzle y, opcional, estadísticas del planner (pragma optimize) al abrir.
 import Database from 'better-sqlite3';
 import { drizzle, type BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import { migrate } from 'drizzle-orm/better-sqlite3/migrator';
@@ -32,6 +32,9 @@ export interface SqliteDbOptions<TSchema extends Record<string, unknown>> {
   logTag?: string;
   // umbral de query lenta en ms (default: env DB_SLOW_QUERY_MS o 100)
   slowQueryMs?: number;
+  // pragma optimize al abrir (escribe sqlite_stat1). opt-in: cambia los planes de TODAS las
+  // queries y una app afinada sin estadísticas puede empeorar (ver createSqliteDb)
+  optimizeOnOpen?: boolean;
 }
 
 export interface SqliteDbHandle<TSchema extends Record<string, unknown>> {
@@ -96,7 +99,12 @@ export function createSqliteDb<TSchema extends Record<string, unknown>>(
   // solo las tablas sin stats o con stats caducadas (cambio > 10x), con analysis_limit
   // temporal (sqlite >= 3.46), así que tras la primera vez es casi gratis. va después de
   // afterOpen para cubrir también las tablas del ddl legacy.
-  sqlite.pragma(PRAGMA_OPTIMIZE_AT_OPEN);
+  // opt-in y no default: las stats cambian el plan de todo. en duckhunt ganan (join por jira
+  // key 26ms → 0.2ms, sin regresiones medidas), pero en sis, con queries afinadas contra el
+  // planner sin stats, varias empeoran 1.5-5x (getAlbumTracks 8ms → 36-48ms,
+  // getMonthlyDistribution 130ms → 200-320ms). una vez escritas, las stats persisten en el
+  // fichero aunque luego se desactive la opción.
+  if (opts.optimizeOnOpen) sqlite.pragma(PRAGMA_OPTIMIZE_AT_OPEN);
 
   log.info(`conectado a ${dbPath} (wal)`);
   return {
