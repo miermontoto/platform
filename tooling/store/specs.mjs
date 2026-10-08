@@ -20,8 +20,8 @@ export const APP_STORE = {
   alpha: false,
   // orden = prioridad al clasificar por tamaño (2048x2732 es a la vez 13" y 12.9": cuenta como 13")
   slots: [
-    { id: 'iphone-duo-outer', label: 'iPhone Duo · pantalla exterior', sizes: both([[1398, 2034]]) },
-    { id: 'iphone-duo-inner', label: 'iPhone Duo · pantalla interior', sizes: both([[2007, 2853]]) },
+    // un solo dispositivo: exterior (1398x2034) e interior (2007x2853) comparten el máximo de 10
+    { id: 'iphone-duo', label: 'iPhone Duo', sizes: both([[1398, 2034], [2007, 2853]]) },
     { id: 'iphone-di-l', label: 'iPhone Dynamic Island grande', sizes: both([[1260, 2736], [1290, 2796], [1320, 2868]]) },
     { id: 'iphone-faceid-l', label: 'iPhone Face ID grande', sizes: both([[1284, 2778], [1242, 2688]]) },
     // obligatorio si la app corre en iphone ("at least one screenshot", aunque su nota cae al

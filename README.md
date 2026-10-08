@@ -143,14 +143,17 @@ renderStore({ dir: HERE, port: 9471, fonts: { families: ['Inter', 'JetBrains Mon
 ```
 
 ```bash
-node assets/store/render.mjs [filtro]   # exporta a assets/{app-store,play-store}/ y valida
+node assets/store/render.mjs [filtro]   # exporta a assets/<tienda>/<idioma>/<slot>/ y valida
 node assets/store/render.mjs --check    # solo valida los png ya exportados
 node assets/store/render.mjs --serve    # galería en local
 ```
 
 contrato: `window.STORE.manifest()` devuelve `[{ hash: 'x.<marco>.<n>.<lang>', w, h, outputs:
-[{ path, scale }] }]` (px css × scale = px de tienda); la página pinta ese marco con `#<hash>`. el
-checker (`tooling/store/specs.mjs` es la fuente de tamaños) falla si un png no lo aceptaría la
+[{ path, scale }] }]` (px css × scale = px de tienda); la página pinta ese marco con `#<hash>`. las
+rutas siguen `<tienda>/<idioma>/<slot>/<nn>-<slug>.png`, un slot por casilla de subida (p.ej.
+`app-store/es/iphone-duo/`, `app-store/es/creative/header.png`, `play-store/en/tablet-7in/`), con
+los textos de la ficha en `<tienda>/<idioma>/*.txt`. el iPhone Duo es un solo slot: exterior e
+interior suman como máximo 10. el checker (`tooling/store/specs.mjs` es la fuente de tamaños) falla si un png no lo aceptaría la
 tienda, si tiene alpha, si un slot pasa del máximo por idioma (10 app store, 8 play) o si falta
 uno obligatorio (iphone dynamic island mediano 1206×2622, ipad 13"). en los creative de ios 27
 (header 21:9 3840×1646, búsqueda 3:2 hasta 3840×2560) lo que marca `[data-safe]` debe caer en la

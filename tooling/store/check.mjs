@@ -39,6 +39,8 @@ export const checkFile = async (job, file) => {
   if (png.fail) return { issues: [error(job.path, `ilegible: ${png.fail}`)] };
   const hit = classify(job.path, png.w, png.h);
   const issues = [
+    // convención de carpetas: <tienda>/<idioma>/<slot>/…
+    job.path.split('/')[1] !== job.lang && warn(job.path, `fuera de su carpeta de idioma (${job.lang}/)`),
     (png.w !== want[0] || png.h !== want[1]) && error(job.path, `mide ${png.w}x${png.h} y el manifiesto espera ${want.join('x')} (¿export viejo?)`),
     !hit && warn(job.path, 'carpeta sin spec de tienda: no se valida'),
     hit && !hit.slot && error(job.path, `${png.w}x${png.h} no es un tamaño que acepte ${hit.store}`),
