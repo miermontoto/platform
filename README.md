@@ -29,6 +29,8 @@ tooling/
               compose de openobserve (backend otlp) + obs.sh — consulta de trazas
               y logs desde terminal, salida json
   mobile/     generadores de icons/splash android+ios desde el logo de la app
+  store/      capturas de tienda: renderer html → png por cdp + specs de app store y
+              google play + checker (tamaños, alpha, límites, safe areas)
   version/    bump snapshot (<yy>w<ww><letra>) + plantilla de hook pre-commit
 .github/workflows/
               android-release.yml · ios-release.yml — releases móviles reutilizables
@@ -126,6 +128,33 @@ tooling/db/db-sqlite.sh --mode local --db ./packages/api/data/duckhunt.db count 
 comandos: `query` · `exec` (multi-sentencia) · `tables` · `schema [tabla]` ·
 `count <tabla>`. modo `docker` (node+better-sqlite3 dentro del contenedor) o
 `local` (python3 stdlib en el host); `docker` se infiere si pasas `--container`.
+
+## capturas de tienda
+
+cada app replica sus pantallas en html en `assets/store/` (`index.html` + `screens.js`, que
+también se publica como artifact para revisarlas) y las exporta con el renderer compartido desde
+un `assets/store/render.mjs` fino:
+
+```js
+import { renderStore } from '../../platform/tooling/store/render.mjs';
+renderStore({ dir: HERE, port: 9471, fonts: { families: ['Inter', 'JetBrains Mono'] } });
+// fuentes locales: fonts: { dir, files: { Geist: 'Geist-Variable.woff2' } } · extra: routes,
+// pages, chromeArgs y modes ({ maps: async (page) => … } se lanza con --maps)
+```
+
+```bash
+node assets/store/render.mjs [filtro]   # exporta a assets/{app-store,play-store}/ y valida
+node assets/store/render.mjs --check    # solo valida los png ya exportados
+node assets/store/render.mjs --serve    # galería en local
+```
+
+contrato: `window.STORE.manifest()` devuelve `[{ hash: 'x.<marco>.<n>.<lang>', w, h, outputs:
+[{ path, scale }] }]` (px css × scale = px de tienda); la página pinta ese marco con `#<hash>`. el
+checker (`tooling/store/specs.mjs` es la fuente de tamaños) falla si un png no lo aceptaría la
+tienda, si tiene alpha, si un slot pasa del máximo por idioma (10 app store, 8 play) o si falta
+uno obligatorio (iphone dynamic island mediano 1206×2622, ipad 13"). en los creative de ios 27
+(header 21:9 3840×1646, búsqueda 3:2 hasta 3840×2560) lo que marca `[data-safe]` debe caer en la
+safe area de las plantillas de apple, que es pequeña y centrada: el fondo va a sangre.
 
 ## convenciones
 
