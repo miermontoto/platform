@@ -13,7 +13,7 @@ import { createServer } from 'node:http';
 import { readFile, mkdir, writeFile, readdir } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { dirname, join, extname, resolve } from 'node:path';
+import { dirname, join, extname, resolve, sep } from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { checkFile, checkSafe, checkSet } from './check.mjs';
 
@@ -62,9 +62,13 @@ const skeleton = (body, files) => {
 // '/' = la galería envuelta, pages = html propio por ruta, routes = prefijo → carpeta, el resto del dir
 const serve = ({ dir, pages, routes, fontFiles }) =>
   new Promise((ok) => {
+    // confinado a su carpeta: un ..%2f sobrevive a la normalización de URL y se decodifica después
     const fileFor = (path) => {
       const prefix = Object.keys(routes).find((p) => path.startsWith(p));
-      return prefix ? join(routes[prefix], path.slice(prefix.length)) : join(dir, path);
+      const root = resolve(prefix ? routes[prefix] : dir);
+      const file = join(root, prefix ? path.slice(prefix.length) : path);
+      if (!file.startsWith(root + sep)) throw new Error('fuera de la carpeta servida');
+      return file;
     };
     const srv = createServer(async (req, res) => {
       const path = decodeURIComponent(new URL(req.url, 'http://x').pathname);
