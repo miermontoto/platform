@@ -22,8 +22,10 @@ export const APP_STORE = {
   slots: [
     // un solo dispositivo: exterior (1398x2034) e interior (2007x2853) comparten el máximo de 10
     { id: 'iphone-duo', label: 'iPhone Duo', sizes: both([[1398, 2034], [2007, 2853]]) },
-    { id: 'iphone-di-l', label: 'iPhone Dynamic Island grande', sizes: both([[1260, 2736], [1290, 2796], [1320, 2868]]) },
-    { id: 'iphone-faceid-l', label: 'iPhone Face ID grande', sizes: both([[1284, 2778], [1242, 2688]]) },
+    // la casilla de app store connect "iPhone 6.5", 6.7", or 6.9" displays" solo acepta estos tres;
+    // la doc aún lista los del face id grande (1284x2778, 1242x2688), pero asc los rechaza ahí.
+    // donde la doc y asc no coinciden manda asc (lo mismo pasó con el iPhone Duo)
+    { id: 'iphone-di-l', label: 'iPhone 6,5" / 6,7" / 6,9"', sizes: both([[1260, 2736], [1290, 2796], [1320, 2868]]) },
     // obligatorio si la app corre en iphone ("at least one screenshot", aunque su nota cae al
     // face id grande escalado: mejor no depender de esa ambigüedad)
     { id: 'iphone-di-m', label: 'iPhone Dynamic Island mediano', sizes: both([[1179, 2556], [1206, 2622]]), requiredWith: 'iphone' },
