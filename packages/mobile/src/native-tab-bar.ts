@@ -42,6 +42,9 @@ export interface NativeTabBarParams {
   onSelect: (id: string) => void;
   // clase de <html> con el teclado en pantalla abierto: con ella la barra se oculta.
   keyboardClass?: string;
+  // media query del layout móvil de una app que no usa html.compact (installCompact): con ella
+  // decide cuándo va la barra (fuera de él solo el rail del Duo). default: la clase compact.
+  compactQuery?: string;
   // color de la pestaña activa (cualquier valor css que resuelva a un color); default el acento.
   tint?: string;
   // tema oscuro en curso; default: data-theme de <html> si lo hay, si no prefers-color-scheme.
@@ -118,6 +121,8 @@ function logError(action: string): (err: unknown) => void {
 export function nativeTabBar(_node: HTMLElement, params: NativeTabBarParams) {
   const root = document.documentElement;
   const darkScheme = window.matchMedia(DARK_SCHEME_QUERY);
+  // la query del layout móvil se fija al montar: cambiarla en caliente no tiene sentido.
+  const compactMedia = params.compactQuery ? window.matchMedia(params.compactQuery) : null;
   let current = params;
   let destroyed = false;
   let frame = 0;
@@ -136,7 +141,7 @@ export function nativeTabBar(_node: HTMLElement, params: NativeTabBarParams) {
     // el tinte se resuelve una vez por tema y valor (sonda en el dom), y solo con el resolver cargado.
     const key = `${root.dataset.theme ?? ''}|${dark}|${tintValue}`;
     if (resolveColor && tint?.key !== key) tint = { key, hex: resolveColor(tintValue) };
-    const compact = root.classList.contains(COMPACT_CLASS);
+    const compact = compactMedia ? compactMedia.matches : root.classList.contains(COMPACT_CLASS);
     const keyboard = root.classList.contains(current.keyboardClass ?? DEFAULT_KEYBOARD_CLASS);
     return {
       items: current.tabs,
@@ -200,6 +205,7 @@ export function nativeTabBar(_node: HTMLElement, params: NativeTabBarParams) {
     });
     observer.observe(root, { attributes: true, attributeFilter: ROOT_ATTRIBUTES });
     darkScheme.addEventListener('change', schedule);
+    compactMedia?.addEventListener('change', schedule);
     send(state());
   })().catch(logError('arranque'));
 
@@ -213,6 +219,7 @@ export function nativeTabBar(_node: HTMLElement, params: NativeTabBarParams) {
       cancelAnimationFrame(frame);
       observer.disconnect();
       darkScheme.removeEventListener('change', schedule);
+      compactMedia?.removeEventListener('change', schedule);
       listeners.forEach((handle) => void handle.then((h) => h.remove()).catch(logError('quitar listener')));
       root.classList.remove(NATIVE_TABBAR_CLASS, NATIVE_TABRAIL_CLASS);
       root.style.removeProperty(NATIVE_TABBAR_HEIGHT_VAR);
