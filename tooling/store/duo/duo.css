@@ -1,0 +1,120 @@
+/* cromo del iPhone Duo para las réplicas de tienda de las apps (lo sirve render.mjs en
+   /platform/duo/, junto a duo.js). sin barras arriba ni abajo: la status bar, la cámara y las
+   barras del sistema van en una columna lateral a la DERECHA, y la app la esquiva (--duo-col como su
+   --safe-right) y pinta sus pestañas en ella, al pie (el rail de @platform/capacitor-native-tabs).
+   medidas de la preview del simulador con xcode 27.1 (pantalla exterior, 466x678 pt): inset lateral
+   ~83pt con la hora y la batería centradas a ~47pt del borde, el eje en el que el rail nativo se
+   centra también (la cámara exterior). usa los tokens de la app si los tiene (--accent, --text,
+   --text-muted, --font-sans), con respaldo. el layout de la app dentro (topbar, main) es de cada app. */
+.duo {
+  --duo-col: 83px;
+  /* distancia del borde al eje de la columna: el de la cámara, la hora y el rail */
+  --duo-axis: 47px;
+  --duo-top: 10px;
+  --duo-bottom: 22px;
+  --duo-glass: rgb(46 52 63 / 0.58);
+  --duo-glass-solid: rgb(46 52 63);
+}
+.duo-col {
+  position: absolute;
+  z-index: 3;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: var(--duo-col);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  /* el padding derecho lleva el centro de la columna al eje del sistema */
+  padding: 14px calc(2 * var(--duo-axis) - var(--duo-col)) calc(var(--duo-bottom) + 6px) 0;
+  pointer-events: none;
+}
+.duo-status {
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  color: #fff;
+}
+.duo-status b {
+  font: 700 15px/1 var(--font-sans, system-ui, sans-serif);
+  letter-spacing: -0.01em;
+}
+/* exterior: la cámara siempre visible, dentro de su isla con la hora y la batería */
+.duo-status.with-cam {
+  width: 54px;
+  padding: 9px 0 8px;
+  border-radius: 27px;
+  background: #030405;
+}
+.duo-status .cam {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: #000;
+  box-shadow: inset 0 0 0 1px #171b22;
+}
+/* liquid glass: lo pinta el sistema (UIGlassEffect), aquí solo su imitación */
+.duo-rail {
+  display: grid;
+  gap: 2px;
+  padding: 6px;
+  border-radius: 28px;
+  background: var(--duo-glass);
+  backdrop-filter: blur(14px) saturate(1.5);
+  box-shadow:
+    inset 0 0 0 1px rgb(255 255 255 / 0.09),
+    inset 0 1px 0 rgb(255 255 255 / 0.14);
+}
+.duo-rail span {
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border-radius: 22px;
+  color: var(--text-muted, #868e9a);
+}
+/* la activa: el tinte de la app y su cápsula al 18%, como NativeTabRailView */
+.duo-rail .on {
+  color: var(--accent, #0a84ff);
+  background: color-mix(in srgb, var(--accent, #0a84ff) 18%, transparent);
+}
+.sf {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+.sf.fill {
+  fill: currentColor;
+}
+.sf.fill .ln {
+  fill: none;
+}
+.sf.fill .hole {
+  fill: var(--duo-glass-solid);
+  stroke: none;
+}
+.duo-home {
+  position: absolute;
+  z-index: 3;
+  left: 50%;
+  bottom: 8px;
+  width: 134px;
+  height: 5px;
+  margin-left: -67px;
+  border-radius: 3px;
+  background: var(--text, #e6eaf0);
+}
+/* bisagra del Duo abierto: dos marcas en el bisel, arriba y abajo del centro */
+.device .hinge {
+  position: absolute;
+  z-index: 1;
+  top: -1px;
+  bottom: -1px;
+  left: 50%;
+  width: 2px;
+  margin-left: -1px;
+  background: linear-gradient(180deg, #3b4350 0 7px, transparent 7px calc(100% - 7px), #3b4350 calc(100% - 7px));
+}
