@@ -6,6 +6,7 @@
   "type": "module",
   "exports": {
     "./base.css": "./src/base.css",
+    "./safe-area.css": "./src/safe-area.css",
     "./http": "./src/http.ts",
     "./i18n": "./src/i18n.ts",
     "./SettingsTabs.svelte": "./src/SettingsTabs.svelte",

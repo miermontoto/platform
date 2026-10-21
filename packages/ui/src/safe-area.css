@@ -1,0 +1,34 @@
+/* safe-area.css — las safe areas de ios como tokens. opt-in, después de base.css:
+
+     @import '@platform/ui/safe-area.css';
+
+   son la ÚNICA lectura de env(safe-area-inset-*) del css de la app: úsalos siempre en vez de env()
+   suelto (env() = 0 en web y en android, donde los márgenes nativos ya recortan el webview). son
+   ASIMÉTRICOS a propósito: en el iPhone Duo la status bar, la cámara y las barras van en una columna
+   LATERAL (exterior en vertical, interior abierta en apaisado), así que un lado puede tener inset y
+   el otro no; nunca supongas izquierda = derecha. los laterales suman además lo que el rail de
+   pestañas nativo (@platform/capacitor-native-tabs) sobresalga de esa columna: lo fija
+   @platform/mobile/native-tab-bar en --native-rail-left/right (0 sin rail o si cabe en la columna).
+   forzar `--safe-right: 60px` en devtools simula la columna. */
+:root {
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-right: calc(env(safe-area-inset-right, 0px) + var(--native-rail-right, 0px));
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: calc(env(safe-area-inset-left, 0px) + var(--native-rail-left, 0px));
+  /* hueco de los overlays a pantalla completa (backdrops, toasts): su margen o el inset de su lado
+     si es mayor. el de arriba sigue siendo de cada overlay, envuelto en max(…, var(--safe-top)). */
+  --overlay-gap: var(--sp-4, 16px);
+  --overlay-pad-right: max(var(--overlay-gap), var(--safe-right));
+  --overlay-pad-bottom: max(var(--overlay-gap), var(--safe-bottom));
+  --overlay-pad-left: max(var(--overlay-gap), var(--safe-left));
+  /* lo que la navegación inferior tapa desde el pie: lo que un elemento fijo o un menú anclado
+     tiene que esquivar. sin barra, la safe area; la app lo redefine en compact con su barra web. */
+  --bottom-chrome: var(--safe-bottom);
+}
+
+/* barra nativa visible en modo barra: tapa el alto que mide el nativo. con el teclado abierto se
+   oculta, y en modo rail (Duo) va de lado: en ambos casos el pie solo lleva su safe area. la clase
+   del teclado es la que usa por defecto native-tab-bar.ts; una app con otra repite esta regla. */
+html.compact.native-tabbar:not(.native-tabrail):not(.keyboard-open) {
+  --bottom-chrome: var(--native-tabbar-h, 0px);
+}

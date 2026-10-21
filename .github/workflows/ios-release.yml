@@ -16,19 +16,20 @@
 #         app_group: group.info.duckhunt.app # obligatorio con widget_extension_dir
 #         widget_min_ios_version: '17.0'     # opcional: target de la extensión (AppIntents = 17)
 #         app_sources_dir: ios-intents       # opcional: swift + .xcstrings extra del target App (ver paso 8)
-#         runner: xcode-27                   # opcional: imagen del runner (default macos-26, ver "XCODE")
-#         xcode_version: '27.0'              # opcional: Xcode fijo (default: el más nuevo instalado)
+#         runner: macos-26                   # opcional: imagen del runner (default xcode-27, ver "XCODE")
+#         xcode_version: '27.1'              # opcional: Xcode fijo (default: el más nuevo FINAL)
 #         upload: true
 #       secrets: inherit
 #
-# XCODE: el runner y el Xcode son inputs porque cada app migra a su ritmo. macos-26 trae
-# Xcode 26.x; Xcode 27 (sdk ios 27, el que da pantalla completa en el iPhone Duo) vive en
-# la imagen `xcode-27` (preview en github), que además instala betas (27.1_beta, 27.2_beta).
-# con xcode_version vacío se escoge el Xcode más nuevo, que ahí sería una BETA: App Store
-# Connect rechaza builds de betas, así que en esa imagen fija siempre xcode_version.
+# XCODE: por defecto la imagen `xcode-27` y su Xcode final más nuevo (27.1 desde el
+# 2026-10-15): sdk ios 27.1, el que da pantalla completa en el iPhone Duo y su
+# verticalBarEdge (el rail de @platform/capacitor-native-tabs). esa imagen trae también
+# betas y release candidates, y App Store Connect rechaza builds de betas: la selección
+# automática los descarta resolviendo cada symlink, y xcode_version fija uno a mano.
 # compilar con el sdk ios 27+ EXIGE el ciclo de vida UIScene (TN3187: sin él la app no
-# arranca): la plantilla de capacitor >= 8.5 lo trae, así que una app en capacitor 7 debe
-# quedarse en macos-26 hasta migrar.
+# arranca): la plantilla de capacitor >= 8.5 lo trae, y el paso "Seleccionar Xcode" corta el
+# build si la app sigue por debajo. una app en capacitor 7 pasa runner: macos-26 (Xcode 26)
+# hasta migrar.
 #
 # REQUISITO: el package.json raíz de la app declara `"packageManager": "pnpm@<v>"`.
 # de ahí saca la versión de pnpm el paso "Setup pnpm" (ver su comentario); sin ese
@@ -221,12 +222,12 @@ on:
         type: string
         default: ''
       runner:
-        description: 'imagen del runner macOS (macos-26 = Xcode 26; xcode-27 = Xcode 27, exige UIScene / capacitor >= 8.5)'
+        description: 'imagen del runner macOS (xcode-27 = Xcode 27, exige UIScene / capacitor >= 8.5; macos-26 = Xcode 26 para una app que siga en capacitor 7)'
         required: false
         type: string
-        default: 'macos-26'
+        default: 'xcode-27'
       xcode_version:
-        description: 'versión de Xcode a seleccionar (/Applications/Xcode_<v>.app, p.ej. 27.0); vacío → la más nueva instalada (en xcode-27 sería una beta)'
+        description: 'versión de Xcode a seleccionar (/Applications/Xcode_<v>.app, p.ej. 27.1); vacío → la más nueva FINAL instalada (salta betas y release candidates)'
         required: false
         type: string
         default: ''
@@ -456,7 +457,7 @@ jobs:
       - name: Install deps
         run: pnpm install --frozen-lockfile
 
-      - name: Seleccionar Xcode (fijo o el más nuevo)
+      - name: Seleccionar Xcode (fijo o el más nuevo final)
         env:
           XCODE_VERSION: ${{ inputs.xcode_version }}
           RUNNER: ${{ inputs.runner }}
@@ -466,14 +467,39 @@ jobs:
             # versión fija: muere si la imagen no la trae, en vez de caer a otra en silencio
             XCODE="/Applications/Xcode_${XCODE_VERSION}.app"
             [ -d "$XCODE" ] || { echo "::error::no hay $XCODE en $RUNNER"; exit 1; }
-            sudo xcode-select -s "$XCODE"
           else
-            # el de mayor versión instalado (defensivo; en macos-26 ya es 26)
-            NEWEST=$(ls -d /Applications/Xcode_*.app 2>/dev/null | sort -V | tail -1)
-            [ -n "$NEWEST" ] && sudo xcode-select -s "$NEWEST"
+            # el más nuevo FINAL: App Store Connect rechaza builds de betas, y las imágenes con
+            # betas (xcode-27 trae Xcode_27.1_Release_Candidate, Xcode_27.2_beta_2…) también les
+            # dan nombres de versión pelada (Xcode_27.2.app). por eso se resuelve cada enlace, se
+            # descarta lo que apunta a una beta o a un release candidate y, por si el nombre no lo
+            # dice, lo que no tenga licencia GM (LicenseInfo.plist; sin la clave, cuenta el nombre).
+            XCODE=$(for x in /Applications/Xcode_*.app; do
+              real=$(readlink -f "$x")
+              case "$real" in *[Bb]eta*|*Release_Candidate*|*_RC*) continue ;; esac
+              lic=$(/usr/libexec/PlistBuddy -c 'Print :licenseType' "$real/Contents/Resources/LicenseInfo.plist" 2>/dev/null || true)
+              echo "::debug::$x → $real (licencia: ${lic:-?})" >&2
+              [ -z "$lic" ] || [ "$lic" = GM ] || continue
+              echo "$real"
+            done | sort -u -V | tail -1)
+            [ -n "$XCODE" ] || { echo "::error::no hay ningún Xcode final en $RUNNER"; exit 1; }
           fi
+          sudo xcode-select -s "$XCODE"
+          echo "Xcode: $XCODE"
           xcodebuild -version
-          echo "iOS SDK: $(xcrun --sdk iphoneos --show-sdk-version)"
+          SDK=$(xcrun --sdk iphoneos --show-sdk-version)
+          echo "iOS SDK: $SDK"
+          # el sdk ios 27+ EXIGE el ciclo de vida UIScene (TN3187: sin él la app no arranca), que
+          # trae la plantilla ios de capacitor >= 8.5. sin este corte el build pasa y la app que
+          # llega a TestFlight se queda en negro al abrirla.
+          CAP=$(node -p "require('$GITHUB_WORKSPACE/packages/web/node_modules/@capacitor/ios/package.json').version")
+          echo "@capacitor/ios: $CAP"
+          node -e '
+            const [sdk, cap] = process.argv.slice(1).map((v) => v.split(".").map(Number));
+            const below = (v, [maj, min]) => v[0] < maj || (v[0] === maj && v[1] < min);
+            if (sdk[0] >= 27 && below(cap, [8, 5])) {
+              console.log(`::error::el sdk ios ${sdk.join(".")} exige UIScene: sube capacitor a >= 8.5 (hay ${cap.join(".")}) o pasa runner: macos-26`);
+              process.exit(1);
+            }' "$SDK" "$CAP"
           pod --version || sudo gem install cocoapods --no-document
 
       - name: Scaffold proyecto iOS (cap add) si no existe
