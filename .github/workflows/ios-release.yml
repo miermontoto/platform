@@ -473,9 +473,11 @@ jobs:
             # dan nombres de versión pelada (Xcode_27.2.app). por eso se resuelve cada enlace, se
             # descarta lo que apunta a una beta o a un release candidate y, por si el nombre no lo
             # dice, lo que no tenga licencia GM (LicenseInfo.plist; sin la clave, cuenta el nombre).
+            # sin `case` dentro del $(...): el bash 3.2 del runner cierra la sustitución en el `)`
+            # del patrón (syntax error near `;;`); el [[ == ]] no lleva paréntesis
             XCODE=$(for x in /Applications/Xcode_*.app; do
               real=$(readlink -f "$x")
-              case "$real" in *[Bb]eta*|*Release_Candidate*|*_RC*) continue ;; esac
+              [[ $real == *[Bb]eta* || $real == *Release_Candidate* || $real == *_RC* ]] && continue
               lic=$(/usr/libexec/PlistBuddy -c 'Print :licenseType' "$real/Contents/Resources/LicenseInfo.plist" 2>/dev/null || true)
               echo "::debug::$x → $real (licencia: ${lic:-?})" >&2
               [ -z "$lic" ] || [ "$lic" = GM ] || continue
