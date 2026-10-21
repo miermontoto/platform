@@ -200,7 +200,7 @@ public class NativeTabBarPlugin: CAPPlugin, CAPBridgedPlugin, UITabBarDelegate {
         return rail
     }
 
-    // dentro de la columna si cabe con su margen (centrado, como la cámara y la hora encima); si
+    // dentro de la columna si cabe con su margen (en el eje de la cámara y la hora de encima); si
     // no, pegado a ella por dentro, y lo que pasa de la safe area queda en railWidth para la web.
     private func placeRail() {
         guard let rail, let railEdge, let host = rail.superview else { return }
@@ -208,7 +208,9 @@ public class NativeTabBarPlugin: CAPPlugin, CAPBridgedPlugin, UITabBarDelegate {
         let margin = NativeTabBarPlugin.railMargin
         let width = NativeTabRailView.width
         let fits = inset >= width + 2 * margin
-        let offset = fits ? inset / 2 : inset + margin + width / 2
+        let offset = fits
+            ? NativeTabBarPlugin.columnAxis(in: host, edge: railEdge, inset: inset, half: width / 2 + margin)
+            : inset + margin + width / 2
         railSideConstraints[railEdge]?.constant = railEdge == .left ? offset : -offset
         railWidth = fits ? 0 : width + 2 * margin
         reportLayout()
@@ -231,6 +233,21 @@ public class NativeTabBarPlugin: CAPPlugin, CAPBridgedPlugin, UITabBarDelegate {
         }
         applyState()
         reportLayout()
+    }
+
+    // distancia del borde al eje de la columna: el de la cámara de la pantalla exterior del Duo (su
+    // región ocluida, siempre presente), que es donde el sistema centra la hora y la batería, y no
+    // el centro del inset (~5pt más hacia dentro en el simulador: inset ~83pt, eje a ~47pt). sin
+    // cámara en la columna (la interior la esconde) vale el centro del inset. acotado a [half,
+    // inset - half] para que el rail, con su margen, nunca salga de la columna.
+    private static func columnAxis(in host: UIView, edge: RailEdge, inset: CGFloat, half: CGFloat) -> CGFloat {
+        let center = inset / 2
+        guard #available(iOS 27.1, *) else { return center }
+        let bounds = host.bounds
+        let axis = host.reservedRegions(kind: .occlusion)
+            .map { edge == .left ? $0.frame.midX - bounds.minX : bounds.maxX - $0.frame.midX }
+            .first { $0 > 0 && $0 < inset }
+        return min(max(axis ?? center, half), inset - half)
     }
 
     // borde FÍSICO de la barra vertical del sistema (la web reserva izquierda o derecha); nil sin
