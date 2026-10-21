@@ -19,14 +19,18 @@ import { Capacitor } from '@capacitor/core';
 
 // ancho (px) por defecto bajo el cual el layout web pasa a compacto.
 export const COMPACT_BREAKPOINT_DEFAULT = 720;
+// clases de <html>: layout móvil y app nativa (las lee también native-tab-bar.ts).
+export const COMPACT_CLASS = 'compact';
+export const NATIVE_CLASS = 'native';
 
 // tablet apaisado: el único caso nativo con layout de escritorio. el alto mínimo es el que
 // descarta al móvil en horizontal (ancho de hasta ~960px pero ~440px de alto); el ancho
 // mínimo baja a 800 para cubrir la pantalla interior de los plegables en horizontal
-// (iPhone Duo ~890x626, menos la columna lateral de la status bar con el sdk 27.0; pixel
-// fold / galaxy z fold ~820-840 de ancho y ~700 de alto) además de todos los iPads. la
-// orientación deja a cualquier tablet vertical en compacto y split view estrecha el
-// viewport y vuelve a compacto sola.
+// (iPhone Duo abierto: 951x669 pt medidos en el simulador, con su columna lateral de status
+// bar dentro de la safe area; pixel fold / galaxy z fold ~820-840 de ancho y ~700 de alto)
+// además de todos los iPads. la orientación deja a cualquier tablet vertical en compacto (el
+// Duo abierto en vertical, 669x951, también) y split view estrecha el viewport y vuelve a
+// compacto sola.
 export const TABLET_LANDSCAPE_QUERY = '(orientation: landscape) and (min-width: 800px) and (min-height: 600px)';
 
 export interface InstallCompactOptions {
@@ -44,10 +48,10 @@ export function installCompact(options: InstallCompactOptions = {}): () => void 
   const breakpoint = options.breakpoint ?? COMPACT_BREAKPOINT_DEFAULT;
   const root = document.documentElement;
   const native = Capacitor.isNativePlatform();
-  if (native) root.classList.add('native');
+  if (native) root.classList.add(NATIVE_CLASS);
   const narrow = window.matchMedia(`(max-width: ${breakpoint}px)`);
   const tabletLandscape = window.matchMedia(TABLET_LANDSCAPE_QUERY);
-  const apply = () => root.classList.toggle('compact', narrow.matches || (native && !tabletLandscape.matches));
+  const apply = () => root.classList.toggle(COMPACT_CLASS, narrow.matches || (native && !tabletLandscape.matches));
   const queries = [narrow, tabletLandscape];
   apply();
   queries.forEach((mq) => mq.addEventListener('change', apply));

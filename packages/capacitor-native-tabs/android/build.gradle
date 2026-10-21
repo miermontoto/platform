@@ -1,0 +1,41 @@
+// módulo android del plugin, vacío a propósito: la barra nativa solo existe en ios, pero
+// capacitor lee capacitor.android.src de todo plugin sin comprobarlo y un paquete solo-ios
+// rompería el `cap sync android`. sin plugin registrado, la web ve el NativeTabBar como no
+// disponible y sigue con su barra. los valores de sdk salen del rootProject de la app
+// que lo consume (android/variables.gradle), con defaults por si falta alguno.
+buildscript {
+    repositories {
+        google()
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'com.android.tools.build:gradle:8.10.1'
+    }
+}
+
+apply plugin: 'com.android.library'
+
+android {
+    namespace "info.mier.platform.nativetabs"
+    compileSdk project.hasProperty('compileSdkVersion') ? rootProject.ext.compileSdkVersion : 35
+    defaultConfig {
+        minSdkVersion project.hasProperty('minSdkVersion') ? rootProject.ext.minSdkVersion : 23
+        targetSdkVersion project.hasProperty('targetSdkVersion') ? rootProject.ext.targetSdkVersion : 35
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_21
+        targetCompatibility JavaVersion.VERSION_21
+    }
+    lintOptions {
+        abortOnError false
+    }
+}
+
+repositories {
+    google()
+    mavenCentral()
+}
+
+dependencies {
+    implementation project(':capacitor-android')
+}

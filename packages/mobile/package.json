@@ -9,6 +9,7 @@
     "./compact": "./src/compact.ts",
     "./connectivity": "./src/connectivity.ts",
     "./deep-link": "./src/deep-link.ts",
+    "./native-tab-bar": "./src/native-tab-bar.ts",
     "./system-bars": "./src/system-bars.ts"
   },
   "peerDependencies": {
