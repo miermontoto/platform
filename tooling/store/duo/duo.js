@@ -21,6 +21,11 @@
     star: '<path d="M12 3.6 14.6 9l5.9.85-4.27 4.15 1 5.87L12 17.1l-5.23 2.77 1-5.87L3.5 9.85 9.4 9Z"/>',
     'square.stack': '<path d="M7.5 4.5h9M5.5 7h13" class="ln"/><rect x="4" y="9.5" width="16" height="10.5" rx="2"/>',
     'person.2': '<circle cx="9" cy="8.4" r="3.3"/><path d="M2.8 19.6c0-3.4 2.8-5.8 6.2-5.8s6.2 2.4 6.2 5.8Z"/><path d="M15.4 5.3a3.1 3.1 0 1 1 0 6.2M17.2 14c2.4.6 4 2.7 4 5.6" class="ln"/>',
+    safari: '<circle cx="12" cy="12" r="8.6" class="ln"/><path d="m15.6 8.4-2.2 5-5 2.2 2.2-5Z"/>',
+    map: '<path d="M3.8 6.4 9 4.5l6 2 5.2-1.9v13l-5.2 1.9-6-2-5.2 1.9Z"/><path d="M9 4.5v13M15 6.5v13" class="ln"/>',
+    location: '<path d="M19.6 4.4 4.5 11l7 1.4 1.4 7Z"/>',
+    bookmark: '<path d="M6.5 3.8h11v16.4L12 16.3l-5.5 3.9Z"/>',
+    person: '<circle cx="12" cy="8.2" r="3.7"/><path d="M4.6 20.2c0-4 3.3-6.6 7.4-6.6s7.4 2.6 7.4 6.6Z"/>',
     // respaldo, como el nativo cuando el símbolo no existe
     circle: '<circle cx="12" cy="12" r="8"/>',
   };
