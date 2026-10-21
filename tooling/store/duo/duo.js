@@ -37,9 +37,10 @@
   const RING = `<svg width="34" height="40" viewBox="0 0 34 40" aria-hidden="true"><path d="M7.4 26.6a13 13 0 1 1 19.2 0" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><path d="M17 13.6c2.4 0 4.6.9 6.2 2.5l-1.4 1.4a6.8 6.8 0 0 0-9.6 0l-1.4-1.4c1.6-1.6 3.8-2.5 6.2-2.5Zm0 4c1.3 0 2.5.5 3.4 1.4L17 22.4 13.6 19c.9-.9 2.1-1.4 3.4-1.4Z" fill="currentColor"/>${[8.5, 14.2, 19.8, 25.5].map((x, i) => `<circle cx="${x}" cy="${i % 3 ? 36 : 34.5}" r="1.9" fill="currentColor" opacity="${i < 3 ? 1 : 0.4}"/>`).join('')}</svg>`;
 
   // columna del sistema. camera: la exterior la enseña siempre, la interior la esconde. tabs:
-  // [id, sf symbol] de la app (sin tabs = no es la app, p.ej. la pantalla de inicio); active: el id
-  const column = ({ camera = false, tabs, active = null } = {}) => `
-    <div class="duo-col">
+  // [id, sf symbol] de la app (sin tabs = no es la app, p.ej. la pantalla de inicio); active: el id.
+  // light: app clara (hora y batería oscuras, cristal claro), como la barra nativa con isDark false
+  const column = ({ camera = false, tabs, active = null, light = false } = {}) => `
+    <div class="duo-col${light ? ' light' : ''}">
       <div class="duo-status${camera ? ' with-cam' : ''}">${camera ? '<span class="cam"></span>' : ''}<b>9:41</b>${RING}</div>
       ${tabs ? `<div class="duo-rail">${tabs.map(([id, symbol]) => `<span class="${id === active ? 'on' : ''}">${sf(symbol, id === active)}</span>`).join('')}</div>` : ''}
     </div>`;
