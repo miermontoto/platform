@@ -474,15 +474,21 @@ jobs:
             # descarta lo que apunta a una beta o a un release candidate y, por si el nombre no lo
             # dice, lo que no tenga licencia GM (LicenseInfo.plist; sin la clave, cuenta el nombre).
             # sin `case` dentro del $(...): el bash 3.2 del runner cierra la sustitución en el `)`
-            # del patrón (syntax error near `;;`); el [[ == ]] no lleva paréntesis
+            # del patrón (syntax error near `;;`); el [[ == ]] no lleva paréntesis.
+            # se ordena por la versión REAL del bundle, no por la ruta: la imagen trae alias
+            # (Xcode_27.app = 27.0, Xcode_27.1.0.app…) y el sort -V de macos pone Xcode_27.app
+            # por encima de Xcode_27.1.app. clave = versión con ceros (027001000), sort plano
             XCODE=$(for x in /Applications/Xcode_*.app; do
               real=$(readlink -f "$x")
               [[ $real == *[Bb]eta* || $real == *Release_Candidate* || $real == *_RC* ]] && continue
               lic=$(/usr/libexec/PlistBuddy -c 'Print :licenseType' "$real/Contents/Resources/LicenseInfo.plist" 2>/dev/null || true)
-              echo "::debug::$x → $real (licencia: ${lic:-?})" >&2
+              ver=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$real/Contents/Info.plist" 2>/dev/null || true)
+              echo "::debug::$x → $real (versión: ${ver:-?}, licencia: ${lic:-?})" >&2
+              [ -n "$ver" ] || continue
               [ -z "$lic" ] || [ "$lic" = GM ] || continue
-              echo "$real"
-            done | sort -u -V | tail -1)
+              IFS=. read -r major minor patch <<< "$ver"
+              printf '%03d%03d%03d %s\n' "$major" "${minor:-0}" "${patch:-0}" "$real"
+            done | sort -u | tail -1 | cut -d' ' -f2-)
             [ -n "$XCODE" ] || { echo "::error::no hay ningún Xcode final en $RUNNER"; exit 1; }
           fi
           sudo xcode-select -s "$XCODE"
@@ -495,13 +501,22 @@ jobs:
           # llega a TestFlight se queda en negro al abrirla.
           CAP=$(node -p "require('$GITHUB_WORKSPACE/packages/web/node_modules/@capacitor/ios/package.json').version")
           echo "@capacitor/ios: $CAP"
+          # y @platform/capacitor-native-tabs (barra nativa + rail del iPhone Duo) compila contra
+          # apis del sdk 27.1 (verticalBarEdge, reservedRegions): con uno anterior, corte claro aquí
+          # en vez de errores de swift en el archive
+          TABS=$([ -d "$GITHUB_WORKSPACE/packages/web/node_modules/@platform/capacitor-native-tabs" ] && echo 1 || echo 0)
           node -e '
-            const [sdk, cap] = process.argv.slice(1).map((v) => v.split(".").map(Number));
-            const below = (v, [maj, min]) => v[0] < maj || (v[0] === maj && v[1] < min);
+            const [sdk, cap] = process.argv.slice(1, 3).map((v) => v.split(".").map(Number));
+            const tabs = process.argv[3] === "1";
+            const below = (v, [maj, min]) => v[0] < maj || (v[0] === maj && (v[1] ?? 0) < min);
             if (sdk[0] >= 27 && below(cap, [8, 5])) {
               console.log(`::error::el sdk ios ${sdk.join(".")} exige UIScene: sube capacitor a >= 8.5 (hay ${cap.join(".")}) o pasa runner: macos-26`);
               process.exit(1);
-            }' "$SDK" "$CAP"
+            }
+            if (tabs && below(sdk, [27, 1])) {
+              console.log(`::error::@platform/capacitor-native-tabs necesita el sdk ios >= 27.1 (Xcode 27.1); hay ${sdk.join(".")}`);
+              process.exit(1);
+            }' "$SDK" "$CAP" "$TABS"
           pod --version || sudo gem install cocoapods --no-document
 
       - name: Scaffold proyecto iOS (cap add) si no existe
