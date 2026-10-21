@@ -18,6 +18,9 @@
     'chart.bar': '<path d="M4.5 13h3.6v6.5H4.5Zm5.7-7.5h3.6v14h-3.6Zm5.7 4.5h3.6v9.5h-3.6Z"/>',
     sparkles: '<path d="M10 3.5 11.8 9l5.2 1.8-5.2 1.8L10 18l-1.8-5.4L3 10.8 8.2 9Z"/><path d="m18 14 .8 2.2 2.2.8-2.2.8L18 20l-.8-2.2-2.2-.8 2.2-.8Z"/>',
     gearshape: '<circle cx="12" cy="12" r="7.4" stroke-width="3.2" stroke-dasharray="2.6 3.2" class="ln"/><circle cx="12" cy="12" r="5.6"/><circle cx="12" cy="12" r="2.2" class="hole"/>',
+    star: '<path d="M12 3.6 14.6 9l5.9.85-4.27 4.15 1 5.87L12 17.1l-5.23 2.77 1-5.87L3.5 9.85 9.4 9Z"/>',
+    'square.stack': '<path d="M7.5 4.5h9M5.5 7h13" class="ln"/><rect x="4" y="9.5" width="16" height="10.5" rx="2"/>',
+    'person.2': '<circle cx="9" cy="8.4" r="3.3"/><path d="M2.8 19.6c0-3.4 2.8-5.8 6.2-5.8s6.2 2.4 6.2 5.8Z"/><path d="M15.4 5.3a3.1 3.1 0 1 1 0 6.2M17.2 14c2.4.6 4 2.7 4 5.6" class="ln"/>',
     // respaldo, como el nativo cuando el símbolo no existe
     circle: '<circle cx="12" cy="12" r="8"/>',
   };
