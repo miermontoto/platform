@@ -28,7 +28,8 @@ tooling/
   observability/
               compose de openobserve (backend otlp) + obs.sh — consulta de trazas
               y logs desde terminal, salida json
-  mobile/     generadores de icons/splash android+ios desde el logo de la app
+  mobile/     generadores de icons/splash android+ios desde el logo de la app +
+              ios-sim.sh — build de simulador y arranque en un mac local
   store/      capturas de tienda: renderer html → png por cdp + specs de app store y
               google play + checker (tamaños, alpha, límites, safe areas)
   version/    bump snapshot (<yy>w<ww><letra>) + plantilla de hook pre-commit
@@ -131,6 +132,20 @@ tooling/db/db-sqlite.sh --mode local --db ./packages/api/data/duckhunt.db count 
 comandos: `query` · `exec` (multi-sentencia) · `tables` · `schema [tabla]` ·
 `count <tabla>`. modo `docker` (node+better-sqlite3 dentro del contenedor) o
 `local` (python3 stdlib en el host); `docker` se infiere si pasas `--container`.
+
+## ios en un mac local
+
+para enseñar una app en el simulador sin pasar por ci. el proyecto `packages/web/ios/` no se
+commitea (ci lo regenera en cada run), así que el script lo scaffoldea igual que
+`ios-release.yml` (cocoapods, deployment target, url scheme, icono y splash, con la config del
+caller de la app) y compila sin firma. sin widgets ni intents: piden firma.
+
+```bash
+# una vez por mac: Xcode 27.1+ con su runtime de simulador, node 22, pnpm, cocoapods
+platform/tooling/mobile/ios-sim.sh                  # desde la raíz de la app: install, build, lanzar
+platform/tooling/mobile/ios-sim.sh --skip-web       # solo nativo (~5s si nada cambió)
+platform/tooling/mobile/ios-sim.sh --device "iPhone 18 Pro" --fresh
+```
 
 ## capturas de tienda
 
