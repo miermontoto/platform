@@ -102,6 +102,9 @@ tooling/backup/backup-sqlite.sh --app sis --mode docker --container sis-sis-1 \
 rotación: `recent/` últimas 4 (cada 6h = 24h) + `weekly/` últimas 4 (1 mes).
 cada app tiene un wrapper en `scripts/backup.sh` invocado por cron.
 
+`--exclude-table <t>` (repetible) vacía cachés regenerables en la copia (conserva el
+esquema) y `--compress` la guarda como `.db.zst` (restaurar: `zstd -d`).
+
 ## acceso a la db en caliente
 
 consulta/modifica la sqlite de una app **en marcha** (lee el wal en su sitio).
