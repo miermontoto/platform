@@ -8,6 +8,9 @@
 // html.compact en css. la DENSIDAD de contenido es una señal aparte, por @media de
 // ancho/orientación, y NO se gestiona aquí (ver convenciones del README).
 //
+// la app de ios en un mac (html.mac, lo marca MacDesktopPlugin antes del primer paint) es
+// un escritorio con puntero: ni .native ni compact forzado, solo por ancho como en web.
+//
 // uso en el root +layout de la app:
 //   import { installCompact } from '@platform/mobile/compact';
 //   onMount(() => installCompact({ breakpoint: 720 }));  // devuelve cleanup
@@ -22,6 +25,9 @@ export const COMPACT_BREAKPOINT_DEFAULT = 720;
 // clases de <html>: layout móvil y app nativa (las lee también native-tab-bar.ts).
 export const COMPACT_CLASS = 'compact';
 export const NATIVE_CLASS = 'native';
+// app de ios en un mac: la pone el nativo (MacDesktopPlugin de @platform/capacitor-native-tabs),
+// nunca la web; aquí solo se lee.
+export const MAC_CLASS = 'mac';
 
 // tablet apaisado: el único caso nativo con layout de escritorio. el alto mínimo es el que
 // descarta al móvil en horizontal (ancho de hasta ~960px pero ~440px de alto); el ancho
@@ -39,15 +45,15 @@ export interface InstallCompactOptions {
 }
 
 /**
- * instala la gestión de html.compact: marca .native en plataforma nativa y mantiene
- * .compact = (<= breakpoint O nativo que no es tablet apaisado), reaccionando a cambios
+ * instala la gestión de html.compact: marca .native en plataforma nativa (salvo en un mac) y
+ * mantiene .compact = (<= breakpoint O nativo que no es tablet apaisado), reaccionando a cambios
  * de viewport y de orientación. seguro de llamar una vez en el boot del root layout;
  * devuelve una función de limpieza.
  */
 export function installCompact(options: InstallCompactOptions = {}): () => void {
   const breakpoint = options.breakpoint ?? COMPACT_BREAKPOINT_DEFAULT;
   const root = document.documentElement;
-  const native = Capacitor.isNativePlatform();
+  const native = Capacitor.isNativePlatform() && !root.classList.contains(MAC_CLASS);
   if (native) root.classList.add(NATIVE_CLASS);
   const narrow = window.matchMedia(`(max-width: ${breakpoint}px)`);
   const tabletLandscape = window.matchMedia(TABLET_LANDSCAPE_QUERY);

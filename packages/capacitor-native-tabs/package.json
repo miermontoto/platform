@@ -2,7 +2,7 @@
   "name": "@platform/capacitor-native-tabs",
   "version": "0.1.0",
   "private": true,
-  "description": "navegación principal nativa de las apps en ios: barra de pestañas con liquid glass y, donde el sistema lleva sus barras a un lado (iPhone Duo), rail vertical. la web la maneja con @platform/mobile/native-tab-bar",
+  "description": "navegación principal nativa de las apps en ios: barra de pestañas con liquid glass y, donde el sistema lleva sus barras a un lado (iPhone Duo), rail vertical; en un mac, ninguna (MacDesktopPlugin: html.mac + compensa la escala del idiom iPad). la web la maneja con @platform/mobile/native-tab-bar",
   "license": "CC-BY-NC-SA-4.0",
   "author": "Juan Mier",
   "capacitor": {

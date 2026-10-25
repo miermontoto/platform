@@ -208,6 +208,13 @@ del iPad apaisado (que se queda en desktop).
 hover: los affordances que en desktop se revelan al pasar el ratón (acciones de fila,
 checks) deben ir siempre visibles. el hide-on-hover va dentro de `@media (hover: hover)`.
 
+**4. app de ios en un mac → `html.mac`** (¿es el binario del iPad en un escritorio?). la
+marca `MacDesktopPlugin` (`@platform/capacitor-native-tabs`) antes del primer paint, en iOS
+Apps on Mac y en catalyst, y compensa con `pageZoom` el 77% al que macos pinta el idiom iPad
+(1px css = 1pt del mac, como en safari). ahí manda el escritorio: `installCompact` no marca
+`.native` y solo pone compact por ancho, y `nativeTabBar` no monta la barra nativa. un estilo
+táctil keya de `.native`, nunca de `Capacitor.isNativePlatform()`, para que el mac no lo herede.
+
 **primitivas css compartidas** (`@platform/ui/base.css`, importar al principio del
 app.css): anti-zoom de iOS en inputs (`<16px` dispara zoom al enfocar), utilidad
 `.u-safe-px` (safe-area lateral en landscape) y `.u-touch-show` (reveal-en-táctil).

@@ -4,7 +4,8 @@
 // y la sustituye con su misma vida (solo existe con el shell montado), sus mismas pestañas y su
 // misma activa. con el plugin presente marca html.native-tabbar: el css de la app oculta su barra
 // web y deja que el contenido scrollee BAJO la nativa (el cristal refracta el contenido) con
-// --native-tabbar-h de margen. en web y android no hace nada: la barra web sigue como siempre.
+// --native-tabbar-h de margen. en web, android y la app de ios en un mac (html.mac: escritorio
+// con puntero) no hace nada: la barra web sigue como siempre.
 //
 // el nativo es tonto: cada cambio le llega como un `render` con el estado completo (pestañas,
 // activa, visible, tema), deduplicado aquí. una vista nativa SIEMPRE queda sobre el webview, así
@@ -25,7 +26,7 @@
 // FOOTGUN capacitor: el proxy del plugin nunca sale de una función async (un proxy devuelto desde
 // async lee `.then` y el puente responde "NativeTabBar.then() is not implemented").
 import type { PluginListenerHandle } from '@capacitor/core';
-import { COMPACT_CLASS } from './compact';
+import { COMPACT_CLASS, MAC_CLASS } from './compact';
 
 /** pestaña de la barra nativa: id = ruta de la spa, symbol = nombre de sf symbol. */
 export interface NativeTab {
@@ -117,7 +118,7 @@ function logError(action: string): (err: unknown) => void {
   return (err) => console.error(`[native-tab-bar] ${action} falló: ${(err as Error).message}`);
 }
 
-/** acción `use:nativeTabBar` de la barra de navegación web: en la app de ios la sustituye por la nativa con liquid glass (rail lateral en el iPhone Duo); no-op en web y android. */
+/** acción `use:nativeTabBar` de la barra de navegación web: en la app de ios la sustituye por la nativa con liquid glass (rail lateral en el iPhone Duo); no-op en web, android y en un mac. */
 export function nativeTabBar(_node: HTMLElement, params: NativeTabBarParams) {
   const root = document.documentElement;
   const darkScheme = window.matchMedia(DARK_SCHEME_QUERY);
@@ -189,7 +190,7 @@ export function nativeTabBar(_node: HTMLElement, params: NativeTabBarParams) {
       import('@capacitor/core'),
       import('./system-bars'),
     ]);
-    if (destroyed || !Capacitor.isPluginAvailable(PLUGIN_NAME)) return;
+    if (destroyed || !Capacitor.isPluginAvailable(PLUGIN_NAME) || root.classList.contains(MAC_CLASS)) return;
     plugin ??= registerPlugin<NativeTabBarPlugin>(PLUGIN_NAME);
     resolveColor = resolveCssColor;
     root.classList.add(NATIVE_TABBAR_CLASS);
