@@ -12,6 +12,7 @@
 #         icon_bg: '#0a0c0e'                # fondo del icono/splash generados
 #         deep_link_scheme: info.duckhunt.app   # opcional: oauth móvil por deep link
 #         sign_in_with_apple: true          # opcional: entitlement applesignin
+#         push_notifications: true          # opcional: push nativo apns (ver SETUP, paso 9)
 #         widget_extension_dir: ios-widgets  # opcional: extensión WidgetKit (ver SETUP, paso 7)
 #         app_group: group.info.duckhunt.app # obligatorio con widget_extension_dir
 #         widget_min_ios_version: '17.0'     # opcional: target de la extensión (AppIntents = 17)
@@ -116,6 +117,17 @@
 #     siri, que solo se registran desde el binario de la app, no desde una extensión widgetkit).
 #     sin ops en apple: no añade capabilities ni perfiles.
 #
+#  9. PUSH NATIVO (opcional, input push_notifications, para @capacitor/push-notifications): el
+#     ci añade el entitlement aps-environment=production y una extensión del AppDelegate que
+#     reenvía el token apns al plugin (la plantilla de `cap add` no lo hace: sin ella el evento
+#     `registration` no salta nunca). ops previas:
+#     - Identifiers → el App ID de la app → capability Push Notifications.
+#     - REGENERAR el perfil de la app (paso 5) → IOS_PROVISIONING_PROFILE_BASE64; un perfil sin
+#       la capability hace fallar el export.
+#     - Keys → (+) con "Apple Push Notifications service (APNs)": la .p8 la usa el SERVER que
+#       envía (no el ci). el token que entrega el plugin es apns crudo: firebase no lo acepta.
+#     el step "Verificar entitlement aps-environment" lo comprueba en el IPA antes de subir.
+#
 # VERSIONADO: CFBundleShortVersionString = input marketing_version > tag ios-vX.Y.Z >
 # AUTOMÁTICA (la pregunta el job `guard` a App Store Connect, ver "TRENES").
 # CFBundleVersion = run_number del caller (único y creciente por run, mismo patrón que
@@ -183,6 +195,11 @@ on:
         default: ''
       sign_in_with_apple:
         description: 'inyectar el entitlement com.apple.developer.applesignin (el profile debe permitirlo)'
+        required: false
+        type: boolean
+        default: false
+      push_notifications:
+        description: 'push nativo: entitlement aps-environment=production + AppDelegate que reenvía el token apns a @capacitor/push-notifications (el profile debe permitirlo, ver SETUP paso 9)'
         required: false
         type: boolean
         default: false
@@ -583,17 +600,20 @@ jobs:
           echo "== CFBundleURLTypes inyectado =="
           /usr/libexec/PlistBuddy -c "Print :CFBundleURLTypes" "$PLIST"
 
-      - name: Fijar firma manual en el target App (+ entitlement Sign in with Apple)
+      - name: Fijar firma manual en el target App (+ entitlements Sign in with Apple y push)
         # el proyecto ios/ se regenera en cada run (cap add), así que la config de firma
         # se inyecta aquí. el PROVISIONING_PROFILE_SPECIFIER va SOLO en el target App (no
         # en los Pods de capacitor: "Capacitor does not support provisioning profiles" si
         # el perfil se pasa global). si sign_in_with_apple=true se añade además el
         # entitlement com.apple.developer.applesignin, que el sheet nativo exige embebido
-        # en el binario; el App ID y el profile deben tener la capability habilitada
-        # (ver cabecera, paso 1) o el export fallará al firmar.
+        # en el binario; con push_notifications=true, aps-environment=production (las
+        # builds de distribución usan el apns de producción). el App ID y el profile deben
+        # tener cada capability habilitada (ver cabecera, pasos 1 y 9) o el export fallará
+        # al firmar.
         working-directory: packages/web/ios/App
         env:
           SIWA: ${{ inputs.sign_in_with_apple }}
+          PUSH: ${{ inputs.push_notifications }}
         run: |
           if [ "$SIWA" = "true" ]; then
             cat > App/App.entitlements <<'PLIST'
@@ -606,6 +626,11 @@ jobs:
           PLIST
             echo "App.entitlements escrito (Sign in with Apple)"
           fi
+          if [ "$PUSH" = "true" ]; then
+            [ -f App/App.entitlements ] || printf '<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n<plist version="1.0"><dict/></plist>\n' > App/App.entitlements
+            /usr/libexec/PlistBuddy -c "Add :aps-environment string production" App/App.entitlements
+            echo "App.entitlements: aps-environment=production"
+          fi
           # el gem xcodeproj viene con cocoapods; defensivo por si falta.
           gem list -i xcodeproj >/dev/null 2>&1 || sudo gem install xcodeproj --no-document
           ruby -e '
@@ -614,11 +639,50 @@ jobs:
             target = project.targets.find { |t| t.name == "App" } or abort("target App no encontrado")
             target.build_configurations.each do |c|
               c.build_settings["PROVISIONING_PROFILE_SPECIFIER"] = ENV["PROFILE_NAME"]
-              c.build_settings["CODE_SIGN_ENTITLEMENTS"] = "App/App.entitlements" if ENV["SIWA"] == "true"
+              c.build_settings["CODE_SIGN_ENTITLEMENTS"] = "App/App.entitlements" if File.exist?("App/App.entitlements")
             end
             project.save
           '
           echo "firma manual fijada en el target App (perfil '$PROFILE_NAME')"
+
+      - name: Reenviar el token apns al plugin de push (AppDelegate)
+        # @capacitor/push-notifications solo emite `registration` si el AppDelegate le reenvía el
+        # token (y el error) de didRegisterForRemoteNotifications; la plantilla de `cap add` no
+        # lo hace y el proyecto ios/ se regenera en cada run, así que se añade aquí como una
+        # extensión del AppDelegate en su propio fichero (sobrevive a cambios de la plantilla).
+        # si una plantilla futura ya trae los métodos, no se duplica.
+        if: ${{ inputs.push_notifications }}
+        working-directory: packages/web/ios/App
+        run: |
+          if grep -q 'didRegisterForRemoteNotificationsWithDeviceToken' App/AppDelegate.swift; then
+            echo "el AppDelegate ya reenvía el token: no se añade la extensión"; exit 0
+          fi
+          cat > App/PushTokenForwarding.swift <<'SWIFT'
+          import UIKit
+          import Capacitor
+
+          // generado por el ci (platform ios-release.yml, input push_notifications): reenvía el token
+          // apns y el fallo del registro a @capacitor/push-notifications.
+          extension AppDelegate {
+              func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
+                  NotificationCenter.default.post(name: .capacitorDidRegisterForRemoteNotifications, object: deviceToken)
+              }
+
+              func application(_ application: UIApplication, didFailToRegisterForRemoteNotificationsWithError error: Error) {
+                  NotificationCenter.default.post(name: .capacitorDidFailToRegisterForRemoteNotifications, object: error)
+              }
+          }
+          SWIFT
+          gem list -i xcodeproj >/dev/null 2>&1 || sudo gem install xcodeproj --no-document
+          ruby -e '
+            require "xcodeproj"
+            project = Xcodeproj::Project.open("App.xcodeproj")
+            app = project.targets.find { |t| t.name == "App" } or abort("target App no encontrado")
+            group = project.main_group.find_subpath("App", false) or abort("grupo App no encontrado")
+            app.add_file_references([group.new_file("PushTokenForwarding.swift")])
+            project.save
+          '
+          echo "target App: PushTokenForwarding.swift añadido"
 
       - name: Generar app icon + splash
         # el proyecto ios/ se regenera en cada run (cap add), así que el icono de marca
@@ -902,6 +966,21 @@ jobs:
             echo "OK: com.apple.developer.applesignin embebido — el sheet nativo funcionará"
           else
             echo "::error::el IPA NO lleva com.apple.developer.applesignin → Sign in with Apple fallará (error 1000)"
+            exit 1
+          fi
+
+      - name: Verificar entitlement aps-environment en el IPA
+        # sin él, register() falla en el dispositivo ("no valid aps-environment entitlement") y
+        # el push no llega nunca: mejor cortar aquí que descubrirlo tras TestFlight.
+        if: ${{ inputs.push_notifications }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/ipa-unz-p"
+          unzip -o "$IPA_PATH" -d "$RUNNER_TEMP/ipa-unz-p" >/dev/null
+          APP=$(find "$RUNNER_TEMP/ipa-unz-p/Payload" -maxdepth 1 -name '*.app' | head -1)
+          if codesign -d --entitlements :- "$APP" 2>/dev/null | grep -A1 "aps-environment" | grep -q "production"; then
+            echo "OK: aps-environment=production embebido"
+          else
+            echo "::error::el IPA NO lleva aps-environment=production → el push de ios no se registrará"
             exit 1
           fi
 
