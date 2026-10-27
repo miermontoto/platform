@@ -36,6 +36,13 @@ export const APP_STORE = {
     { id: 'header', label: 'header de la ficha (21:9)', sizes: [[3840, 1646]], safe: { ref: 3840, rect: [1097, 493, 1646, 661] } },
     { id: 'search', label: 'resultados de búsqueda (3:2)', ratio: [3, 2], width: [1920, 3840], safe: { ref: 3840, rect: [836, 765, 2168, 1030] } },
     { id: 'universal', label: 'creative universal (16:9, solo png)', sizes: [[5244, 2950]], safe: { ref: 5244, rect: [1921, 660, 1402, 962] } },
+    // in-app events: tarjeta apaisada y página de detalle vertical, de 1x a 2x del mínimo
+    // (developer.apple.com/help/app-store-connect/reference/in-app-event-media-and-audio-specifications).
+    // apple no publica plantilla con safe area: la app store pinta badge, nombre y descripción corta
+    // sobre el 40 % inferior y recorta los bordes, así que lo clave va arriba y centrado (márgenes de
+    // las guías de aso: arriba 5 % en la tarjeta y 8 % en el detalle, lados 6 %)
+    { id: 'event-card', label: 'in-app event: tarjeta (16:9)', ratio: [16, 9], width: [1920, 3840], safe: { ref: 3840, rect: [230, 108, 3380, 1188] } },
+    { id: 'event-details', label: 'in-app event: detalle (9:16)', ratio: [9, 16], width: [1080, 2160], safe: { ref: 2160, rect: [130, 307, 1900, 1997] } },
   ],
   // vídeo: no lo genera el renderer; queda aquí para cuando haya previews o creative en vídeo.
   // el iPhone Duo acepta las mismas previews que el resto de iphones modernos
