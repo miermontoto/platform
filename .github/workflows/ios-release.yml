@@ -13,6 +13,7 @@
 #         deep_link_scheme: info.duckhunt.app   # opcional: oauth móvil por deep link
 #         sign_in_with_apple: true          # opcional: entitlement applesignin
 #         push_notifications: true          # opcional: push nativo apns (ver SETUP, paso 9)
+#         associated_domains: 'webcredentials:duckhunt.info'  # opcional: dominios asociados (paso 10)
 #         widget_extension_dir: ios-widgets  # opcional: extensión WidgetKit (ver SETUP, paso 7)
 #         app_group: group.info.duckhunt.app # obligatorio con widget_extension_dir
 #         widget_min_ios_version: '17.0'     # opcional: target de la extensión (AppIntents = 17)
@@ -128,6 +129,18 @@
 #       envía (no el ci). el token que entrega el plugin es apns crudo: firebase no lo acepta.
 #     el step "Verificar entitlement aps-environment" lo comprueba en el IPA antes de subir.
 #
+# 10. DOMINIOS ASOCIADOS (opcional, input associated_domains, separados por espacios): el ci
+#     añade el entitlement com.apple.developer.associated-domains con esa lista. el caso de uso
+#     es `webcredentials:<dominio>`: el autofill de contraseñas del sistema liga el webview a ese
+#     dominio (sin él, lo que el usuario guarda en la app no casa con la web). ops previas:
+#     - Identifiers → el App ID de la app → capability Associated Domains.
+#     - REGENERAR el perfil de la app (paso 5) → IOS_PROVISIONING_PROFILE_BASE64; un perfil sin
+#       la capability hace fallar el export.
+#     - el dominio sirve https://<dominio>/.well-known/apple-app-site-association (json, sin
+#       redirects) con {"webcredentials":{"apps":["<TEAM_ID>.<bundle_id>"]}}; apple lo lee por
+#       su cdn, así que tarda en verse tras publicarlo.
+#     el step "Verificar entitlement associated-domains" lo comprueba en el IPA antes de subir.
+#
 # VERSIONADO: CFBundleShortVersionString = input marketing_version > tag ios-vX.Y.Z >
 # AUTOMÁTICA (la pregunta el job `guard` a App Store Connect, ver "TRENES").
 # CFBundleVersion = run_number del caller (único y creciente por run, mismo patrón que
@@ -203,6 +216,11 @@ on:
         required: false
         type: boolean
         default: false
+      associated_domains:
+        description: 'entitlement com.apple.developer.associated-domains, separados por espacios (p.ej. "webcredentials:duckhunt.info"); vacío → sin él (el profile debe permitirlo, ver SETUP paso 10)'
+        required: false
+        type: string
+        default: ''
       provisioning_profile:
         description: 'nombre del provisioning profile de App Store; vacío → "<app> App Store CI"'
         required: false
@@ -600,20 +618,22 @@ jobs:
           echo "== CFBundleURLTypes inyectado =="
           /usr/libexec/PlistBuddy -c "Print :CFBundleURLTypes" "$PLIST"
 
-      - name: Fijar firma manual en el target App (+ entitlements Sign in with Apple y push)
+      - name: Fijar firma manual en el target App (+ entitlements Sign in with Apple, push y dominios)
         # el proyecto ios/ se regenera en cada run (cap add), así que la config de firma
         # se inyecta aquí. el PROVISIONING_PROFILE_SPECIFIER va SOLO en el target App (no
         # en los Pods de capacitor: "Capacitor does not support provisioning profiles" si
         # el perfil se pasa global). si sign_in_with_apple=true se añade además el
         # entitlement com.apple.developer.applesignin, que el sheet nativo exige embebido
         # en el binario; con push_notifications=true, aps-environment=production (las
-        # builds de distribución usan el apns de producción). el App ID y el profile deben
-        # tener cada capability habilitada (ver cabecera, pasos 1 y 9) o el export fallará
-        # al firmar.
+        # builds de distribución usan el apns de producción); con associated_domains, su
+        # lista en com.apple.developer.associated-domains. el App ID y el profile deben
+        # tener cada capability habilitada (ver cabecera, pasos 1, 9 y 10) o el export
+        # fallará al firmar.
         working-directory: packages/web/ios/App
         env:
           SIWA: ${{ inputs.sign_in_with_apple }}
           PUSH: ${{ inputs.push_notifications }}
+          DOMAINS: ${{ inputs.associated_domains }}
         run: |
           if [ "$SIWA" = "true" ]; then
             cat > App/App.entitlements <<'PLIST'
@@ -630,6 +650,16 @@ jobs:
             [ -f App/App.entitlements ] || printf '<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n<plist version="1.0"><dict/></plist>\n' > App/App.entitlements
             /usr/libexec/PlistBuddy -c "Add :aps-environment string production" App/App.entitlements
             echo "App.entitlements: aps-environment=production"
+          fi
+          if [ -n "$DOMAINS" ]; then
+            [ -f App/App.entitlements ] || printf '<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n<plist version="1.0"><dict/></plist>\n' > App/App.entitlements
+            /usr/libexec/PlistBuddy -c "Add :com.apple.developer.associated-domains array" App/App.entitlements
+            i=0
+            for d in $DOMAINS; do
+              /usr/libexec/PlistBuddy -c "Add :com.apple.developer.associated-domains:$i string $d" App/App.entitlements
+              i=$((i + 1))
+            done
+            echo "App.entitlements: associated-domains = $DOMAINS"
           fi
           # el gem xcodeproj viene con cocoapods; defensivo por si falta.
           gem list -i xcodeproj >/dev/null 2>&1 || sudo gem install xcodeproj --no-document
@@ -983,6 +1013,26 @@ jobs:
             echo "::error::el IPA NO lleva aps-environment=production → el push de ios no se registrará"
             exit 1
           fi
+
+      - name: Verificar entitlement associated-domains en el IPA
+        # sin él, el autofill de contraseñas no liga la app a su dominio: mejor cortar aquí que
+        # descubrirlo en el dispositivo tras TestFlight.
+        if: ${{ inputs.associated_domains != '' }}
+        env:
+          DOMAINS: ${{ inputs.associated_domains }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/ipa-unz-d"
+          unzip -o "$IPA_PATH" -d "$RUNNER_TEMP/ipa-unz-d" >/dev/null
+          APP=$(find "$RUNNER_TEMP/ipa-unz-d/Payload" -maxdepth 1 -name '*.app' | head -1)
+          ENTS=$(codesign -d --entitlements :- "$APP" 2>/dev/null)
+          for d in $DOMAINS; do
+            if printf '%s' "$ENTS" | grep -qF "$d"; then
+              echo "OK: associated-domains lleva $d"
+            else
+              echo "::error::el IPA NO lleva $d en com.apple.developer.associated-domains"
+              exit 1
+            fi
+          done
 
       - name: Verificar la extensión de widgets en el IPA
         # falla aquí, y no en App Store Connect o en el dispositivo, si el .appex no quedó

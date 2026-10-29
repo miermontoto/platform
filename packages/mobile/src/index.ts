@@ -12,8 +12,19 @@
 // plataformas: esta config es cross-platform. el bloque `android:` y el plugin
 // EdgeToEdge son android-scoped (no-op en ios, que sí expone env(safe-area-inset-*)
 // nativo en su webview, sin necesidad del hack de márgenes). ios usa su scheme
-// seguro por defecto (capacitor://localhost), así que no necesita iosScheme:'https'.
+// seguro por defecto (capacitor://<hostname>), así que no necesita iosScheme:'https'.
 // StatusBar y CapacitorHttp/Cookies aplican igual en ambas.
+//
+// hostname: el origen del webview es https://<hostname> (android) y capacitor://<hostname>
+// (ios), 'localhost' por defecto. los gestores de contraseñas (y el autofill del sistema)
+// guardan las credenciales bajo ese host: con localhost se mezclan las de todas las apps y no
+// casan con las de la web. un subdominio propio (app.<dominio>) las agrupa con las del dominio.
+// footguns: (1) NUNCA el host de la api: android sirve en local toda petición a su hostname
+// (WebViewLocalServer) y el fetch parcheado manda `${serverUrl}/…` al fetch del webview, así
+// que la api y sus <img> recibirían el index.html; (2) cambiarlo cambia el origen, y el
+// localStorage/indexedDB del webview empiezan vacíos en la versión que lo estrena (las
+// cookies de la api viven en el jar nativo, por host de la api: la sesión sobrevive); (3) el
+// server tiene que aceptar el origen nuevo en sus checks de Origin.
 import type { CapacitorConfig } from '@capacitor/cli';
 import { isDarkColor } from './color';
 
@@ -30,6 +41,9 @@ export interface PlatformMobileOptions {
   statusBarStyle?: 'DARK' | 'LIGHT';
   // directorio del build estático de sveltekit (default 'build')
   webDir?: string;
+  // host local del webview (default 'localhost'): subdominio propio que no sea el de la api,
+  // ej. 'app.duckhunt.info' (ver footguns de la cabecera)
+  hostname?: string;
   // overrides puntuales sobre los defaults
   overrides?: Partial<CapacitorConfig>;
 }
@@ -53,6 +67,7 @@ export function createCapacitorConfig({
   backgroundColor = '#000000',
   statusBarStyle,
   webDir = 'build',
+  hostname,
   overrides = {},
 }: PlatformMobileOptions): CapacitorConfig {
   return {
@@ -61,8 +76,9 @@ export function createCapacitorConfig({
     webDir,
     backgroundColor,
     server: {
-      // origen https://localhost: scheme seguro, cookies y storage estables
+      // origen https://<hostname>: scheme seguro, cookies y storage estables
       androidScheme: 'https',
+      ...(hostname ? { hostname } : {}),
     },
     android: CAP7_ANDROID as CapacitorConfig['android'],
     plugins: {
