@@ -23,8 +23,11 @@
 // (WebViewLocalServer) y el fetch parcheado manda `${serverUrl}/…` al fetch del webview, así
 // que la api y sus <img> recibirían el index.html; (2) cambiarlo cambia el origen, y el
 // localStorage/indexedDB del webview empiezan vacíos en la versión que lo estrena (las
-// cookies de la api viven en el jar nativo, por host de la api: la sesión sobrevive); (3) el
-// server tiene que aceptar el origen nuevo en sus checks de Origin.
+// cookies de la api viven en el jar nativo, por host de la api: la sesión sobrevive); (3) un
+// subdominio de la api es SAME-SITE con ella: sin dns (ni wildcard) para él y nunca su https:// en
+// el allowlist de Origin del server, o una página servida ahí haría csrf con la cookie Lax. las
+// escrituras van por CapacitorHttp (nativo, sin Origin); capacitor://<hostname> sí es seguro de
+// aceptar (ninguna página web tiene ese origen).
 import type { CapacitorConfig } from '@capacitor/cli';
 import { isDarkColor } from './color';
 
