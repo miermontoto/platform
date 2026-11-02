@@ -7,6 +7,17 @@
    elemento + utilidades `u-*`). los tokens, el layout y la densidad siguen siendo
    propios de cada app. ver "convenciones web (móvil/tablet)" en el README. */
 
+/* inflado de texto de iOS (safari y wkwebview): webkit agranda por su cuenta los
+   bloques de varias líneas según el ancho de la pantalla, al margen del tamaño de
+   texto del sistema. 100% lo apaga y conserva el zoom con los dedos (none lo
+   bloquearía en algunos navegadores). visto en el iPhone Duo abierto en vertical:
+   la lista de conversaciones de /agents de duckhunt salía con la letra grande
+   (t#587). */
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
 /* anti-zoom de iOS: safari amplía el viewport al enfocar un campo de texto con
    font-size < 16px. en modo compacto las apps reducen la tipografía de los
    controles, así que en dispositivos TÁCTILES (hover:none) forzamos >=16px.

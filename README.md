@@ -234,8 +234,10 @@ Apps on Mac y en catalyst, y compensa con `pageZoom` el 77% al que macos pinta e
 táctil keya de `.native`, nunca de `Capacitor.isNativePlatform()`, para que el mac no lo herede.
 
 **primitivas css compartidas** (`@platform/ui/base.css`, importar al principio del
-app.css): anti-zoom de iOS en inputs (`<16px` dispara zoom al enfocar), utilidad
-`.u-safe-px` (safe-area lateral en landscape) y `.u-touch-show` (reveal-en-táctil).
+app.css): sin inflado de texto de iOS en `html` (`text-size-adjust: 100%`; webkit
+agranda solo los bloques de varias líneas según el ancho), anti-zoom de iOS en inputs
+(`<16px` dispara zoom al enfocar), utilidad `.u-safe-px` (safe-area lateral en
+landscape) y `.u-touch-show` (reveal-en-táctil).
 
 **drag & drop**: el drag HTML5 (`draggable`/`dataTransfer`) **no existe en iOS
 Safari/WKWebView**. si una vista lo usa, dale una alternativa táctil (menú/acciones);
