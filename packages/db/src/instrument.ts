@@ -7,6 +7,7 @@
 // se parchea el prototipo de Statement (compartido por todas las conexiones del proceso)
 // en vez de envolver cada statement en un proxy: cero asignaciones extra por query.
 // iterate() no se cronometra (su coste se reparte entre las iteraciones del caller).
+import { basename } from 'node:path';
 import type Database from 'better-sqlite3';
 import { SpanKind, SpanStatusCode, trace } from '@opentelemetry/api';
 import { createLogger, dbOperationDuration, tracer } from '@platform/observability';
@@ -50,34 +51,39 @@ const describe = (sql: string) => {
   return { name: table ? `${operation} ${table}` : operation, operation, table };
 };
 
-const attrsOf = (sql: string): Record<string, string> => {
-  const hit = metricAttrs.get(sql);
+// db.namespace de sqlite = el fichero (`duckhunt.db`): identifica la base en la vista nativa de
+// bases de datos de openobserve y distingue conexiones si un proceso abre varias
+const IN_MEMORY = ':memory:';
+const namespaceOf = (stmt: Database.Statement): string => {
+  const file = stmt.database.name;
+  return file && file !== IN_MEMORY ? basename(file) : IN_MEMORY;
+};
+
+const attrsOf = (sql: string, namespace: string): Record<string, string> => {
+  const key = `${namespace}\0${sql}`;
+  const hit = metricAttrs.get(key);
   if (hit) return hit;
   const { operation, table } = describe(sql);
-  const attrs = { 'db.system.name': DB_SYSTEM, 'db.operation.name': operation, ...(table && { 'db.collection.name': table }) };
+  const attrs = {
+    'db.system.name': DB_SYSTEM,
+    'db.namespace': namespace,
+    'db.operation.name': operation,
+    ...(table && { 'db.collection.name': table }),
+  };
   if (metricAttrs.size >= MAX_CACHED_STATEMENTS) metricAttrs.clear();
-  metricAttrs.set(sql, attrs);
+  metricAttrs.set(key, attrs);
   return attrs;
 };
 
-const startQuerySpan = (sql: string) => {
-  const { name, operation, table } = describe(sql);
-  return tracer.startSpan(name, {
-    kind: SpanKind.CLIENT,
-    attributes: {
-      'db.system.name': DB_SYSTEM,
-      'db.operation.name': operation,
-      'db.query.text': sql,
-      ...(table && { 'db.collection.name': table }),
-    },
-  });
-};
+const startQuerySpan = (sql: string, attrs: Record<string, string>) =>
+  tracer.startSpan(describe(sql).name, { kind: SpanKind.CLIENT, attributes: { ...attrs, 'db.query.text': sql } });
 
 function timed(method: Method, original: Exec): Exec {
   const [rowsAttr, countRows] = ROWS[method];
   return function (this: Database.Statement, ...params: unknown[]) {
     const sql = this.source;
-    const span = trace.getActiveSpan() ? startQuerySpan(sql) : undefined;
+    const attrs = attrsOf(sql, namespaceOf(this));
+    const span = trace.getActiveSpan() ? startQuerySpan(sql, attrs) : undefined;
     const start = performance.now();
     let rows: number | undefined;
     try {
@@ -92,7 +98,7 @@ function timed(method: Method, original: Exec): Exec {
     } finally {
       span?.end();
       const elapsed = performance.now() - start;
-      dbOperationDuration.record(elapsed / MS_PER_S, attrsOf(sql));
+      dbOperationDuration.record(elapsed / MS_PER_S, attrs);
       const ms = Math.round(elapsed);
       if (ms >= slowMs) {
         log.warn(`query lenta (${ms}ms): ${describe(sql).name}`, {

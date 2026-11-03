@@ -1,8 +1,8 @@
-// barrel de @platform/observability: trazas + logs estructurados (opentelemetry) de las apis y
-// la ingesta de la telemetría de cliente. el sdk de navegador vive en ./browser (sin node)
-export { initTelemetry, shutdownTelemetry, clientTelemetryEnabled, type TelemetryOptions } from './telemetry.js';
+// barrel de @platform/observability: trazas, logs y métricas (opentelemetry) de las apis y el destino
+// openobserve (proxy de rum, source maps). el sdk de navegador vive en ./browser (sin node)
+export { initTelemetry, shutdownTelemetry, WEB_SERVICE_SUFFIX, type TelemetryOptions } from './telemetry.js';
 export { createLogger, type Logger, type LogLevel, type LogAttrs } from './logger.js';
 export { withSpan, currentTraceId, tracer, TRACER_NAME } from './tracing.js';
 export { httpServerDuration, dbOperationDuration } from './metrics.js';
-export { ingestClientBatch, CLIENT_SERVICE_SUFFIX, type ClientContext } from './ingest.js';
-export { CLIENT_TELEMETRY_PATH, WIRE_LIMITS } from './wire.js';
+export { openObserveTarget, rumToken, publishSourceMaps, type OpenObserveTarget, type SourceMapRelease } from './o2.js';
+export { RUM_PROXY_PATH, RUM_LIMITS } from './wire.js';

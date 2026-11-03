@@ -9,8 +9,9 @@
 // extensión de asset conocida) es 404: el chunk de un build anterior debe fallar rápido para
 // que sveltekit recargue, no cachearse como html bajo una url .js. la lista de extensiones es
 // cerrada a propósito: hay rutas con puntos en el parámetro (ids de usuario de spotify en sis).
-// source maps: el build los trae (hidden) para que la api simbolice los errores del cliente
-// (ver client-telemetry.ts), pero nunca se sirven: expondrían el fuente original.
+// source maps: el build los trae (hidden) para que la api los publique en openobserve, con los que
+// el rum simboliza los errores del cliente (publishSourceMaps), pero nunca se sirven: expondrían el
+// fuente original.
 import { serveStatic } from '@hono/node-server/serve-static';
 import fs from 'fs';
 import path from 'path';
@@ -26,7 +27,7 @@ const CACHE_REVALIDATE = 'no-cache';
 const ASSET_EXT_RE = /\.(?:m?js|css|map|json|webmanifest|html|png|jpe?g|gif|svg|ico|webp|avif|woff2?|ttf|otf|txt|xml|wasm)$/i;
 const SOURCEMAP_EXT = '.map';
 
-/** build estático por defecto (./static relativo a cwd): lo comparten mountSpa y la ingesta de cliente. */
+/** build estático por defecto (./static relativo a cwd); initTelemetry publica sus source maps. */
 export const DEFAULT_STATIC_DIR = path.resolve(process.cwd(), 'static');
 
 export interface MountSpaOptions {

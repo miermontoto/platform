@@ -80,7 +80,7 @@
           login,
           'Para mantener tu sesión iniciada guardamos un identificador de sesión (un token almacenado de forma hasheada), las fechas de inicio y caducidad de la sesión, y el identificador del navegador o dispositivo (user-agent). Esto te permite ver y cerrar tus sesiones activas desde los ajustes.',
           `Además tratamos los datos que generas al usar ${app}: el contenido y las acciones propias de la herramienta, necesarios para que funcione.`,
-          'Para detectar y corregir fallos, la web y las apps envían a nuestro propio servidor datos técnicos de diagnóstico: los errores que se producen, los tiempos de carga y de respuesta, la pantalla en la que ocurren, la versión de la app, el navegador o dispositivo y la dirección IP. Si has iniciado sesión, se asocian a tu cuenta.',
+          'Para detectar y corregir fallos, la web y las apps envían a nuestro propio servidor datos técnicos de diagnóstico: los errores que se producen, los tiempos de carga y de respuesta, la pantalla en la que ocurren, las interacciones con la interfaz (qué controles se pulsan, nunca el texto que escribes), la versión de la app, el navegador o dispositivo y la dirección IP. Si has iniciado sesión, se asocian a tu cuenta.',
         ],
       },
       {
@@ -149,7 +149,7 @@
           login,
           'To keep you signed in we store a session identifier (a token kept in hashed form), the session start and expiry dates, and your browser or device identifier (user-agent). This lets you review and revoke your active sessions from settings.',
           `We also process the data you generate while using ${app}: the content and actions that are part of the tool itself, needed for it to work.`,
-          'To detect and fix problems, the web and mobile apps send technical diagnostic data to our own server: the errors that occur, load and response times, the screen where they happen, the app version, your browser or device and your IP address. If you are signed in, it is linked to your account.',
+          'To detect and fix problems, the web and mobile apps send technical diagnostic data to our own server: the errors that occur, load and response times, the screen where they happen, your interactions with the interface (which controls you tap or click, never the text you type), the app version, your browser or device and your IP address. If you are signed in, it is linked to your account.',
         ],
       },
       {

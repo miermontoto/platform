@@ -1,2553 +1,1543 @@
 {
- "version": 8,
- "title": "carreterinas",
- "description": "api (carreterinas), sqlite y usuarios reales (carreterinas-web): trazas, logs y métricas de @platform/observability",
- "tabs": [
-  {
-   "tabId": "resumen",
-   "name": "Resumen",
-   "panels": [
+  "version": 8,
+  "title": "carreterinas",
+  "description": "api (carreterinas) y su sqlite: trazas, logs y métricas de @platform/observability. el cliente está en la sección RUM nativa (servicio carreterinas-web) y las queries por fingerprint en Traces → Databases",
+  "tabs": [
     {
-     "id": "r-req",
-     "type": "metric",
-     "title": "Requests",
-     "description": "Requests http atendidas por la api.",
-     "config": {
-      "show_legends": true,
-      "legends_position": "bottom",
-      "unit": "short",
-      "decimals": 0,
-      "axis_border_show": false,
-      "show_gridlines": true,
-      "connect_nulls": false,
-      "no_value_replacement": "0",
-      "table_pagination": true,
-      "table_pagination_rows_per_page": 15,
-      "table_filtering": true,
-      "drilldown": [],
-      "mark_line": [],
-      "override_config": []
-     },
-     "layout": {
-      "x": 0,
-      "y": 0,
-      "w": 48,
-      "h": 8,
-      "i": 1
-     },
-     "htmlContent": "",
-     "markdownContent": "",
-     "queryType": "sql",
-     "queries": [
-      {
-       "query": "SELECT count(*) AS value FROM \"default\" WHERE service_name = 'carreterinas' AND span_kind = '2'",
-       "vrlFunctionQuery": "",
-       "customQuery": true,
-       "fields": {
-        "stream": "default",
-        "stream_type": "traces",
-        "x": [],
-        "y": [
-         {
-          "label": "Requests",
-          "alias": "value",
-          "column": "value",
-          "color": null,
-          "aggregationFunction": null,
-          "isDerived": false
-         }
-        ],
-        "z": [],
-        "breakdown": [],
-        "filter": {
-         "filterType": "group",
-         "logicalOperator": "AND",
-         "conditions": []
+      "tabId": "resumen",
+      "name": "Resumen",
+      "panels": [
+        {
+          "id": "r-req",
+          "type": "metric",
+          "title": "Requests",
+          "description": "Requests http atendidas por la api.",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "unit": "short",
+            "decimals": 0,
+            "axis_border_show": false,
+            "show_gridlines": true,
+            "connect_nulls": false,
+            "no_value_replacement": "0",
+            "table_pagination": true,
+            "table_pagination_rows_per_page": 15,
+            "table_filtering": true,
+            "drilldown": [],
+            "mark_line": [],
+            "override_config": []
+          },
+          "layout": {
+            "x": 0,
+            "y": 0,
+            "w": 48,
+            "h": 8,
+            "i": 1
+          },
+          "htmlContent": "",
+          "markdownContent": "",
+          "queryType": "sql",
+          "queries": [
+            {
+              "query": "SELECT count(*) AS value FROM \"default\" WHERE service_name = 'carreterinas' AND span_kind = '2'",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "default",
+                "stream_type": "traces",
+                "x": [],
+                "y": [
+                  {
+                    "label": "Requests",
+                    "alias": "value",
+                    "column": "value",
+                    "color": null,
+                    "aggregationFunction": null,
+                    "isDerived": false
+                  }
+                ],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "",
+                "layer_type": "scatter",
+                "weight_fixed": 1
+              }
+            }
+          ]
+        },
+        {
+          "id": "r-5xx",
+          "type": "metric",
+          "title": "5xx",
+          "description": "Requests que acabaron en error de servidor.",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "unit": "short",
+            "decimals": 0,
+            "axis_border_show": false,
+            "show_gridlines": true,
+            "connect_nulls": false,
+            "no_value_replacement": "0",
+            "table_pagination": true,
+            "table_pagination_rows_per_page": 15,
+            "table_filtering": true,
+            "drilldown": [],
+            "mark_line": [],
+            "override_config": []
+          },
+          "layout": {
+            "x": 48,
+            "y": 0,
+            "w": 48,
+            "h": 8,
+            "i": 2
+          },
+          "htmlContent": "",
+          "markdownContent": "",
+          "queryType": "sql",
+          "queries": [
+            {
+              "query": "SELECT count(*) AS value FROM \"default\" WHERE service_name = 'carreterinas' AND span_kind = '2' AND span_status = 'ERROR'",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "default",
+                "stream_type": "traces",
+                "x": [],
+                "y": [
+                  {
+                    "label": "5xx",
+                    "alias": "value",
+                    "column": "value",
+                    "color": null,
+                    "aggregationFunction": null,
+                    "isDerived": false
+                  }
+                ],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "",
+                "layer_type": "scatter",
+                "weight_fixed": 1
+              }
+            }
+          ]
+        },
+        {
+          "id": "r-p95",
+          "type": "metric",
+          "title": "p95 (ms)",
+          "description": "Percentil 95 de las requests (trazas).",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "unit": "ms",
+            "decimals": 0,
+            "axis_border_show": false,
+            "show_gridlines": true,
+            "connect_nulls": false,
+            "no_value_replacement": "0",
+            "table_pagination": true,
+            "table_pagination_rows_per_page": 15,
+            "table_filtering": true,
+            "drilldown": [],
+            "mark_line": [],
+            "override_config": []
+          },
+          "layout": {
+            "x": 96,
+            "y": 0,
+            "w": 48,
+            "h": 8,
+            "i": 3
+          },
+          "htmlContent": "",
+          "markdownContent": "",
+          "queryType": "sql",
+          "queries": [
+            {
+              "query": "SELECT approx_percentile_cont(duration, 0.95) / 1000 AS value FROM \"default\" WHERE service_name = 'carreterinas' AND span_kind = '2'",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "default",
+                "stream_type": "traces",
+                "x": [],
+                "y": [
+                  {
+                    "label": "ms",
+                    "alias": "value",
+                    "column": "value",
+                    "color": null,
+                    "aggregationFunction": null,
+                    "isDerived": false
+                  }
+                ],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "",
+                "layer_type": "scatter",
+                "weight_fixed": 1
+              }
+            }
+          ]
+        },
+        {
+          "id": "r-err",
+          "type": "metric",
+          "title": "Logs de error",
+          "description": "Errores de la api (carreterinas) y del cliente (carreterinas-web).",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "unit": "short",
+            "decimals": 0,
+            "axis_border_show": false,
+            "show_gridlines": true,
+            "connect_nulls": false,
+            "no_value_replacement": "0",
+            "table_pagination": true,
+            "table_pagination_rows_per_page": 15,
+            "table_filtering": true,
+            "drilldown": [],
+            "mark_line": [],
+            "override_config": []
+          },
+          "layout": {
+            "x": 144,
+            "y": 0,
+            "w": 48,
+            "h": 8,
+            "i": 4
+          },
+          "htmlContent": "",
+          "markdownContent": "",
+          "queryType": "sql",
+          "queries": [
+            {
+              "query": "SELECT count(*) AS value FROM \"default\" WHERE service_name IN ('carreterinas', 'carreterinas-web') AND severity = 'ERROR'",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "default",
+                "stream_type": "logs",
+                "x": [],
+                "y": [
+                  {
+                    "label": "Errores",
+                    "alias": "value",
+                    "column": "value",
+                    "color": null,
+                    "aggregationFunction": null,
+                    "isDerived": false
+                  }
+                ],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "",
+                "layer_type": "scatter",
+                "weight_fixed": 1
+              }
+            }
+          ]
+        },
+        {
+          "id": "r-rps",
+          "type": "line",
+          "title": "Requests/s",
+          "description": "Tráfico total y 5xx (métrica http.server.request.duration).",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "unit": "short",
+            "decimals": 2,
+            "axis_border_show": false,
+            "show_gridlines": true,
+            "connect_nulls": false,
+            "no_value_replacement": "0",
+            "table_pagination": true,
+            "table_pagination_rows_per_page": 15,
+            "table_filtering": true,
+            "drilldown": [],
+            "mark_line": [],
+            "override_config": []
+          },
+          "layout": {
+            "x": 0,
+            "y": 8,
+            "w": 96,
+            "h": 16,
+            "i": 5
+          },
+          "htmlContent": "",
+          "markdownContent": "",
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "sum(rate(http_server_request_duration_count{service_name=\"carreterinas\"}[5m]))",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "http_server_request_duration_count",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "total",
+                "layer_type": "scatter",
+                "weight_fixed": 1
+              }
+            },
+            {
+              "query": "sum(rate(http_server_request_duration_count{service_name=\"carreterinas\",http_response_status_code=~\"5..\"}[5m]))",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "http_server_request_duration_count",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "5xx",
+                "layer_type": "scatter",
+                "weight_fixed": 1
+              }
+            }
+          ]
+        },
+        {
+          "id": "r-lat",
+          "type": "line",
+          "title": "Latencia (s)",
+          "description": "Percentiles de duración de las requests.",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "unit": "seconds",
+            "decimals": 2,
+            "axis_border_show": false,
+            "show_gridlines": true,
+            "connect_nulls": false,
+            "no_value_replacement": "0",
+            "table_pagination": true,
+            "table_pagination_rows_per_page": 15,
+            "table_filtering": true,
+            "drilldown": [],
+            "mark_line": [],
+            "override_config": []
+          },
+          "layout": {
+            "x": 96,
+            "y": 8,
+            "w": 96,
+            "h": 16,
+            "i": 6
+          },
+          "htmlContent": "",
+          "markdownContent": "",
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "histogram_quantile(0.5, sum by (le) (rate(http_server_request_duration_bucket{service_name=\"carreterinas\"}[5m])))",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "http_server_request_duration_bucket",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "p50",
+                "layer_type": "scatter",
+                "weight_fixed": 1
+              }
+            },
+            {
+              "query": "histogram_quantile(0.95, sum by (le) (rate(http_server_request_duration_bucket{service_name=\"carreterinas\"}[5m])))",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "http_server_request_duration_bucket",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "p95",
+                "layer_type": "scatter",
+                "weight_fixed": 1
+              }
+            },
+            {
+              "query": "histogram_quantile(0.99, sum by (le) (rate(http_server_request_duration_bucket{service_name=\"carreterinas\"}[5m])))",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "http_server_request_duration_bucket",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "p99",
+                "layer_type": "scatter",
+                "weight_fixed": 1
+              }
+            }
+          ]
+        },
+        {
+          "id": "r-mem",
+          "type": "line",
+          "title": "Memoria",
+          "description": "Memoria residente (rss) y heap de v8 en uso.",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "unit": "bytes",
+            "decimals": 2,
+            "axis_border_show": false,
+            "show_gridlines": true,
+            "connect_nulls": false,
+            "no_value_replacement": "0",
+            "table_pagination": true,
+            "table_pagination_rows_per_page": 15,
+            "table_filtering": true,
+            "drilldown": [],
+            "mark_line": [],
+            "override_config": []
+          },
+          "layout": {
+            "x": 0,
+            "y": 24,
+            "w": 96,
+            "h": 16,
+            "i": 7
+          },
+          "htmlContent": "",
+          "markdownContent": "",
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "max(process_memory_usage{service_name=\"carreterinas\"})",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "process_memory_usage",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "rss",
+                "layer_type": "scatter",
+                "weight_fixed": 1
+              }
+            },
+            {
+              "query": "max(v8js_memory_heap_used{service_name=\"carreterinas\"})",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "v8js_memory_heap_used",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "heap",
+                "layer_type": "scatter",
+                "weight_fixed": 1
+              }
+            }
+          ]
+        },
+        {
+          "id": "r-loop",
+          "type": "line",
+          "title": "Lag del event loop p99 (s)",
+          "description": "Si sube, algo síncrono (una query, un cálculo) bloquea el proceso.",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "unit": "seconds",
+            "decimals": 2,
+            "axis_border_show": false,
+            "show_gridlines": true,
+            "connect_nulls": false,
+            "no_value_replacement": "0",
+            "table_pagination": true,
+            "table_pagination_rows_per_page": 15,
+            "table_filtering": true,
+            "drilldown": [],
+            "mark_line": [],
+            "override_config": []
+          },
+          "layout": {
+            "x": 96,
+            "y": 24,
+            "w": 96,
+            "h": 16,
+            "i": 8
+          },
+          "htmlContent": "",
+          "markdownContent": "",
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "max(nodejs_eventloop_delay_p99{service_name=\"carreterinas\"})",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "nodejs_eventloop_delay_p99",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "p99",
+                "layer_type": "scatter",
+                "weight_fixed": 1
+              }
+            }
+          ]
+        },
+        {
+          "id": "r-endpoints",
+          "type": "table",
+          "title": "Endpoints",
+          "description": "Por p95, con volumen y errores (trazas).",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "unit": "short",
+            "decimals": 2,
+            "axis_border_show": false,
+            "show_gridlines": true,
+            "connect_nulls": false,
+            "no_value_replacement": "0",
+            "table_pagination": true,
+            "table_pagination_rows_per_page": 15,
+            "table_filtering": true,
+            "drilldown": [],
+            "mark_line": [],
+            "override_config": []
+          },
+          "layout": {
+            "x": 0,
+            "y": 40,
+            "w": 96,
+            "h": 22,
+            "i": 9
+          },
+          "htmlContent": "",
+          "markdownContent": "",
+          "queryType": "sql",
+          "queries": [
+            {
+              "query": "SELECT http_route, count(*) AS requests, approx_percentile_cont(duration, 0.5) / 1000 AS p50_ms, approx_percentile_cont(duration, 0.95) / 1000 AS p95_ms, sum(CASE WHEN span_status = 'ERROR' THEN 1 ELSE 0 END) AS errores FROM \"default\" WHERE service_name = 'carreterinas' AND span_kind = '2' AND http_route IS NOT NULL GROUP BY http_route ORDER BY p95_ms DESC LIMIT 50",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "default",
+                "stream_type": "traces",
+                "x": [
+                  {
+                    "label": "Ruta",
+                    "alias": "http_route",
+                    "column": "http_route",
+                    "color": null,
+                    "aggregationFunction": null,
+                    "isDerived": false
+                  },
+                  {
+                    "label": "Requests",
+                    "alias": "requests",
+                    "column": "requests",
+                    "color": null,
+                    "aggregationFunction": null,
+                    "isDerived": false
+                  },
+                  {
+                    "label": "p50 ms",
+                    "alias": "p50_ms",
+                    "column": "p50_ms",
+                    "color": null,
+                    "aggregationFunction": null,
+                    "isDerived": false
+                  },
+                  {
+                    "label": "p95 ms",
+                    "alias": "p95_ms",
+                    "column": "p95_ms",
+                    "color": null,
+                    "aggregationFunction": null,
+                    "isDerived": false
+                  },
+                  {
+                    "label": "5xx",
+                    "alias": "errores",
+                    "column": "errores",
+                    "color": null,
+                    "aggregationFunction": null,
+                    "isDerived": false
+                  }
+                ],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "",
+                "layer_type": "scatter",
+                "weight_fixed": 1
+              }
+            }
+          ]
+        },
+        {
+          "id": "r-recent",
+          "type": "table",
+          "title": "Últimos errores",
+          "description": "Copia el trace_id en Traces para ver la request entera.",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "unit": "short",
+            "decimals": 2,
+            "axis_border_show": false,
+            "show_gridlines": true,
+            "connect_nulls": false,
+            "no_value_replacement": "0",
+            "table_pagination": true,
+            "table_pagination_rows_per_page": 15,
+            "table_filtering": true,
+            "drilldown": [],
+            "mark_line": [],
+            "override_config": []
+          },
+          "layout": {
+            "x": 96,
+            "y": 40,
+            "w": 96,
+            "h": 22,
+            "i": 10
+          },
+          "htmlContent": "",
+          "markdownContent": "",
+          "queryType": "sql",
+          "queries": [
+            {
+              "query": "SELECT _timestamp, service_name, scope, body, trace_id FROM \"default\" WHERE service_name IN ('carreterinas', 'carreterinas-web') AND severity = 'ERROR' ORDER BY _timestamp DESC LIMIT 50",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "default",
+                "stream_type": "logs",
+                "x": [
+                  {
+                    "label": "Hora",
+                    "alias": "_timestamp",
+                    "column": "_timestamp",
+                    "color": null,
+                    "aggregationFunction": null,
+                    "isDerived": false
+                  },
+                  {
+                    "label": "Servicio",
+                    "alias": "service_name",
+                    "column": "service_name",
+                    "color": null,
+                    "aggregationFunction": null,
+                    "isDerived": false
+                  },
+                  {
+                    "label": "Scope",
+                    "alias": "scope",
+                    "column": "scope",
+                    "color": null,
+                    "aggregationFunction": null,
+                    "isDerived": false
+                  },
+                  {
+                    "label": "Mensaje",
+                    "alias": "body",
+                    "column": "body",
+                    "color": null,
+                    "aggregationFunction": null,
+                    "isDerived": false
+                  },
+                  {
+                    "label": "Trace",
+                    "alias": "trace_id",
+                    "column": "trace_id",
+                    "color": null,
+                    "aggregationFunction": null,
+                    "isDerived": false
+                  }
+                ],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "",
+                "layer_type": "scatter",
+                "weight_fixed": 1
+              }
+            }
+          ]
         }
-       },
-       "config": {
-        "promql_legend": "",
-        "layer_type": "scatter",
-        "weight_fixed": 1
-       }
-      }
-     ]
+      ]
     },
     {
-     "id": "r-5xx",
-     "type": "metric",
-     "title": "5xx",
-     "description": "Requests que acabaron en error de servidor.",
-     "config": {
-      "show_legends": true,
-      "legends_position": "bottom",
-      "unit": "short",
-      "decimals": 0,
-      "axis_border_show": false,
-      "show_gridlines": true,
-      "connect_nulls": false,
-      "no_value_replacement": "0",
-      "table_pagination": true,
-      "table_pagination_rows_per_page": 15,
-      "table_filtering": true,
-      "drilldown": [],
-      "mark_line": [],
-      "override_config": []
-     },
-     "layout": {
-      "x": 48,
-      "y": 0,
-      "w": 48,
-      "h": 8,
-      "i": 2
-     },
-     "htmlContent": "",
-     "markdownContent": "",
-     "queryType": "sql",
-     "queries": [
-      {
-       "query": "SELECT count(*) AS value FROM \"default\" WHERE service_name = 'carreterinas' AND span_kind = '2' AND span_status = 'ERROR'",
-       "vrlFunctionQuery": "",
-       "customQuery": true,
-       "fields": {
-        "stream": "default",
-        "stream_type": "traces",
-        "x": [],
-        "y": [
-         {
-          "label": "5xx",
-          "alias": "value",
-          "column": "value",
-          "color": null,
-          "aggregationFunction": null,
-          "isDerived": false
-         }
-        ],
-        "z": [],
-        "breakdown": [],
-        "filter": {
-         "filterType": "group",
-         "logicalOperator": "AND",
-         "conditions": []
+      "tabId": "db",
+      "name": "Base de datos",
+      "panels": [
+        {
+          "id": "d-qps",
+          "type": "metric",
+          "title": "Queries/s",
+          "description": "Sentencias sqlite por segundo (5m).",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "unit": "short",
+            "decimals": 0,
+            "axis_border_show": false,
+            "show_gridlines": true,
+            "connect_nulls": false,
+            "no_value_replacement": "0",
+            "table_pagination": true,
+            "table_pagination_rows_per_page": 15,
+            "table_filtering": true,
+            "drilldown": [],
+            "mark_line": [],
+            "override_config": []
+          },
+          "layout": {
+            "x": 0,
+            "y": 0,
+            "w": 48,
+            "h": 8,
+            "i": 1
+          },
+          "htmlContent": "",
+          "markdownContent": "",
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "sum(rate(db_client_operation_duration_count{service_name=\"carreterinas\"}[5m]))",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "db_client_operation_duration_count",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "q/s",
+                "layer_type": "scatter",
+                "weight_fixed": 1
+              }
+            }
+          ]
+        },
+        {
+          "id": "d-p95",
+          "type": "metric",
+          "title": "p95 query (s)",
+          "description": "Percentil 95 de las sentencias (5m).",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "unit": "seconds",
+            "decimals": 0,
+            "axis_border_show": false,
+            "show_gridlines": true,
+            "connect_nulls": false,
+            "no_value_replacement": "0",
+            "table_pagination": true,
+            "table_pagination_rows_per_page": 15,
+            "table_filtering": true,
+            "drilldown": [],
+            "mark_line": [],
+            "override_config": []
+          },
+          "layout": {
+            "x": 48,
+            "y": 0,
+            "w": 48,
+            "h": 8,
+            "i": 2
+          },
+          "htmlContent": "",
+          "markdownContent": "",
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "histogram_quantile(0.95, sum by (le) (rate(db_client_operation_duration_bucket{service_name=\"carreterinas\"}[5m])))",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "db_client_operation_duration_bucket",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "p95",
+                "layer_type": "scatter",
+                "weight_fixed": 1
+              }
+            }
+          ]
+        },
+        {
+          "id": "d-err",
+          "type": "metric",
+          "title": "Errores de sqlite",
+          "description": "Sentencias fallidas (incluye busy/locked: escrituras que no consiguen el lock).",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "unit": "short",
+            "decimals": 0,
+            "axis_border_show": false,
+            "show_gridlines": true,
+            "connect_nulls": false,
+            "no_value_replacement": "0",
+            "table_pagination": true,
+            "table_pagination_rows_per_page": 15,
+            "table_filtering": true,
+            "drilldown": [],
+            "mark_line": [],
+            "override_config": []
+          },
+          "layout": {
+            "x": 96,
+            "y": 0,
+            "w": 48,
+            "h": 8,
+            "i": 3
+          },
+          "htmlContent": "",
+          "markdownContent": "",
+          "queryType": "sql",
+          "queries": [
+            {
+              "query": "SELECT count(*) AS value FROM \"default\" WHERE service_name = 'carreterinas' AND db_system_name = 'sqlite' AND span_status = 'ERROR'",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "default",
+                "stream_type": "traces",
+                "x": [],
+                "y": [
+                  {
+                    "label": "Errores",
+                    "alias": "value",
+                    "column": "value",
+                    "color": null,
+                    "aggregationFunction": null,
+                    "isDerived": false
+                  }
+                ],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "",
+                "layer_type": "scatter",
+                "weight_fixed": 1
+              }
+            }
+          ]
+        },
+        {
+          "id": "d-slow",
+          "type": "metric",
+          "title": "Queries lentas",
+          "description": "Sentencias por encima de DB_SLOW_QUERY_MS (100 por defecto).",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "unit": "short",
+            "decimals": 0,
+            "axis_border_show": false,
+            "show_gridlines": true,
+            "connect_nulls": false,
+            "no_value_replacement": "0",
+            "table_pagination": true,
+            "table_pagination_rows_per_page": 15,
+            "table_filtering": true,
+            "drilldown": [],
+            "mark_line": [],
+            "override_config": []
+          },
+          "layout": {
+            "x": 144,
+            "y": 0,
+            "w": 48,
+            "h": 8,
+            "i": 4
+          },
+          "htmlContent": "",
+          "markdownContent": "",
+          "queryType": "sql",
+          "queries": [
+            {
+              "query": "SELECT count(*) AS value FROM \"default\" WHERE service_name = 'carreterinas' AND scope = 'db' AND body LIKE 'query lenta%'",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "default",
+                "stream_type": "logs",
+                "x": [],
+                "y": [
+                  {
+                    "label": "Lentas",
+                    "alias": "value",
+                    "column": "value",
+                    "color": null,
+                    "aggregationFunction": null,
+                    "isDerived": false
+                  }
+                ],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "",
+                "layer_type": "scatter",
+                "weight_fixed": 1
+              }
+            }
+          ]
+        },
+        {
+          "id": "d-ops",
+          "type": "line",
+          "title": "Queries/s por operación",
+          "description": "SELECT, INSERT, UPDATE...",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "unit": "short",
+            "decimals": 2,
+            "axis_border_show": false,
+            "show_gridlines": true,
+            "connect_nulls": false,
+            "no_value_replacement": "0",
+            "table_pagination": true,
+            "table_pagination_rows_per_page": 15,
+            "table_filtering": true,
+            "drilldown": [],
+            "mark_line": [],
+            "override_config": []
+          },
+          "layout": {
+            "x": 0,
+            "y": 8,
+            "w": 96,
+            "h": 16,
+            "i": 5
+          },
+          "htmlContent": "",
+          "markdownContent": "",
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "sum by (db_operation_name) (rate(db_client_operation_duration_count{service_name=\"carreterinas\"}[5m]))",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "db_client_operation_duration_count",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "{db_operation_name}",
+                "layer_type": "scatter",
+                "weight_fixed": 1
+              }
+            }
+          ]
+        },
+        {
+          "id": "d-tables",
+          "type": "line",
+          "title": "p95 por tabla (s)",
+          "description": "Qué tablas tardan más.",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "unit": "seconds",
+            "decimals": 2,
+            "axis_border_show": false,
+            "show_gridlines": true,
+            "connect_nulls": false,
+            "no_value_replacement": "0",
+            "table_pagination": true,
+            "table_pagination_rows_per_page": 15,
+            "table_filtering": true,
+            "drilldown": [],
+            "mark_line": [],
+            "override_config": []
+          },
+          "layout": {
+            "x": 96,
+            "y": 8,
+            "w": 96,
+            "h": 16,
+            "i": 6
+          },
+          "htmlContent": "",
+          "markdownContent": "",
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "histogram_quantile(0.95, sum by (le, db_collection_name) (rate(db_client_operation_duration_bucket{service_name=\"carreterinas\"}[5m])))",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "db_client_operation_duration_bucket",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "{db_collection_name}",
+                "layer_type": "scatter",
+                "weight_fixed": 1
+              }
+            }
+          ]
+        },
+        {
+          "id": "d-total",
+          "type": "table",
+          "title": "SQL por tiempo total",
+          "description": "Hotspots: sentencias (con ?) por tiempo acumulado (las que corren dentro de una traza).",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "unit": "short",
+            "decimals": 2,
+            "axis_border_show": false,
+            "show_gridlines": true,
+            "connect_nulls": false,
+            "no_value_replacement": "0",
+            "table_pagination": true,
+            "table_pagination_rows_per_page": 15,
+            "table_filtering": true,
+            "drilldown": [],
+            "mark_line": [],
+            "override_config": []
+          },
+          "layout": {
+            "x": 0,
+            "y": 24,
+            "w": 96,
+            "h": 22,
+            "i": 7
+          },
+          "htmlContent": "",
+          "markdownContent": "",
+          "queryType": "sql",
+          "queries": [
+            {
+              "query": "SELECT db_query_text, count(*) AS llamadas, sum(duration) / 1000 AS total_ms, avg(duration) / 1000 AS media_ms, max(duration) / 1000 AS max_ms FROM \"default\" WHERE service_name = 'carreterinas' AND db_system_name = 'sqlite' GROUP BY db_query_text ORDER BY total_ms DESC LIMIT 30",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "default",
+                "stream_type": "traces",
+                "x": [
+                  {
+                    "label": "SQL",
+                    "alias": "db_query_text",
+                    "column": "db_query_text",
+                    "color": null,
+                    "aggregationFunction": null,
+                    "isDerived": false
+                  },
+                  {
+                    "label": "Llamadas",
+                    "alias": "llamadas",
+                    "column": "llamadas",
+                    "color": null,
+                    "aggregationFunction": null,
+                    "isDerived": false
+                  },
+                  {
+                    "label": "Total ms",
+                    "alias": "total_ms",
+                    "column": "total_ms",
+                    "color": null,
+                    "aggregationFunction": null,
+                    "isDerived": false
+                  },
+                  {
+                    "label": "Media ms",
+                    "alias": "media_ms",
+                    "column": "media_ms",
+                    "color": null,
+                    "aggregationFunction": null,
+                    "isDerived": false
+                  },
+                  {
+                    "label": "Máx ms",
+                    "alias": "max_ms",
+                    "column": "max_ms",
+                    "color": null,
+                    "aggregationFunction": null,
+                    "isDerived": false
+                  }
+                ],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "",
+                "layer_type": "scatter",
+                "weight_fixed": 1
+              }
+            }
+          ]
+        },
+        {
+          "id": "d-n1",
+          "type": "table",
+          "title": "Sospechosas de n+1",
+          "description": "Sentencias que se repiten muchas veces dentro de una misma traza.",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "unit": "short",
+            "decimals": 2,
+            "axis_border_show": false,
+            "show_gridlines": true,
+            "connect_nulls": false,
+            "no_value_replacement": "0",
+            "table_pagination": true,
+            "table_pagination_rows_per_page": 15,
+            "table_filtering": true,
+            "drilldown": [],
+            "mark_line": [],
+            "override_config": []
+          },
+          "layout": {
+            "x": 96,
+            "y": 24,
+            "w": 96,
+            "h": 22,
+            "i": 8
+          },
+          "htmlContent": "",
+          "markdownContent": "",
+          "queryType": "sql",
+          "queries": [
+            {
+              "query": "SELECT db_query_text, count(*) AS llamadas, count(DISTINCT trace_id) AS trazas, count(*) / count(DISTINCT trace_id) AS por_traza FROM \"default\" WHERE service_name = 'carreterinas' AND db_system_name = 'sqlite' GROUP BY db_query_text HAVING count(*) / count(DISTINCT trace_id) >= 5 ORDER BY por_traza DESC LIMIT 30",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "default",
+                "stream_type": "traces",
+                "x": [
+                  {
+                    "label": "SQL",
+                    "alias": "db_query_text",
+                    "column": "db_query_text",
+                    "color": null,
+                    "aggregationFunction": null,
+                    "isDerived": false
+                  },
+                  {
+                    "label": "Llamadas",
+                    "alias": "llamadas",
+                    "column": "llamadas",
+                    "color": null,
+                    "aggregationFunction": null,
+                    "isDerived": false
+                  },
+                  {
+                    "label": "Trazas",
+                    "alias": "trazas",
+                    "column": "trazas",
+                    "color": null,
+                    "aggregationFunction": null,
+                    "isDerived": false
+                  },
+                  {
+                    "label": "Por traza",
+                    "alias": "por_traza",
+                    "column": "por_traza",
+                    "color": null,
+                    "aggregationFunction": null,
+                    "isDerived": false
+                  }
+                ],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "",
+                "layer_type": "scatter",
+                "weight_fixed": 1
+              }
+            }
+          ]
+        },
+        {
+          "id": "d-slowlog",
+          "type": "table",
+          "title": "Queries lentas",
+          "description": "Log [db] query lenta: también las de fuera de una traza (pollers, arranque).",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "unit": "short",
+            "decimals": 2,
+            "axis_border_show": false,
+            "show_gridlines": true,
+            "connect_nulls": false,
+            "no_value_replacement": "0",
+            "table_pagination": true,
+            "table_pagination_rows_per_page": 15,
+            "table_filtering": true,
+            "drilldown": [],
+            "mark_line": [],
+            "override_config": []
+          },
+          "layout": {
+            "x": 0,
+            "y": 46,
+            "w": 96,
+            "h": 20,
+            "i": 9
+          },
+          "htmlContent": "",
+          "markdownContent": "",
+          "queryType": "sql",
+          "queries": [
+            {
+              "query": "SELECT _timestamp, duration_ms, db_query_text, trace_id FROM \"default\" WHERE service_name = 'carreterinas' AND scope = 'db' AND body LIKE 'query lenta%' ORDER BY _timestamp DESC LIMIT 50",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "default",
+                "stream_type": "logs",
+                "x": [
+                  {
+                    "label": "Hora",
+                    "alias": "_timestamp",
+                    "column": "_timestamp",
+                    "color": null,
+                    "aggregationFunction": null,
+                    "isDerived": false
+                  },
+                  {
+                    "label": "ms",
+                    "alias": "duration_ms",
+                    "column": "duration_ms",
+                    "color": null,
+                    "aggregationFunction": null,
+                    "isDerived": false
+                  },
+                  {
+                    "label": "SQL",
+                    "alias": "db_query_text",
+                    "column": "db_query_text",
+                    "color": null,
+                    "aggregationFunction": null,
+                    "isDerived": false
+                  },
+                  {
+                    "label": "Trace",
+                    "alias": "trace_id",
+                    "column": "trace_id",
+                    "color": null,
+                    "aggregationFunction": null,
+                    "isDerived": false
+                  }
+                ],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "",
+                "layer_type": "scatter",
+                "weight_fixed": 1
+              }
+            }
+          ]
+        },
+        {
+          "id": "d-errors",
+          "type": "table",
+          "title": "Errores de sqlite",
+          "description": "Con su mensaje (SQLITE_BUSY / database is locked = contención de escritura).",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "unit": "short",
+            "decimals": 2,
+            "axis_border_show": false,
+            "show_gridlines": true,
+            "connect_nulls": false,
+            "no_value_replacement": "0",
+            "table_pagination": true,
+            "table_pagination_rows_per_page": 15,
+            "table_filtering": true,
+            "drilldown": [],
+            "mark_line": [],
+            "override_config": []
+          },
+          "layout": {
+            "x": 96,
+            "y": 46,
+            "w": 96,
+            "h": 20,
+            "i": 10
+          },
+          "htmlContent": "",
+          "markdownContent": "",
+          "queryType": "sql",
+          "queries": [
+            {
+              "query": "SELECT _timestamp, operation_name, status_message, db_query_text, trace_id FROM \"default\" WHERE service_name = 'carreterinas' AND db_system_name = 'sqlite' AND span_status = 'ERROR' ORDER BY _timestamp DESC LIMIT 50",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "default",
+                "stream_type": "traces",
+                "x": [
+                  {
+                    "label": "Hora",
+                    "alias": "_timestamp",
+                    "column": "_timestamp",
+                    "color": null,
+                    "aggregationFunction": null,
+                    "isDerived": false
+                  },
+                  {
+                    "label": "Sentencia",
+                    "alias": "operation_name",
+                    "column": "operation_name",
+                    "color": null,
+                    "aggregationFunction": null,
+                    "isDerived": false
+                  },
+                  {
+                    "label": "Error",
+                    "alias": "status_message",
+                    "column": "status_message",
+                    "color": null,
+                    "aggregationFunction": null,
+                    "isDerived": false
+                  },
+                  {
+                    "label": "SQL",
+                    "alias": "db_query_text",
+                    "column": "db_query_text",
+                    "color": null,
+                    "aggregationFunction": null,
+                    "isDerived": false
+                  },
+                  {
+                    "label": "Trace",
+                    "alias": "trace_id",
+                    "column": "trace_id",
+                    "color": null,
+                    "aggregationFunction": null,
+                    "isDerived": false
+                  }
+                ],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "",
+                "layer_type": "scatter",
+                "weight_fixed": 1
+              }
+            }
+          ]
         }
-       },
-       "config": {
-        "promql_legend": "",
-        "layer_type": "scatter",
-        "weight_fixed": 1
-       }
-      }
-     ]
-    },
-    {
-     "id": "r-p95",
-     "type": "metric",
-     "title": "p95 (ms)",
-     "description": "Percentil 95 de las requests (trazas).",
-     "config": {
-      "show_legends": true,
-      "legends_position": "bottom",
-      "unit": "ms",
-      "decimals": 0,
-      "axis_border_show": false,
-      "show_gridlines": true,
-      "connect_nulls": false,
-      "no_value_replacement": "0",
-      "table_pagination": true,
-      "table_pagination_rows_per_page": 15,
-      "table_filtering": true,
-      "drilldown": [],
-      "mark_line": [],
-      "override_config": []
-     },
-     "layout": {
-      "x": 96,
-      "y": 0,
-      "w": 48,
-      "h": 8,
-      "i": 3
-     },
-     "htmlContent": "",
-     "markdownContent": "",
-     "queryType": "sql",
-     "queries": [
-      {
-       "query": "SELECT approx_percentile_cont(duration, 0.95) / 1000 AS value FROM \"default\" WHERE service_name = 'carreterinas' AND span_kind = '2'",
-       "vrlFunctionQuery": "",
-       "customQuery": true,
-       "fields": {
-        "stream": "default",
-        "stream_type": "traces",
-        "x": [],
-        "y": [
-         {
-          "label": "ms",
-          "alias": "value",
-          "column": "value",
-          "color": null,
-          "aggregationFunction": null,
-          "isDerived": false
-         }
-        ],
-        "z": [],
-        "breakdown": [],
-        "filter": {
-         "filterType": "group",
-         "logicalOperator": "AND",
-         "conditions": []
-        }
-       },
-       "config": {
-        "promql_legend": "",
-        "layer_type": "scatter",
-        "weight_fixed": 1
-       }
-      }
-     ]
-    },
-    {
-     "id": "r-err",
-     "type": "metric",
-     "title": "Logs de error",
-     "description": "Errores de la api (carreterinas) y del cliente (carreterinas-web).",
-     "config": {
-      "show_legends": true,
-      "legends_position": "bottom",
-      "unit": "short",
-      "decimals": 0,
-      "axis_border_show": false,
-      "show_gridlines": true,
-      "connect_nulls": false,
-      "no_value_replacement": "0",
-      "table_pagination": true,
-      "table_pagination_rows_per_page": 15,
-      "table_filtering": true,
-      "drilldown": [],
-      "mark_line": [],
-      "override_config": []
-     },
-     "layout": {
-      "x": 144,
-      "y": 0,
-      "w": 48,
-      "h": 8,
-      "i": 4
-     },
-     "htmlContent": "",
-     "markdownContent": "",
-     "queryType": "sql",
-     "queries": [
-      {
-       "query": "SELECT count(*) AS value FROM \"default\" WHERE service_name IN ('carreterinas', 'carreterinas-web') AND severity = 'ERROR'",
-       "vrlFunctionQuery": "",
-       "customQuery": true,
-       "fields": {
-        "stream": "default",
-        "stream_type": "logs",
-        "x": [],
-        "y": [
-         {
-          "label": "Errores",
-          "alias": "value",
-          "column": "value",
-          "color": null,
-          "aggregationFunction": null,
-          "isDerived": false
-         }
-        ],
-        "z": [],
-        "breakdown": [],
-        "filter": {
-         "filterType": "group",
-         "logicalOperator": "AND",
-         "conditions": []
-        }
-       },
-       "config": {
-        "promql_legend": "",
-        "layer_type": "scatter",
-        "weight_fixed": 1
-       }
-      }
-     ]
-    },
-    {
-     "id": "r-rps",
-     "type": "line",
-     "title": "Requests/s",
-     "description": "Tráfico total y 5xx (métrica http.server.request.duration).",
-     "config": {
-      "show_legends": true,
-      "legends_position": "bottom",
-      "unit": "short",
-      "decimals": 2,
-      "axis_border_show": false,
-      "show_gridlines": true,
-      "connect_nulls": false,
-      "no_value_replacement": "0",
-      "table_pagination": true,
-      "table_pagination_rows_per_page": 15,
-      "table_filtering": true,
-      "drilldown": [],
-      "mark_line": [],
-      "override_config": []
-     },
-     "layout": {
-      "x": 0,
-      "y": 8,
-      "w": 96,
-      "h": 16,
-      "i": 5
-     },
-     "htmlContent": "",
-     "markdownContent": "",
-     "queryType": "promql",
-     "queries": [
-      {
-       "query": "sum(rate(http_server_request_duration_count{service_name=\"carreterinas\"}[5m]))",
-       "vrlFunctionQuery": "",
-       "customQuery": true,
-       "fields": {
-        "stream": "http_server_request_duration_count",
-        "stream_type": "metrics",
-        "x": [],
-        "y": [],
-        "z": [],
-        "breakdown": [],
-        "filter": {
-         "filterType": "group",
-         "logicalOperator": "AND",
-         "conditions": []
-        }
-       },
-       "config": {
-        "promql_legend": "total",
-        "layer_type": "scatter",
-        "weight_fixed": 1
-       }
-      },
-      {
-       "query": "sum(rate(http_server_request_duration_count{service_name=\"carreterinas\",http_response_status_code=~\"5..\"}[5m]))",
-       "vrlFunctionQuery": "",
-       "customQuery": true,
-       "fields": {
-        "stream": "http_server_request_duration_count",
-        "stream_type": "metrics",
-        "x": [],
-        "y": [],
-        "z": [],
-        "breakdown": [],
-        "filter": {
-         "filterType": "group",
-         "logicalOperator": "AND",
-         "conditions": []
-        }
-       },
-       "config": {
-        "promql_legend": "5xx",
-        "layer_type": "scatter",
-        "weight_fixed": 1
-       }
-      }
-     ]
-    },
-    {
-     "id": "r-lat",
-     "type": "line",
-     "title": "Latencia (s)",
-     "description": "Percentiles de duración de las requests.",
-     "config": {
-      "show_legends": true,
-      "legends_position": "bottom",
-      "unit": "seconds",
-      "decimals": 2,
-      "axis_border_show": false,
-      "show_gridlines": true,
-      "connect_nulls": false,
-      "no_value_replacement": "0",
-      "table_pagination": true,
-      "table_pagination_rows_per_page": 15,
-      "table_filtering": true,
-      "drilldown": [],
-      "mark_line": [],
-      "override_config": []
-     },
-     "layout": {
-      "x": 96,
-      "y": 8,
-      "w": 96,
-      "h": 16,
-      "i": 6
-     },
-     "htmlContent": "",
-     "markdownContent": "",
-     "queryType": "promql",
-     "queries": [
-      {
-       "query": "histogram_quantile(0.5, sum by (le) (rate(http_server_request_duration_bucket{service_name=\"carreterinas\"}[5m])))",
-       "vrlFunctionQuery": "",
-       "customQuery": true,
-       "fields": {
-        "stream": "http_server_request_duration_bucket",
-        "stream_type": "metrics",
-        "x": [],
-        "y": [],
-        "z": [],
-        "breakdown": [],
-        "filter": {
-         "filterType": "group",
-         "logicalOperator": "AND",
-         "conditions": []
-        }
-       },
-       "config": {
-        "promql_legend": "p50",
-        "layer_type": "scatter",
-        "weight_fixed": 1
-       }
-      },
-      {
-       "query": "histogram_quantile(0.95, sum by (le) (rate(http_server_request_duration_bucket{service_name=\"carreterinas\"}[5m])))",
-       "vrlFunctionQuery": "",
-       "customQuery": true,
-       "fields": {
-        "stream": "http_server_request_duration_bucket",
-        "stream_type": "metrics",
-        "x": [],
-        "y": [],
-        "z": [],
-        "breakdown": [],
-        "filter": {
-         "filterType": "group",
-         "logicalOperator": "AND",
-         "conditions": []
-        }
-       },
-       "config": {
-        "promql_legend": "p95",
-        "layer_type": "scatter",
-        "weight_fixed": 1
-       }
-      },
-      {
-       "query": "histogram_quantile(0.99, sum by (le) (rate(http_server_request_duration_bucket{service_name=\"carreterinas\"}[5m])))",
-       "vrlFunctionQuery": "",
-       "customQuery": true,
-       "fields": {
-        "stream": "http_server_request_duration_bucket",
-        "stream_type": "metrics",
-        "x": [],
-        "y": [],
-        "z": [],
-        "breakdown": [],
-        "filter": {
-         "filterType": "group",
-         "logicalOperator": "AND",
-         "conditions": []
-        }
-       },
-       "config": {
-        "promql_legend": "p99",
-        "layer_type": "scatter",
-        "weight_fixed": 1
-       }
-      }
-     ]
-    },
-    {
-     "id": "r-mem",
-     "type": "line",
-     "title": "Memoria",
-     "description": "Memoria residente (rss) y heap de v8 en uso.",
-     "config": {
-      "show_legends": true,
-      "legends_position": "bottom",
-      "unit": "bytes",
-      "decimals": 2,
-      "axis_border_show": false,
-      "show_gridlines": true,
-      "connect_nulls": false,
-      "no_value_replacement": "0",
-      "table_pagination": true,
-      "table_pagination_rows_per_page": 15,
-      "table_filtering": true,
-      "drilldown": [],
-      "mark_line": [],
-      "override_config": []
-     },
-     "layout": {
-      "x": 0,
-      "y": 24,
-      "w": 96,
-      "h": 16,
-      "i": 7
-     },
-     "htmlContent": "",
-     "markdownContent": "",
-     "queryType": "promql",
-     "queries": [
-      {
-       "query": "max(process_memory_usage{service_name=\"carreterinas\"})",
-       "vrlFunctionQuery": "",
-       "customQuery": true,
-       "fields": {
-        "stream": "process_memory_usage",
-        "stream_type": "metrics",
-        "x": [],
-        "y": [],
-        "z": [],
-        "breakdown": [],
-        "filter": {
-         "filterType": "group",
-         "logicalOperator": "AND",
-         "conditions": []
-        }
-       },
-       "config": {
-        "promql_legend": "rss",
-        "layer_type": "scatter",
-        "weight_fixed": 1
-       }
-      },
-      {
-       "query": "max(v8js_memory_heap_used{service_name=\"carreterinas\"})",
-       "vrlFunctionQuery": "",
-       "customQuery": true,
-       "fields": {
-        "stream": "v8js_memory_heap_used",
-        "stream_type": "metrics",
-        "x": [],
-        "y": [],
-        "z": [],
-        "breakdown": [],
-        "filter": {
-         "filterType": "group",
-         "logicalOperator": "AND",
-         "conditions": []
-        }
-       },
-       "config": {
-        "promql_legend": "heap",
-        "layer_type": "scatter",
-        "weight_fixed": 1
-       }
-      }
-     ]
-    },
-    {
-     "id": "r-loop",
-     "type": "line",
-     "title": "Lag del event loop p99 (s)",
-     "description": "Si sube, algo síncrono (una query, un cálculo) bloquea el proceso.",
-     "config": {
-      "show_legends": true,
-      "legends_position": "bottom",
-      "unit": "seconds",
-      "decimals": 2,
-      "axis_border_show": false,
-      "show_gridlines": true,
-      "connect_nulls": false,
-      "no_value_replacement": "0",
-      "table_pagination": true,
-      "table_pagination_rows_per_page": 15,
-      "table_filtering": true,
-      "drilldown": [],
-      "mark_line": [],
-      "override_config": []
-     },
-     "layout": {
-      "x": 96,
-      "y": 24,
-      "w": 96,
-      "h": 16,
-      "i": 8
-     },
-     "htmlContent": "",
-     "markdownContent": "",
-     "queryType": "promql",
-     "queries": [
-      {
-       "query": "max(nodejs_eventloop_delay_p99{service_name=\"carreterinas\"})",
-       "vrlFunctionQuery": "",
-       "customQuery": true,
-       "fields": {
-        "stream": "nodejs_eventloop_delay_p99",
-        "stream_type": "metrics",
-        "x": [],
-        "y": [],
-        "z": [],
-        "breakdown": [],
-        "filter": {
-         "filterType": "group",
-         "logicalOperator": "AND",
-         "conditions": []
-        }
-       },
-       "config": {
-        "promql_legend": "p99",
-        "layer_type": "scatter",
-        "weight_fixed": 1
-       }
-      }
-     ]
-    },
-    {
-     "id": "r-endpoints",
-     "type": "table",
-     "title": "Endpoints",
-     "description": "Por p95, con volumen y errores (trazas).",
-     "config": {
-      "show_legends": true,
-      "legends_position": "bottom",
-      "unit": "short",
-      "decimals": 2,
-      "axis_border_show": false,
-      "show_gridlines": true,
-      "connect_nulls": false,
-      "no_value_replacement": "0",
-      "table_pagination": true,
-      "table_pagination_rows_per_page": 15,
-      "table_filtering": true,
-      "drilldown": [],
-      "mark_line": [],
-      "override_config": []
-     },
-     "layout": {
-      "x": 0,
-      "y": 40,
-      "w": 96,
-      "h": 22,
-      "i": 9
-     },
-     "htmlContent": "",
-     "markdownContent": "",
-     "queryType": "sql",
-     "queries": [
-      {
-       "query": "SELECT http_route, count(*) AS requests, approx_percentile_cont(duration, 0.5) / 1000 AS p50_ms, approx_percentile_cont(duration, 0.95) / 1000 AS p95_ms, sum(CASE WHEN span_status = 'ERROR' THEN 1 ELSE 0 END) AS errores FROM \"default\" WHERE service_name = 'carreterinas' AND span_kind = '2' AND http_route IS NOT NULL GROUP BY http_route ORDER BY p95_ms DESC LIMIT 50",
-       "vrlFunctionQuery": "",
-       "customQuery": true,
-       "fields": {
-        "stream": "default",
-        "stream_type": "traces",
-        "x": [
-         {
-          "label": "Ruta",
-          "alias": "http_route",
-          "column": "http_route",
-          "color": null,
-          "aggregationFunction": null,
-          "isDerived": false
-         },
-         {
-          "label": "Requests",
-          "alias": "requests",
-          "column": "requests",
-          "color": null,
-          "aggregationFunction": null,
-          "isDerived": false
-         },
-         {
-          "label": "p50 ms",
-          "alias": "p50_ms",
-          "column": "p50_ms",
-          "color": null,
-          "aggregationFunction": null,
-          "isDerived": false
-         },
-         {
-          "label": "p95 ms",
-          "alias": "p95_ms",
-          "column": "p95_ms",
-          "color": null,
-          "aggregationFunction": null,
-          "isDerived": false
-         },
-         {
-          "label": "5xx",
-          "alias": "errores",
-          "column": "errores",
-          "color": null,
-          "aggregationFunction": null,
-          "isDerived": false
-         }
-        ],
-        "y": [],
-        "z": [],
-        "breakdown": [],
-        "filter": {
-         "filterType": "group",
-         "logicalOperator": "AND",
-         "conditions": []
-        }
-       },
-       "config": {
-        "promql_legend": "",
-        "layer_type": "scatter",
-        "weight_fixed": 1
-       }
-      }
-     ]
-    },
-    {
-     "id": "r-recent",
-     "type": "table",
-     "title": "Últimos errores",
-     "description": "Copia el trace_id en Traces para ver la request entera.",
-     "config": {
-      "show_legends": true,
-      "legends_position": "bottom",
-      "unit": "short",
-      "decimals": 2,
-      "axis_border_show": false,
-      "show_gridlines": true,
-      "connect_nulls": false,
-      "no_value_replacement": "0",
-      "table_pagination": true,
-      "table_pagination_rows_per_page": 15,
-      "table_filtering": true,
-      "drilldown": [],
-      "mark_line": [],
-      "override_config": []
-     },
-     "layout": {
-      "x": 96,
-      "y": 40,
-      "w": 96,
-      "h": 22,
-      "i": 10
-     },
-     "htmlContent": "",
-     "markdownContent": "",
-     "queryType": "sql",
-     "queries": [
-      {
-       "query": "SELECT _timestamp, service_name, scope, body, trace_id FROM \"default\" WHERE service_name IN ('carreterinas', 'carreterinas-web') AND severity = 'ERROR' ORDER BY _timestamp DESC LIMIT 50",
-       "vrlFunctionQuery": "",
-       "customQuery": true,
-       "fields": {
-        "stream": "default",
-        "stream_type": "logs",
-        "x": [
-         {
-          "label": "Hora",
-          "alias": "_timestamp",
-          "column": "_timestamp",
-          "color": null,
-          "aggregationFunction": null,
-          "isDerived": false
-         },
-         {
-          "label": "Servicio",
-          "alias": "service_name",
-          "column": "service_name",
-          "color": null,
-          "aggregationFunction": null,
-          "isDerived": false
-         },
-         {
-          "label": "Scope",
-          "alias": "scope",
-          "column": "scope",
-          "color": null,
-          "aggregationFunction": null,
-          "isDerived": false
-         },
-         {
-          "label": "Mensaje",
-          "alias": "body",
-          "column": "body",
-          "color": null,
-          "aggregationFunction": null,
-          "isDerived": false
-         },
-         {
-          "label": "Trace",
-          "alias": "trace_id",
-          "column": "trace_id",
-          "color": null,
-          "aggregationFunction": null,
-          "isDerived": false
-         }
-        ],
-        "y": [],
-        "z": [],
-        "breakdown": [],
-        "filter": {
-         "filterType": "group",
-         "logicalOperator": "AND",
-         "conditions": []
-        }
-       },
-       "config": {
-        "promql_legend": "",
-        "layer_type": "scatter",
-        "weight_fixed": 1
-       }
-      }
-     ]
+      ]
     }
-   ]
+  ],
+  "variables": {
+    "list": [],
+    "showDynamicFilters": true
   },
-  {
-   "tabId": "db",
-   "name": "Base de datos",
-   "panels": [
-    {
-     "id": "d-qps",
-     "type": "metric",
-     "title": "Queries/s",
-     "description": "Sentencias sqlite por segundo (5m).",
-     "config": {
-      "show_legends": true,
-      "legends_position": "bottom",
-      "unit": "short",
-      "decimals": 0,
-      "axis_border_show": false,
-      "show_gridlines": true,
-      "connect_nulls": false,
-      "no_value_replacement": "0",
-      "table_pagination": true,
-      "table_pagination_rows_per_page": 15,
-      "table_filtering": true,
-      "drilldown": [],
-      "mark_line": [],
-      "override_config": []
-     },
-     "layout": {
-      "x": 0,
-      "y": 0,
-      "w": 48,
-      "h": 8,
-      "i": 1
-     },
-     "htmlContent": "",
-     "markdownContent": "",
-     "queryType": "promql",
-     "queries": [
-      {
-       "query": "sum(rate(db_client_operation_duration_count{service_name=\"carreterinas\"}[5m]))",
-       "vrlFunctionQuery": "",
-       "customQuery": true,
-       "fields": {
-        "stream": "db_client_operation_duration_count",
-        "stream_type": "metrics",
-        "x": [],
-        "y": [],
-        "z": [],
-        "breakdown": [],
-        "filter": {
-         "filterType": "group",
-         "logicalOperator": "AND",
-         "conditions": []
-        }
-       },
-       "config": {
-        "promql_legend": "q/s",
-        "layer_type": "scatter",
-        "weight_fixed": 1
-       }
-      }
-     ]
-    },
-    {
-     "id": "d-p95",
-     "type": "metric",
-     "title": "p95 query (s)",
-     "description": "Percentil 95 de las sentencias (5m).",
-     "config": {
-      "show_legends": true,
-      "legends_position": "bottom",
-      "unit": "seconds",
-      "decimals": 0,
-      "axis_border_show": false,
-      "show_gridlines": true,
-      "connect_nulls": false,
-      "no_value_replacement": "0",
-      "table_pagination": true,
-      "table_pagination_rows_per_page": 15,
-      "table_filtering": true,
-      "drilldown": [],
-      "mark_line": [],
-      "override_config": []
-     },
-     "layout": {
-      "x": 48,
-      "y": 0,
-      "w": 48,
-      "h": 8,
-      "i": 2
-     },
-     "htmlContent": "",
-     "markdownContent": "",
-     "queryType": "promql",
-     "queries": [
-      {
-       "query": "histogram_quantile(0.95, sum by (le) (rate(db_client_operation_duration_bucket{service_name=\"carreterinas\"}[5m])))",
-       "vrlFunctionQuery": "",
-       "customQuery": true,
-       "fields": {
-        "stream": "db_client_operation_duration_bucket",
-        "stream_type": "metrics",
-        "x": [],
-        "y": [],
-        "z": [],
-        "breakdown": [],
-        "filter": {
-         "filterType": "group",
-         "logicalOperator": "AND",
-         "conditions": []
-        }
-       },
-       "config": {
-        "promql_legend": "p95",
-        "layer_type": "scatter",
-        "weight_fixed": 1
-       }
-      }
-     ]
-    },
-    {
-     "id": "d-err",
-     "type": "metric",
-     "title": "Errores de sqlite",
-     "description": "Sentencias fallidas (incluye busy/locked: escrituras que no consiguen el lock).",
-     "config": {
-      "show_legends": true,
-      "legends_position": "bottom",
-      "unit": "short",
-      "decimals": 0,
-      "axis_border_show": false,
-      "show_gridlines": true,
-      "connect_nulls": false,
-      "no_value_replacement": "0",
-      "table_pagination": true,
-      "table_pagination_rows_per_page": 15,
-      "table_filtering": true,
-      "drilldown": [],
-      "mark_line": [],
-      "override_config": []
-     },
-     "layout": {
-      "x": 96,
-      "y": 0,
-      "w": 48,
-      "h": 8,
-      "i": 3
-     },
-     "htmlContent": "",
-     "markdownContent": "",
-     "queryType": "sql",
-     "queries": [
-      {
-       "query": "SELECT count(*) AS value FROM \"default\" WHERE service_name = 'carreterinas' AND db_system_name = 'sqlite' AND span_status = 'ERROR'",
-       "vrlFunctionQuery": "",
-       "customQuery": true,
-       "fields": {
-        "stream": "default",
-        "stream_type": "traces",
-        "x": [],
-        "y": [
-         {
-          "label": "Errores",
-          "alias": "value",
-          "column": "value",
-          "color": null,
-          "aggregationFunction": null,
-          "isDerived": false
-         }
-        ],
-        "z": [],
-        "breakdown": [],
-        "filter": {
-         "filterType": "group",
-         "logicalOperator": "AND",
-         "conditions": []
-        }
-       },
-       "config": {
-        "promql_legend": "",
-        "layer_type": "scatter",
-        "weight_fixed": 1
-       }
-      }
-     ]
-    },
-    {
-     "id": "d-slow",
-     "type": "metric",
-     "title": "Queries lentas",
-     "description": "Sentencias por encima de DB_SLOW_QUERY_MS (100 por defecto).",
-     "config": {
-      "show_legends": true,
-      "legends_position": "bottom",
-      "unit": "short",
-      "decimals": 0,
-      "axis_border_show": false,
-      "show_gridlines": true,
-      "connect_nulls": false,
-      "no_value_replacement": "0",
-      "table_pagination": true,
-      "table_pagination_rows_per_page": 15,
-      "table_filtering": true,
-      "drilldown": [],
-      "mark_line": [],
-      "override_config": []
-     },
-     "layout": {
-      "x": 144,
-      "y": 0,
-      "w": 48,
-      "h": 8,
-      "i": 4
-     },
-     "htmlContent": "",
-     "markdownContent": "",
-     "queryType": "sql",
-     "queries": [
-      {
-       "query": "SELECT count(*) AS value FROM \"default\" WHERE service_name = 'carreterinas' AND scope = 'db' AND body LIKE 'query lenta%'",
-       "vrlFunctionQuery": "",
-       "customQuery": true,
-       "fields": {
-        "stream": "default",
-        "stream_type": "logs",
-        "x": [],
-        "y": [
-         {
-          "label": "Lentas",
-          "alias": "value",
-          "column": "value",
-          "color": null,
-          "aggregationFunction": null,
-          "isDerived": false
-         }
-        ],
-        "z": [],
-        "breakdown": [],
-        "filter": {
-         "filterType": "group",
-         "logicalOperator": "AND",
-         "conditions": []
-        }
-       },
-       "config": {
-        "promql_legend": "",
-        "layer_type": "scatter",
-        "weight_fixed": 1
-       }
-      }
-     ]
-    },
-    {
-     "id": "d-ops",
-     "type": "line",
-     "title": "Queries/s por operación",
-     "description": "SELECT, INSERT, UPDATE...",
-     "config": {
-      "show_legends": true,
-      "legends_position": "bottom",
-      "unit": "short",
-      "decimals": 2,
-      "axis_border_show": false,
-      "show_gridlines": true,
-      "connect_nulls": false,
-      "no_value_replacement": "0",
-      "table_pagination": true,
-      "table_pagination_rows_per_page": 15,
-      "table_filtering": true,
-      "drilldown": [],
-      "mark_line": [],
-      "override_config": []
-     },
-     "layout": {
-      "x": 0,
-      "y": 8,
-      "w": 96,
-      "h": 16,
-      "i": 5
-     },
-     "htmlContent": "",
-     "markdownContent": "",
-     "queryType": "promql",
-     "queries": [
-      {
-       "query": "sum by (db_operation_name) (rate(db_client_operation_duration_count{service_name=\"carreterinas\"}[5m]))",
-       "vrlFunctionQuery": "",
-       "customQuery": true,
-       "fields": {
-        "stream": "db_client_operation_duration_count",
-        "stream_type": "metrics",
-        "x": [],
-        "y": [],
-        "z": [],
-        "breakdown": [],
-        "filter": {
-         "filterType": "group",
-         "logicalOperator": "AND",
-         "conditions": []
-        }
-       },
-       "config": {
-        "promql_legend": "{db_operation_name}",
-        "layer_type": "scatter",
-        "weight_fixed": 1
-       }
-      }
-     ]
-    },
-    {
-     "id": "d-tables",
-     "type": "line",
-     "title": "p95 por tabla (s)",
-     "description": "Qué tablas tardan más.",
-     "config": {
-      "show_legends": true,
-      "legends_position": "bottom",
-      "unit": "seconds",
-      "decimals": 2,
-      "axis_border_show": false,
-      "show_gridlines": true,
-      "connect_nulls": false,
-      "no_value_replacement": "0",
-      "table_pagination": true,
-      "table_pagination_rows_per_page": 15,
-      "table_filtering": true,
-      "drilldown": [],
-      "mark_line": [],
-      "override_config": []
-     },
-     "layout": {
-      "x": 96,
-      "y": 8,
-      "w": 96,
-      "h": 16,
-      "i": 6
-     },
-     "htmlContent": "",
-     "markdownContent": "",
-     "queryType": "promql",
-     "queries": [
-      {
-       "query": "histogram_quantile(0.95, sum by (le, db_collection_name) (rate(db_client_operation_duration_bucket{service_name=\"carreterinas\"}[5m])))",
-       "vrlFunctionQuery": "",
-       "customQuery": true,
-       "fields": {
-        "stream": "db_client_operation_duration_bucket",
-        "stream_type": "metrics",
-        "x": [],
-        "y": [],
-        "z": [],
-        "breakdown": [],
-        "filter": {
-         "filterType": "group",
-         "logicalOperator": "AND",
-         "conditions": []
-        }
-       },
-       "config": {
-        "promql_legend": "{db_collection_name}",
-        "layer_type": "scatter",
-        "weight_fixed": 1
-       }
-      }
-     ]
-    },
-    {
-     "id": "d-total",
-     "type": "table",
-     "title": "SQL por tiempo total",
-     "description": "Hotspots: sentencias (con ?) por tiempo acumulado (las que corren dentro de una traza).",
-     "config": {
-      "show_legends": true,
-      "legends_position": "bottom",
-      "unit": "short",
-      "decimals": 2,
-      "axis_border_show": false,
-      "show_gridlines": true,
-      "connect_nulls": false,
-      "no_value_replacement": "0",
-      "table_pagination": true,
-      "table_pagination_rows_per_page": 15,
-      "table_filtering": true,
-      "drilldown": [],
-      "mark_line": [],
-      "override_config": []
-     },
-     "layout": {
-      "x": 0,
-      "y": 24,
-      "w": 96,
-      "h": 22,
-      "i": 7
-     },
-     "htmlContent": "",
-     "markdownContent": "",
-     "queryType": "sql",
-     "queries": [
-      {
-       "query": "SELECT db_query_text, count(*) AS llamadas, sum(duration) / 1000 AS total_ms, avg(duration) / 1000 AS media_ms, max(duration) / 1000 AS max_ms FROM \"default\" WHERE service_name = 'carreterinas' AND db_system_name = 'sqlite' GROUP BY db_query_text ORDER BY total_ms DESC LIMIT 30",
-       "vrlFunctionQuery": "",
-       "customQuery": true,
-       "fields": {
-        "stream": "default",
-        "stream_type": "traces",
-        "x": [
-         {
-          "label": "SQL",
-          "alias": "db_query_text",
-          "column": "db_query_text",
-          "color": null,
-          "aggregationFunction": null,
-          "isDerived": false
-         },
-         {
-          "label": "Llamadas",
-          "alias": "llamadas",
-          "column": "llamadas",
-          "color": null,
-          "aggregationFunction": null,
-          "isDerived": false
-         },
-         {
-          "label": "Total ms",
-          "alias": "total_ms",
-          "column": "total_ms",
-          "color": null,
-          "aggregationFunction": null,
-          "isDerived": false
-         },
-         {
-          "label": "Media ms",
-          "alias": "media_ms",
-          "column": "media_ms",
-          "color": null,
-          "aggregationFunction": null,
-          "isDerived": false
-         },
-         {
-          "label": "Máx ms",
-          "alias": "max_ms",
-          "column": "max_ms",
-          "color": null,
-          "aggregationFunction": null,
-          "isDerived": false
-         }
-        ],
-        "y": [],
-        "z": [],
-        "breakdown": [],
-        "filter": {
-         "filterType": "group",
-         "logicalOperator": "AND",
-         "conditions": []
-        }
-       },
-       "config": {
-        "promql_legend": "",
-        "layer_type": "scatter",
-        "weight_fixed": 1
-       }
-      }
-     ]
-    },
-    {
-     "id": "d-n1",
-     "type": "table",
-     "title": "Sospechosas de n+1",
-     "description": "Sentencias que se repiten muchas veces dentro de una misma traza.",
-     "config": {
-      "show_legends": true,
-      "legends_position": "bottom",
-      "unit": "short",
-      "decimals": 2,
-      "axis_border_show": false,
-      "show_gridlines": true,
-      "connect_nulls": false,
-      "no_value_replacement": "0",
-      "table_pagination": true,
-      "table_pagination_rows_per_page": 15,
-      "table_filtering": true,
-      "drilldown": [],
-      "mark_line": [],
-      "override_config": []
-     },
-     "layout": {
-      "x": 96,
-      "y": 24,
-      "w": 96,
-      "h": 22,
-      "i": 8
-     },
-     "htmlContent": "",
-     "markdownContent": "",
-     "queryType": "sql",
-     "queries": [
-      {
-       "query": "SELECT db_query_text, count(*) AS llamadas, count(DISTINCT trace_id) AS trazas, count(*) / count(DISTINCT trace_id) AS por_traza FROM \"default\" WHERE service_name = 'carreterinas' AND db_system_name = 'sqlite' GROUP BY db_query_text HAVING count(*) / count(DISTINCT trace_id) >= 5 ORDER BY por_traza DESC LIMIT 30",
-       "vrlFunctionQuery": "",
-       "customQuery": true,
-       "fields": {
-        "stream": "default",
-        "stream_type": "traces",
-        "x": [
-         {
-          "label": "SQL",
-          "alias": "db_query_text",
-          "column": "db_query_text",
-          "color": null,
-          "aggregationFunction": null,
-          "isDerived": false
-         },
-         {
-          "label": "Llamadas",
-          "alias": "llamadas",
-          "column": "llamadas",
-          "color": null,
-          "aggregationFunction": null,
-          "isDerived": false
-         },
-         {
-          "label": "Trazas",
-          "alias": "trazas",
-          "column": "trazas",
-          "color": null,
-          "aggregationFunction": null,
-          "isDerived": false
-         },
-         {
-          "label": "Por traza",
-          "alias": "por_traza",
-          "column": "por_traza",
-          "color": null,
-          "aggregationFunction": null,
-          "isDerived": false
-         }
-        ],
-        "y": [],
-        "z": [],
-        "breakdown": [],
-        "filter": {
-         "filterType": "group",
-         "logicalOperator": "AND",
-         "conditions": []
-        }
-       },
-       "config": {
-        "promql_legend": "",
-        "layer_type": "scatter",
-        "weight_fixed": 1
-       }
-      }
-     ]
-    },
-    {
-     "id": "d-slowlog",
-     "type": "table",
-     "title": "Queries lentas",
-     "description": "Log [db] query lenta: también las de fuera de una traza (pollers, arranque).",
-     "config": {
-      "show_legends": true,
-      "legends_position": "bottom",
-      "unit": "short",
-      "decimals": 2,
-      "axis_border_show": false,
-      "show_gridlines": true,
-      "connect_nulls": false,
-      "no_value_replacement": "0",
-      "table_pagination": true,
-      "table_pagination_rows_per_page": 15,
-      "table_filtering": true,
-      "drilldown": [],
-      "mark_line": [],
-      "override_config": []
-     },
-     "layout": {
-      "x": 0,
-      "y": 46,
-      "w": 96,
-      "h": 20,
-      "i": 9
-     },
-     "htmlContent": "",
-     "markdownContent": "",
-     "queryType": "sql",
-     "queries": [
-      {
-       "query": "SELECT _timestamp, duration_ms, db_query_text, trace_id FROM \"default\" WHERE service_name = 'carreterinas' AND scope = 'db' AND body LIKE 'query lenta%' ORDER BY _timestamp DESC LIMIT 50",
-       "vrlFunctionQuery": "",
-       "customQuery": true,
-       "fields": {
-        "stream": "default",
-        "stream_type": "logs",
-        "x": [
-         {
-          "label": "Hora",
-          "alias": "_timestamp",
-          "column": "_timestamp",
-          "color": null,
-          "aggregationFunction": null,
-          "isDerived": false
-         },
-         {
-          "label": "ms",
-          "alias": "duration_ms",
-          "column": "duration_ms",
-          "color": null,
-          "aggregationFunction": null,
-          "isDerived": false
-         },
-         {
-          "label": "SQL",
-          "alias": "db_query_text",
-          "column": "db_query_text",
-          "color": null,
-          "aggregationFunction": null,
-          "isDerived": false
-         },
-         {
-          "label": "Trace",
-          "alias": "trace_id",
-          "column": "trace_id",
-          "color": null,
-          "aggregationFunction": null,
-          "isDerived": false
-         }
-        ],
-        "y": [],
-        "z": [],
-        "breakdown": [],
-        "filter": {
-         "filterType": "group",
-         "logicalOperator": "AND",
-         "conditions": []
-        }
-       },
-       "config": {
-        "promql_legend": "",
-        "layer_type": "scatter",
-        "weight_fixed": 1
-       }
-      }
-     ]
-    },
-    {
-     "id": "d-errors",
-     "type": "table",
-     "title": "Errores de sqlite",
-     "description": "Con su mensaje (SQLITE_BUSY / database is locked = contención de escritura).",
-     "config": {
-      "show_legends": true,
-      "legends_position": "bottom",
-      "unit": "short",
-      "decimals": 2,
-      "axis_border_show": false,
-      "show_gridlines": true,
-      "connect_nulls": false,
-      "no_value_replacement": "0",
-      "table_pagination": true,
-      "table_pagination_rows_per_page": 15,
-      "table_filtering": true,
-      "drilldown": [],
-      "mark_line": [],
-      "override_config": []
-     },
-     "layout": {
-      "x": 96,
-      "y": 46,
-      "w": 96,
-      "h": 20,
-      "i": 10
-     },
-     "htmlContent": "",
-     "markdownContent": "",
-     "queryType": "sql",
-     "queries": [
-      {
-       "query": "SELECT _timestamp, operation_name, status_message, db_query_text, trace_id FROM \"default\" WHERE service_name = 'carreterinas' AND db_system_name = 'sqlite' AND span_status = 'ERROR' ORDER BY _timestamp DESC LIMIT 50",
-       "vrlFunctionQuery": "",
-       "customQuery": true,
-       "fields": {
-        "stream": "default",
-        "stream_type": "traces",
-        "x": [
-         {
-          "label": "Hora",
-          "alias": "_timestamp",
-          "column": "_timestamp",
-          "color": null,
-          "aggregationFunction": null,
-          "isDerived": false
-         },
-         {
-          "label": "Sentencia",
-          "alias": "operation_name",
-          "column": "operation_name",
-          "color": null,
-          "aggregationFunction": null,
-          "isDerived": false
-         },
-         {
-          "label": "Error",
-          "alias": "status_message",
-          "column": "status_message",
-          "color": null,
-          "aggregationFunction": null,
-          "isDerived": false
-         },
-         {
-          "label": "SQL",
-          "alias": "db_query_text",
-          "column": "db_query_text",
-          "color": null,
-          "aggregationFunction": null,
-          "isDerived": false
-         },
-         {
-          "label": "Trace",
-          "alias": "trace_id",
-          "column": "trace_id",
-          "color": null,
-          "aggregationFunction": null,
-          "isDerived": false
-         }
-        ],
-        "y": [],
-        "z": [],
-        "breakdown": [],
-        "filter": {
-         "filterType": "group",
-         "logicalOperator": "AND",
-         "conditions": []
-        }
-       },
-       "config": {
-        "promql_legend": "",
-        "layer_type": "scatter",
-        "weight_fixed": 1
-       }
-      }
-     ]
-    }
-   ]
-  },
-  {
-   "tabId": "rum",
-   "name": "RUM",
-   "panels": [
-    {
-     "id": "u-sessions",
-     "type": "metric",
-     "title": "Sesiones",
-     "description": "Cargas de página distintas (session.id) en web y apps.",
-     "config": {
-      "show_legends": true,
-      "legends_position": "bottom",
-      "unit": "short",
-      "decimals": 0,
-      "axis_border_show": false,
-      "show_gridlines": true,
-      "connect_nulls": false,
-      "no_value_replacement": "0",
-      "table_pagination": true,
-      "table_pagination_rows_per_page": 15,
-      "table_filtering": true,
-      "drilldown": [],
-      "mark_line": [],
-      "override_config": []
-     },
-     "layout": {
-      "x": 0,
-      "y": 0,
-      "w": 48,
-      "h": 8,
-      "i": 1
-     },
-     "htmlContent": "",
-     "markdownContent": "",
-     "queryType": "sql",
-     "queries": [
-      {
-       "query": "SELECT count(DISTINCT session_id) AS value FROM \"default\" WHERE service_name = 'carreterinas-web'",
-       "vrlFunctionQuery": "",
-       "customQuery": true,
-       "fields": {
-        "stream": "default",
-        "stream_type": "logs",
-        "x": [],
-        "y": [
-         {
-          "label": "Sesiones",
-          "alias": "value",
-          "column": "value",
-          "color": null,
-          "aggregationFunction": null,
-          "isDerived": false
-         }
-        ],
-        "z": [],
-        "breakdown": [],
-        "filter": {
-         "filterType": "group",
-         "logicalOperator": "AND",
-         "conditions": []
-        }
-       },
-       "config": {
-        "promql_legend": "",
-        "layer_type": "scatter",
-        "weight_fixed": 1
-       }
-      }
-     ]
-    },
-    {
-     "id": "u-users",
-     "type": "metric",
-     "title": "Usuarios",
-     "description": "Usuarios con sesión iniciada (user.id lo resuelve el servidor).",
-     "config": {
-      "show_legends": true,
-      "legends_position": "bottom",
-      "unit": "short",
-      "decimals": 0,
-      "axis_border_show": false,
-      "show_gridlines": true,
-      "connect_nulls": false,
-      "no_value_replacement": "0",
-      "table_pagination": true,
-      "table_pagination_rows_per_page": 15,
-      "table_filtering": true,
-      "drilldown": [],
-      "mark_line": [],
-      "override_config": []
-     },
-     "layout": {
-      "x": 48,
-      "y": 0,
-      "w": 48,
-      "h": 8,
-      "i": 2
-     },
-     "htmlContent": "",
-     "markdownContent": "",
-     "queryType": "sql",
-     "queries": [
-      {
-       "query": "SELECT count(DISTINCT user_id) AS value FROM \"default\" WHERE service_name = 'carreterinas-web'",
-       "vrlFunctionQuery": "",
-       "customQuery": true,
-       "fields": {
-        "stream": "default",
-        "stream_type": "logs",
-        "x": [],
-        "y": [
-         {
-          "label": "Usuarios",
-          "alias": "value",
-          "column": "value",
-          "color": null,
-          "aggregationFunction": null,
-          "isDerived": false
-         }
-        ],
-        "z": [],
-        "breakdown": [],
-        "filter": {
-         "filterType": "group",
-         "logicalOperator": "AND",
-         "conditions": []
-        }
-       },
-       "config": {
-        "promql_legend": "",
-        "layer_type": "scatter",
-        "weight_fixed": 1
-       }
-      }
-     ]
-    },
-    {
-     "id": "u-errors",
-     "type": "metric",
-     "title": "Errores del cliente",
-     "description": "Excepciones, rechazos sin handler y chunks que no cargan.",
-     "config": {
-      "show_legends": true,
-      "legends_position": "bottom",
-      "unit": "short",
-      "decimals": 0,
-      "axis_border_show": false,
-      "show_gridlines": true,
-      "connect_nulls": false,
-      "no_value_replacement": "0",
-      "table_pagination": true,
-      "table_pagination_rows_per_page": 15,
-      "table_filtering": true,
-      "drilldown": [],
-      "mark_line": [],
-      "override_config": []
-     },
-     "layout": {
-      "x": 96,
-      "y": 0,
-      "w": 48,
-      "h": 8,
-      "i": 3
-     },
-     "htmlContent": "",
-     "markdownContent": "",
-     "queryType": "sql",
-     "queries": [
-      {
-       "query": "SELECT count(*) AS value FROM \"default\" WHERE service_name = 'carreterinas-web' AND severity = 'ERROR'",
-       "vrlFunctionQuery": "",
-       "customQuery": true,
-       "fields": {
-        "stream": "default",
-        "stream_type": "logs",
-        "x": [],
-        "y": [
-         {
-          "label": "Errores",
-          "alias": "value",
-          "column": "value",
-          "color": null,
-          "aggregationFunction": null,
-          "isDerived": false
-         }
-        ],
-        "z": [],
-        "breakdown": [],
-        "filter": {
-         "filterType": "group",
-         "logicalOperator": "AND",
-         "conditions": []
-        }
-       },
-       "config": {
-        "promql_legend": "",
-        "layer_type": "scatter",
-        "weight_fixed": 1
-       }
-      }
-     ]
-    },
-    {
-     "id": "u-load",
-     "type": "metric",
-     "title": "Carga p75 (ms)",
-     "description": "Desde el inicio de la navegación hasta la primera ruta pintada.",
-     "config": {
-      "show_legends": true,
-      "legends_position": "bottom",
-      "unit": "ms",
-      "decimals": 0,
-      "axis_border_show": false,
-      "show_gridlines": true,
-      "connect_nulls": false,
-      "no_value_replacement": "0",
-      "table_pagination": true,
-      "table_pagination_rows_per_page": 15,
-      "table_filtering": true,
-      "drilldown": [],
-      "mark_line": [],
-      "override_config": []
-     },
-     "layout": {
-      "x": 144,
-      "y": 0,
-      "w": 48,
-      "h": 8,
-      "i": 4
-     },
-     "htmlContent": "",
-     "markdownContent": "",
-     "queryType": "sql",
-     "queries": [
-      {
-       "query": "SELECT approx_percentile_cont(duration, 0.75) / 1000 AS value FROM \"default\" WHERE service_name = 'carreterinas-web' AND operation_name LIKE 'pageload%'",
-       "vrlFunctionQuery": "",
-       "customQuery": true,
-       "fields": {
-        "stream": "default",
-        "stream_type": "traces",
-        "x": [],
-        "y": [
-         {
-          "label": "ms",
-          "alias": "value",
-          "column": "value",
-          "color": null,
-          "aggregationFunction": null,
-          "isDerived": false
-         }
-        ],
-        "z": [],
-        "breakdown": [],
-        "filter": {
-         "filterType": "group",
-         "logicalOperator": "AND",
-         "conditions": []
-        }
-       },
-       "config": {
-        "promql_legend": "",
-        "layer_type": "scatter",
-        "weight_fixed": 1
-       }
-      }
-     ]
-    },
-    {
-     "id": "u-vitals",
-     "type": "table",
-     "title": "Web vitals",
-     "description": "p75 y % poor por ruta de aterrizaje. good: LCP < 2500 ms, INP < 200 ms, CLS < 0.1, FCP < 1800 ms, TTFB < 800 ms.",
-     "config": {
-      "show_legends": true,
-      "legends_position": "bottom",
-      "unit": "short",
-      "decimals": 2,
-      "axis_border_show": false,
-      "show_gridlines": true,
-      "connect_nulls": false,
-      "no_value_replacement": "0",
-      "table_pagination": true,
-      "table_pagination_rows_per_page": 15,
-      "table_filtering": true,
-      "drilldown": [],
-      "mark_line": [],
-      "override_config": []
-     },
-     "layout": {
-      "x": 0,
-      "y": 8,
-      "w": 96,
-      "h": 22,
-      "i": 5
-     },
-     "htmlContent": "",
-     "markdownContent": "",
-     "queryType": "sql",
-     "queries": [
-      {
-       "query": "SELECT web_vital_name, app_route, count(*) AS muestras, approx_percentile_cont(web_vital_value, 0.75) AS p75, round(sum(CASE WHEN web_vital_rating = 'poor' THEN 1 ELSE 0 END) * 100.0 / count(*)) AS pct_poor FROM \"default\" WHERE service_name = 'carreterinas-web' AND scope = 'web-vitals' GROUP BY web_vital_name, app_route ORDER BY web_vital_name, muestras DESC LIMIT 100",
-       "vrlFunctionQuery": "",
-       "customQuery": true,
-       "fields": {
-        "stream": "default",
-        "stream_type": "logs",
-        "x": [
-         {
-          "label": "Métrica",
-          "alias": "web_vital_name",
-          "column": "web_vital_name",
-          "color": null,
-          "aggregationFunction": null,
-          "isDerived": false
-         },
-         {
-          "label": "Ruta",
-          "alias": "app_route",
-          "column": "app_route",
-          "color": null,
-          "aggregationFunction": null,
-          "isDerived": false
-         },
-         {
-          "label": "Muestras",
-          "alias": "muestras",
-          "column": "muestras",
-          "color": null,
-          "aggregationFunction": null,
-          "isDerived": false
-         },
-         {
-          "label": "p75",
-          "alias": "p75",
-          "column": "p75",
-          "color": null,
-          "aggregationFunction": null,
-          "isDerived": false
-         },
-         {
-          "label": "% poor",
-          "alias": "pct_poor",
-          "column": "pct_poor",
-          "color": null,
-          "aggregationFunction": null,
-          "isDerived": false
-         }
-        ],
-        "y": [],
-        "z": [],
-        "breakdown": [],
-        "filter": {
-         "filterType": "group",
-         "logicalOperator": "AND",
-         "conditions": []
-        }
-       },
-       "config": {
-        "promql_legend": "",
-        "layer_type": "scatter",
-        "weight_fixed": 1
-       }
-      }
-     ]
-    },
-    {
-     "id": "u-api",
-     "type": "table",
-     "title": "La api vista desde el cliente",
-     "description": "Latencia que nota el usuario (red incluida). 5xx = la api respondió con error; sin respuesta = fallo de red o petición cancelada (firefox cancela así las de una recarga).",
-     "config": {
-      "show_legends": true,
-      "legends_position": "bottom",
-      "unit": "short",
-      "decimals": 2,
-      "axis_border_show": false,
-      "show_gridlines": true,
-      "connect_nulls": false,
-      "no_value_replacement": "0",
-      "table_pagination": true,
-      "table_pagination_rows_per_page": 15,
-      "table_filtering": true,
-      "drilldown": [],
-      "mark_line": [],
-      "override_config": []
-     },
-     "layout": {
-      "x": 96,
-      "y": 8,
-      "w": 96,
-      "h": 22,
-      "i": 6
-     },
-     "htmlContent": "",
-     "markdownContent": "",
-     "queryType": "sql",
-     "queries": [
-      {
-       "query": "SELECT operation_name, count(*) AS llamadas, approx_percentile_cont(duration, 0.5) / 1000 AS p50_ms, approx_percentile_cont(duration, 0.95) / 1000 AS p95_ms, sum(CASE WHEN http_response_status_code >= 500 THEN 1 ELSE 0 END) AS e5xx, sum(CASE WHEN status_message LIKE 'network:%' THEN 1 ELSE 0 END) AS sin_respuesta FROM \"default\" WHERE service_name = 'carreterinas-web' AND span_kind = '3' AND operation_name NOT LIKE '% /_app/%' GROUP BY operation_name ORDER BY p95_ms DESC LIMIT 50",
-       "vrlFunctionQuery": "",
-       "customQuery": true,
-       "fields": {
-        "stream": "default",
-        "stream_type": "traces",
-        "x": [
-         {
-          "label": "Llamada",
-          "alias": "operation_name",
-          "column": "operation_name",
-          "color": null,
-          "aggregationFunction": null,
-          "isDerived": false
-         },
-         {
-          "label": "Llamadas",
-          "alias": "llamadas",
-          "column": "llamadas",
-          "color": null,
-          "aggregationFunction": null,
-          "isDerived": false
-         },
-         {
-          "label": "p50 ms",
-          "alias": "p50_ms",
-          "column": "p50_ms",
-          "color": null,
-          "aggregationFunction": null,
-          "isDerived": false
-         },
-         {
-          "label": "p95 ms",
-          "alias": "p95_ms",
-          "column": "p95_ms",
-          "color": null,
-          "aggregationFunction": null,
-          "isDerived": false
-         },
-         {
-          "label": "5xx",
-          "alias": "e5xx",
-          "column": "e5xx",
-          "color": null,
-          "aggregationFunction": null,
-          "isDerived": false
-         },
-         {
-          "label": "Sin respuesta",
-          "alias": "sin_respuesta",
-          "column": "sin_respuesta",
-          "color": null,
-          "aggregationFunction": null,
-          "isDerived": false
-         }
-        ],
-        "y": [],
-        "z": [],
-        "breakdown": [],
-        "filter": {
-         "filterType": "group",
-         "logicalOperator": "AND",
-         "conditions": []
-        }
-       },
-       "config": {
-        "promql_legend": "",
-        "layer_type": "scatter",
-        "weight_fixed": 1
-       }
-      }
-     ]
-    },
-    {
-     "id": "u-load-line",
-     "type": "line",
-     "title": "Carga y navegaciones p75 (ms)",
-     "description": "pageload (arranque de la spa) y navigate (cambio de ruta).",
-     "config": {
-      "show_legends": true,
-      "legends_position": "bottom",
-      "unit": "ms",
-      "decimals": 2,
-      "axis_border_show": false,
-      "show_gridlines": true,
-      "connect_nulls": false,
-      "no_value_replacement": "0",
-      "table_pagination": true,
-      "table_pagination_rows_per_page": 15,
-      "table_filtering": true,
-      "drilldown": [],
-      "mark_line": [],
-      "override_config": []
-     },
-     "layout": {
-      "x": 0,
-      "y": 30,
-      "w": 96,
-      "h": 16,
-      "i": 7
-     },
-     "htmlContent": "",
-     "markdownContent": "",
-     "queryType": "sql",
-     "queries": [
-      {
-       "query": "SELECT histogram(_timestamp) AS x_axis_1, approx_percentile_cont(duration, 0.75) / 1000 AS y_axis_1, CASE WHEN operation_name LIKE 'pageload%' THEN 'pageload' ELSE 'navigate' END AS breakdown_1 FROM \"default\" WHERE service_name = 'carreterinas-web' AND span_kind = '1' GROUP BY x_axis_1, breakdown_1 ORDER BY x_axis_1",
-       "vrlFunctionQuery": "",
-       "customQuery": true,
-       "fields": {
-        "stream": "default",
-        "stream_type": "traces",
-        "x": [
-         {
-          "label": "Hora",
-          "alias": "x_axis_1",
-          "column": "x_axis_1",
-          "color": null,
-          "aggregationFunction": null,
-          "isDerived": false
-         }
-        ],
-        "y": [
-         {
-          "label": "p75 ms",
-          "alias": "y_axis_1",
-          "column": "y_axis_1",
-          "color": null,
-          "aggregationFunction": null,
-          "isDerived": false
-         }
-        ],
-        "z": [],
-        "breakdown": [
-         {
-          "label": "Tipo",
-          "alias": "breakdown_1",
-          "column": "breakdown_1",
-          "color": null,
-          "aggregationFunction": null,
-          "isDerived": false
-         }
-        ],
-        "filter": {
-         "filterType": "group",
-         "logicalOperator": "AND",
-         "conditions": []
-        }
-       },
-       "config": {
-        "promql_legend": "",
-        "layer_type": "scatter",
-        "weight_fixed": 1
-       }
-      }
-     ]
-    },
-    {
-     "id": "u-err-line",
-     "type": "area-stacked",
-     "title": "Errores del cliente",
-     "description": "Por plataforma.",
-     "config": {
-      "show_legends": true,
-      "legends_position": "bottom",
-      "unit": "short",
-      "decimals": 2,
-      "axis_border_show": false,
-      "show_gridlines": true,
-      "connect_nulls": false,
-      "no_value_replacement": "0",
-      "table_pagination": true,
-      "table_pagination_rows_per_page": 15,
-      "table_filtering": true,
-      "drilldown": [],
-      "mark_line": [],
-      "override_config": []
-     },
-     "layout": {
-      "x": 96,
-      "y": 30,
-      "w": 96,
-      "h": 16,
-      "i": 8
-     },
-     "htmlContent": "",
-     "markdownContent": "",
-     "queryType": "sql",
-     "queries": [
-      {
-       "query": "SELECT histogram(_timestamp) AS x_axis_1, count(*) AS y_axis_1, app_platform AS breakdown_1 FROM \"default\" WHERE service_name = 'carreterinas-web' AND severity = 'ERROR' GROUP BY x_axis_1, breakdown_1 ORDER BY x_axis_1",
-       "vrlFunctionQuery": "",
-       "customQuery": true,
-       "fields": {
-        "stream": "default",
-        "stream_type": "logs",
-        "x": [
-         {
-          "label": "Hora",
-          "alias": "x_axis_1",
-          "column": "x_axis_1",
-          "color": null,
-          "aggregationFunction": null,
-          "isDerived": false
-         }
-        ],
-        "y": [
-         {
-          "label": "Errores",
-          "alias": "y_axis_1",
-          "column": "y_axis_1",
-          "color": null,
-          "aggregationFunction": null,
-          "isDerived": false
-         }
-        ],
-        "z": [],
-        "breakdown": [
-         {
-          "label": "Plataforma",
-          "alias": "breakdown_1",
-          "column": "breakdown_1",
-          "color": null,
-          "aggregationFunction": null,
-          "isDerived": false
-         }
-        ],
-        "filter": {
-         "filterType": "group",
-         "logicalOperator": "AND",
-         "conditions": []
-        }
-       },
-       "config": {
-        "promql_legend": "",
-        "layer_type": "scatter",
-        "weight_fixed": 1
-       }
-      }
-     ]
-    },
-    {
-     "id": "u-err-table",
-     "type": "table",
-     "title": "Errores del cliente agrupados",
-     "description": "Por mensaje, ruta, build y plataforma; el stack (simbolizado) está en el log.",
-     "config": {
-      "show_legends": true,
-      "legends_position": "bottom",
-      "unit": "short",
-      "decimals": 2,
-      "axis_border_show": false,
-      "show_gridlines": true,
-      "connect_nulls": false,
-      "no_value_replacement": "0",
-      "table_pagination": true,
-      "table_pagination_rows_per_page": 15,
-      "table_filtering": true,
-      "drilldown": [],
-      "mark_line": [],
-      "override_config": []
-     },
-     "layout": {
-      "x": 0,
-      "y": 46,
-      "w": 192,
-      "h": 20,
-      "i": 9
-     },
-     "htmlContent": "",
-     "markdownContent": "",
-     "queryType": "sql",
-     "queries": [
-      {
-       "query": "SELECT body, app_route, service_version, app_platform, count(*) AS veces, count(DISTINCT session_id) AS sesiones, max(_timestamp) AS ultimo FROM \"default\" WHERE service_name = 'carreterinas-web' AND severity = 'ERROR' GROUP BY body, app_route, service_version, app_platform ORDER BY veces DESC LIMIT 50",
-       "vrlFunctionQuery": "",
-       "customQuery": true,
-       "fields": {
-        "stream": "default",
-        "stream_type": "logs",
-        "x": [
-         {
-          "label": "Mensaje",
-          "alias": "body",
-          "column": "body",
-          "color": null,
-          "aggregationFunction": null,
-          "isDerived": false
-         },
-         {
-          "label": "Ruta",
-          "alias": "app_route",
-          "column": "app_route",
-          "color": null,
-          "aggregationFunction": null,
-          "isDerived": false
-         },
-         {
-          "label": "Build",
-          "alias": "service_version",
-          "column": "service_version",
-          "color": null,
-          "aggregationFunction": null,
-          "isDerived": false
-         },
-         {
-          "label": "Plataforma",
-          "alias": "app_platform",
-          "column": "app_platform",
-          "color": null,
-          "aggregationFunction": null,
-          "isDerived": false
-         },
-         {
-          "label": "Veces",
-          "alias": "veces",
-          "column": "veces",
-          "color": null,
-          "aggregationFunction": null,
-          "isDerived": false
-         },
-         {
-          "label": "Sesiones",
-          "alias": "sesiones",
-          "column": "sesiones",
-          "color": null,
-          "aggregationFunction": null,
-          "isDerived": false
-         },
-         {
-          "label": "Último",
-          "alias": "ultimo",
-          "column": "ultimo",
-          "color": null,
-          "aggregationFunction": null,
-          "isDerived": false
-         }
-        ],
-        "y": [],
-        "z": [],
-        "breakdown": [],
-        "filter": {
-         "filterType": "group",
-         "logicalOperator": "AND",
-         "conditions": []
-        }
-       },
-       "config": {
-        "promql_legend": "",
-        "layer_type": "scatter",
-        "weight_fixed": 1
-       }
-      }
-     ]
-    },
-    {
-     "id": "u-nav",
-     "type": "table",
-     "title": "Navegaciones",
-     "description": "pageload y navigate por ruta, p75.",
-     "config": {
-      "show_legends": true,
-      "legends_position": "bottom",
-      "unit": "short",
-      "decimals": 2,
-      "axis_border_show": false,
-      "show_gridlines": true,
-      "connect_nulls": false,
-      "no_value_replacement": "0",
-      "table_pagination": true,
-      "table_pagination_rows_per_page": 15,
-      "table_filtering": true,
-      "drilldown": [],
-      "mark_line": [],
-      "override_config": []
-     },
-     "layout": {
-      "x": 0,
-      "y": 66,
-      "w": 64,
-      "h": 20,
-      "i": 10
-     },
-     "htmlContent": "",
-     "markdownContent": "",
-     "queryType": "sql",
-     "queries": [
-      {
-       "query": "SELECT operation_name, count(*) AS veces, approx_percentile_cont(duration, 0.75) / 1000 AS p75_ms, max(duration) / 1000 AS max_ms FROM \"default\" WHERE service_name = 'carreterinas-web' AND span_kind = '1' GROUP BY operation_name ORDER BY p75_ms DESC LIMIT 50",
-       "vrlFunctionQuery": "",
-       "customQuery": true,
-       "fields": {
-        "stream": "default",
-        "stream_type": "traces",
-        "x": [
-         {
-          "label": "Navegación",
-          "alias": "operation_name",
-          "column": "operation_name",
-          "color": null,
-          "aggregationFunction": null,
-          "isDerived": false
-         },
-         {
-          "label": "Veces",
-          "alias": "veces",
-          "column": "veces",
-          "color": null,
-          "aggregationFunction": null,
-          "isDerived": false
-         },
-         {
-          "label": "p75 ms",
-          "alias": "p75_ms",
-          "column": "p75_ms",
-          "color": null,
-          "aggregationFunction": null,
-          "isDerived": false
-         },
-         {
-          "label": "Máx ms",
-          "alias": "max_ms",
-          "column": "max_ms",
-          "color": null,
-          "aggregationFunction": null,
-          "isDerived": false
-         }
-        ],
-        "y": [],
-        "z": [],
-        "breakdown": [],
-        "filter": {
-         "filterType": "group",
-         "logicalOperator": "AND",
-         "conditions": []
-        }
-       },
-       "config": {
-        "promql_legend": "",
-        "layer_type": "scatter",
-        "weight_fixed": 1
-       }
-      }
-     ]
-    },
-    {
-     "id": "u-platforms",
-     "type": "table",
-     "title": "Plataformas y builds",
-     "description": "Sesiones por plataforma (web, ios, android) y versión del bundle.",
-     "config": {
-      "show_legends": true,
-      "legends_position": "bottom",
-      "unit": "short",
-      "decimals": 2,
-      "axis_border_show": false,
-      "show_gridlines": true,
-      "connect_nulls": false,
-      "no_value_replacement": "0",
-      "table_pagination": true,
-      "table_pagination_rows_per_page": 15,
-      "table_filtering": true,
-      "drilldown": [],
-      "mark_line": [],
-      "override_config": []
-     },
-     "layout": {
-      "x": 64,
-      "y": 66,
-      "w": 64,
-      "h": 20,
-      "i": 11
-     },
-     "htmlContent": "",
-     "markdownContent": "",
-     "queryType": "sql",
-     "queries": [
-      {
-       "query": "SELECT app_platform, service_version, count(DISTINCT session_id) AS sesiones, count(DISTINCT user_id) AS usuarios FROM \"default\" WHERE service_name = 'carreterinas-web' GROUP BY app_platform, service_version ORDER BY sesiones DESC LIMIT 30",
-       "vrlFunctionQuery": "",
-       "customQuery": true,
-       "fields": {
-        "stream": "default",
-        "stream_type": "logs",
-        "x": [
-         {
-          "label": "Plataforma",
-          "alias": "app_platform",
-          "column": "app_platform",
-          "color": null,
-          "aggregationFunction": null,
-          "isDerived": false
-         },
-         {
-          "label": "Build",
-          "alias": "service_version",
-          "column": "service_version",
-          "color": null,
-          "aggregationFunction": null,
-          "isDerived": false
-         },
-         {
-          "label": "Sesiones",
-          "alias": "sesiones",
-          "column": "sesiones",
-          "color": null,
-          "aggregationFunction": null,
-          "isDerived": false
-         },
-         {
-          "label": "Usuarios",
-          "alias": "usuarios",
-          "column": "usuarios",
-          "color": null,
-          "aggregationFunction": null,
-          "isDerived": false
-         }
-        ],
-        "y": [],
-        "z": [],
-        "breakdown": [],
-        "filter": {
-         "filterType": "group",
-         "logicalOperator": "AND",
-         "conditions": []
-        }
-       },
-       "config": {
-        "promql_legend": "",
-        "layer_type": "scatter",
-        "weight_fixed": 1
-       }
-      }
-     ]
-    },
-    {
-     "id": "u-browsers",
-     "type": "table",
-     "title": "Navegadores",
-     "description": "User agent por sesiones.",
-     "config": {
-      "show_legends": true,
-      "legends_position": "bottom",
-      "unit": "short",
-      "decimals": 2,
-      "axis_border_show": false,
-      "show_gridlines": true,
-      "connect_nulls": false,
-      "no_value_replacement": "0",
-      "table_pagination": true,
-      "table_pagination_rows_per_page": 15,
-      "table_filtering": true,
-      "drilldown": [],
-      "mark_line": [],
-      "override_config": []
-     },
-     "layout": {
-      "x": 128,
-      "y": 66,
-      "w": 64,
-      "h": 20,
-      "i": 12
-     },
-     "htmlContent": "",
-     "markdownContent": "",
-     "queryType": "sql",
-     "queries": [
-      {
-       "query": "SELECT user_agent_original, count(DISTINCT session_id) AS sesiones FROM \"default\" WHERE service_name = 'carreterinas-web' GROUP BY user_agent_original ORDER BY sesiones DESC LIMIT 30",
-       "vrlFunctionQuery": "",
-       "customQuery": true,
-       "fields": {
-        "stream": "default",
-        "stream_type": "logs",
-        "x": [
-         {
-          "label": "User agent",
-          "alias": "user_agent_original",
-          "column": "user_agent_original",
-          "color": null,
-          "aggregationFunction": null,
-          "isDerived": false
-         },
-         {
-          "label": "Sesiones",
-          "alias": "sesiones",
-          "column": "sesiones",
-          "color": null,
-          "aggregationFunction": null,
-          "isDerived": false
-         }
-        ],
-        "y": [],
-        "z": [],
-        "breakdown": [],
-        "filter": {
-         "filterType": "group",
-         "logicalOperator": "AND",
-         "conditions": []
-        }
-       },
-       "config": {
-        "promql_legend": "",
-        "layer_type": "scatter",
-        "weight_fixed": 1
-       }
-      }
-     ]
-    }
-   ]
+  "defaultDatetimeDuration": {
+    "type": "relative",
+    "relativeTimePeriod": "6h"
   }
- ],
- "variables": {
-  "list": [],
-  "showDynamicFilters": true
- },
- "defaultDatetimeDuration": {
-  "type": "relative",
-  "relativeTimePeriod": "6h"
- }
 }

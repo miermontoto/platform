@@ -3,6 +3,10 @@
 # pensado para que un agente (o un humano) investigue errores, endpoints o queries
 # lentas, o una request concreta, sin abrir la ui: devuelve json compacto (jq).
 #
+# orgs: cada app exporta a la suya (sis, duckhunt, carreterinas; su web va como <app>-web en la
+# misma). --org la fija; si no, sale de --service (sin el -web) y, sin servicio, de O2_ORG o
+# `default`. trace sin --org busca en todas las de las apps.
+#
 # credenciales: O2_URL / O2_ORG / O2_USER / O2_PASSWORD en el entorno o, si faltan,
 # el .env de este directorio (ZO_ROOT_USER_EMAIL / ZO_ROOT_USER_PASSWORD del compose).
 #
@@ -37,7 +41,8 @@
 # flags:
 #   --since DUR       ventana hacia atrás: 45s, 30m, 6h, 2d (default 1h; trace: 7d)
 #   --service NAME    filtra por service.name (sis, duckhunt, carreterinas, mier.info, fantasy;
-#                     <app>-web = su cliente web/ios/android)
+#                     <app>-web = su cliente web/ios/android) y elige la org de la app
+#   --org NAME        org de openobserve (default: la de --service, O2_ORG o default)
 #   --limit N         máximo de filas (default 50)
 #   --level LVL       logs: debug|info|warn|error
 #   --scope NAME      logs: scope del logger (el [scope] de la línea)
@@ -53,6 +58,10 @@ set -euo pipefail
 
 SINCE=""
 SERVICE=""
+ORG=""
+# orgs de las apps, donde trace busca si no se le dice cuál
+APP_ORGS=(sis duckhunt carreterinas)
+WEB_SUFFIX="-web"
 LIMIT=50
 LEVEL=""
 SCOPE=""
@@ -68,7 +77,7 @@ STREAM="default"
 ENV_FILE="$(dirname "$0")/.env"
 
 usage() {
-  sed -n '2,50p' "$0" | sed 's/^# \{0,1\}//'
+  sed -n '2,55p' "$0" | sed 's/^# \{0,1\}//'
   exit "${1:-0}"
 }
 
@@ -83,6 +92,7 @@ while [[ $# -gt 0 ]]; do
   case "$1" in
     --since) SINCE="$2"; shift 2 ;;
     --service) SERVICE="$2"; shift 2 ;;
+    --org) ORG="$2"; shift 2 ;;
     --limit) LIMIT="$2"; shift 2 ;;
     --level) LEVEL="$2"; shift 2 ;;
     --scope) SCOPE="$2"; shift 2 ;;
@@ -114,7 +124,8 @@ env_value() {
 }
 O2_URL="${O2_URL:-$(env_value O2_URL || true)}"
 O2_URL="${O2_URL:-http://172.17.0.1:5080}"
-O2_ORG="${O2_ORG:-default}"
+SERVICE_ORG="${SERVICE%"$WEB_SUFFIX"}"
+O2_ORG="${ORG:-${SERVICE_ORG:-${O2_ORG:-default}}}"
 O2_USER="${O2_USER:-$(env_value ZO_ROOT_USER_EMAIL || true)}"
 O2_PASSWORD="${O2_PASSWORD:-$(env_value ZO_ROOT_USER_PASSWORD || true)}"
 [[ -n "$O2_USER" && -n "$O2_PASSWORD" ]] || die "sin credenciales: exporta O2_USER/O2_PASSWORD o crea $ENV_FILE"
@@ -239,11 +250,20 @@ case "$COMMAND" in
     id="${1:-}"
     [[ "$id" =~ ^[0-9a-f]{32}$ ]] || die "trace id inválido (32 hex): '${id}'"
     window 7d
-    spans=$(search traces "SELECT * FROM \"$STREAM\" WHERE trace_id = '$id' ORDER BY start_time" 1000)
-    logs=$(search logs "SELECT * FROM \"$STREAM\" WHERE trace_id = '$id' ORDER BY _timestamp" 500)
-    [[ $RAW -eq 1 ]] && { jq -nc --argjson s "$spans" --argjson l "$logs" '{spans: $s, logs: $l}'; exit 0; }
+    # sin --org ni --service: la primera org de las apps que tenga la traza
+    orgs=("$O2_ORG")
+    [[ -z "$ORG" && -z "$SERVICE" ]] && orgs=("${APP_ORGS[@]}" "$O2_ORG")
+    spans="[]"
+    for O2_ORG in "${orgs[@]}"; do
+      # una org sin el stream (aún sin datos) devuelve {error}: se toma como vacía
+      spans=$(search traces "SELECT * FROM \"$STREAM\" WHERE trace_id = '$id' ORDER BY start_time" 1000) || spans="[]"
+      [[ "$(jq 'length' <<<"$spans")" -gt 0 ]] && break
+    done
+    logs=$(search logs "SELECT * FROM \"$STREAM\" WHERE trace_id = '$id' ORDER BY _timestamp" 500) || logs="[]"
+    [[ $RAW -eq 1 ]] && { jq -nc --slurpfile s <(printf '%s' "$spans") --slurpfile l <(printf '%s' "$logs") '{spans: $s[0], logs: $l[0]}'; exit 0; }
     # árbol en profundidad ordenado por inicio; start_ms relativo al primer span
-    jq -nc --argjson s "$spans" --argjson l "$logs" --argjson sl "$STACK_LINES" "$JQ_COMMON"'
+    jq -nc --slurpfile s0 <(printf '%s' "$spans") --slurpfile l0 <(printf '%s' "$logs") --argjson sl "$STACK_LINES" "$JQ_COMMON"'
+      $s0[0] as $s | $l0[0] as $l |
       ($s | map({key: .span_id, value: .}) | from_entries) as $by
       | ($s | group_by(.reference_parent_span_id // "") | map({key: (.[0].reference_parent_span_id // ""), value: (sort_by(.start_time) | map(.span_id))}) | from_entries) as $kids
       | ($s | map(.start_time) | min) as $t0
@@ -285,6 +305,8 @@ case "$COMMAND" in
     file="${1:-}"
     [[ -f "$file" ]] || die "falta el json del dashboard (p.ej. $(dirname "$0")/dashboards/sis.dashboard.json)"
     title=$(jq -er '.title' "$file") || die "json sin título: $file"
+    # el dashboard de una app va a su org (el título es el nombre de la app)
+    [[ -z "$ORG" && -z "$SERVICE" ]] && O2_ORG="$title"
     # el post siempre crea uno nuevo: se borra antes el del mismo título para no duplicarlo
     o2 GET dashboards | jq -r --arg t "$title" '.dashboards[]? | select((.v8.title // .title) == $t) | (.v8.dashboardId // .dashboardId)' |
       while read -r id; do o2 DELETE "dashboards/$id" >/dev/null; done

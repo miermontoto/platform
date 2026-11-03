@@ -14,10 +14,9 @@ packages/
   db/         factoría sqlite (wal + pragmas + unaccent + migraciones drizzle +
               spans por query y log de queries lentas)
   observability/
-              opentelemetry: trazas + logs estructurados, logger con scope,
-              bridge de console.*, fetch saliente con traceparent, withSpan +
-              sdk de navegador (./browser: errores, web vitals, spans de cliente)
-              e ingesta de lo que manda, con stacks simbolizados
+              opentelemetry: trazas, logs y métricas, logger con scope, bridge de
+              console.*, fetch saliente con traceparent, withSpan + rum nativo de
+              openobserve (./browser) con su proxy y la subida de source maps
   auth/       tabla canónica de sesiones + servicio de ciclo de vida
   ui/         componentes svelte compartidos (SettingsTabs, SessionsPanel,
               PrivacyPolicy, Support, LanguageSwitcher) + http + i18n +
@@ -93,7 +92,7 @@ cp tooling/observability/.env.example tooling/observability/.env   # rellenar pa
 docker compose -f tooling/observability/docker-compose.yml up -d
 
 # en el .env de cada app
-OTEL_EXPORTER_OTLP_ENDPOINT=http://172.17.0.1:5080/api/default
+OTEL_EXPORTER_OTLP_ENDPOINT=http://172.17.0.1:5080/api/<app>   # org de la app
 OTEL_EXPORTER_OTLP_HEADERS=Authorization=Basic <base64 de email:password>
 
 # consultas (json): errores, lo más lento, sql por tiempo total, una traza entera
@@ -105,32 +104,22 @@ tooling/observability/obs.sh trace <trace_id>
 
 ui en https://obs.mier.info (vhost de nginx-proxy; la ingesta otlp/bulk/rum da 403 desde fuera,
 las apps exportan por 172.17.0.1). un dashboard por app (`tooling/observability/dashboards/`):
-resumen (tráfico, 5xx, latencia, memoria, event loop), base de datos (queries/s, p95 por
-tabla, errores busy/locked, lentas, n+1) y rum (sesiones, vitals, carga, la api vista desde el
-cliente, errores por build y plataforma). `obs.sh dashboard <json>` lo (re)importa.
+resumen (tráfico, 5xx, latencia, memoria, event loop) y base de datos (queries/s, p95 por tabla,
+errores busy/locked, lentas, n+1), en la org de la app. `obs.sh dashboard <json>` lo (re)importa.
 
 ### cliente (web y apps nativas)
 
-la web y las apps capacitor mandan sus errores, web vitals y spans a la api de la propia app
-(`POST /api/_client`, pre-auth, montada por `createPlatformApp`), que los valida y los mete en
-el mismo export como servicio `<app>-web`. el cliente nunca ve openobserve ni sus credenciales,
-y en la web es una petición al mismo origen (csp `'self'`). sin export la ruta da 404 y el
-cliente deja de enviar.
+rum nativo de openobserve (`@openobserve/browser-rum-slim`, sin session replay): vistas por ruta
+plantilla de kit, llamadas a la api enlazadas con su traza de servidor (`traceparent`), errores,
+web vitals, long tasks y clics, en la sección **RUM** de la org de cada app como `<app>-web`.
 
-- **trazas de punta a punta**: el sdk parchea `fetch` y manda `traceparent` a la api (solo a
-  ella), así que una navegación queda como `navigate /albums/[id]` → `GET /api/albums/:id`
-  (cliente) → span de servidor → queries. también la carga inicial (`pageload /ruta`).
-- **errores**: excepciones, promesas sin handler, chunks que no cargan y el `handleError` de
-  sveltekit, con la ruta plantilla y el trace id de la navegación en curso. salen en
-  `obs.sh errors` junto a los del servidor. los stacks se simbolizan al llegar con los source
-  maps `hidden` que el preset de vite deja en `static/` (`mountSpa` no los sirve); un frame de
-  otro build (pestaña vieja, app nativa) se queda minificado.
-- **web vitals**: lcp, inp, cls, fcp y ttfb con atribución (elemento, subpartes), por ruta de
-  aterrizaje: `obs.sh vitals --service <app>-web`.
-- **identidad**: `user.id` lo resuelve el servidor (`identify`, solo para peticiones sin `Origin`
-  o del propio host: un lote desde otra web entra anónimo), nunca el cliente; `session.id`
-  agrupa una carga de página, `service.version` es la del bundle y `app.platform` web|ios|android.
-  los atributos propios que pase una app (`captureError(err, attrs)`) van bajo `app.*`.
+- **transporte**: el sdk manda por `proxy` a la api de la propia app (`POST /api/_rum`, pre-auth,
+  montada por `createPlatformApp`), que reenvía a openobserve por 172.17.0.1 con el token de rum de
+  su org y el `usr.id` de la sesión (`identify`; el del cliente se descarta, un origen ajeno entra
+  anónimo). ni token ni openobserve en el bundle; mismo origen en la web (csp `'self'`).
+- **errores simbolizados**: la api sube al arrancar los source maps `hidden` de su `static/`
+  (`<app>-web` + versión + entorno, una vez por versión) y el rum traduce los stacks; `mountSpa`
+  no sirve los `.map`. los scripts `mobile:*` construyen sin maps.
 
 ```ts
 // api: app.ts
@@ -138,24 +127,32 @@ const app = createPlatformApp<AppEnv>({
   clientTelemetry: { identify: (c) => validate(getCookie(c, SESSION_COOKIE))?.userId },
 });
 
-// web: svelte.config.js → versión de la api en $app/environment
+// web: svelte.config.js → versión de la api en $app/environment (la de los source maps)
 import { appVersion } from '@platform/config/version';
 kit: { version: { name: appVersion() } }
 
 // web: src/hooks.client.ts
 import { version } from '$app/environment';
 import { captureError, initBrowserTelemetry } from '@platform/observability/browser';
-initBrowserTelemetry({ version, apiOrigin: import.meta.env.VITE_API_BASE }); // '' en la web
+initBrowserTelemetry({ service: '<app>-web', version, apiOrigin: import.meta.env.VITE_API_BASE }); // '' en la web
 export const handleError: HandleClientError = ({ error, status }) => {
-  if (status !== 404) captureError(error, { 'http.response.status_code': status });
+  if (status !== 404) captureError(error, { status });
 };
 
-// web: +layout.svelte raíz
+// web: +layout.svelte raíz → una vista de rum por ruta
 trackNavigations({ beforeNavigate, afterNavigate });
 ```
 
-deps: la web declara `@platform/observability` y la api `@jridgewell/trace-mapping` (externo en
-tsup, como los `@opentelemetry/*`). los scripts `mobile:*` construyen sin source maps.
+deps: la web declara `@platform/observability` y la api `fflate` (zip de los maps; externo en tsup,
+como los `@opentelemetry/*`).
+
+### orgs y bases de datos
+
+una org de openobserve por app (`sis`, `duckhunt`, `carreterinas`): la del path de su
+`OTEL_EXPORTER_OTLP_ENDPOINT` (`…/api/<app>`), que se crea sola al primer dato. el proxy de rum y los
+source maps van a la misma. `ZO_DB_MONITORING_ENABLED` activa **Traces → Databases**: queries por
+fingerprint, latencia y servicio a partir de los spans de sqlite (`db.system.name`, `db.namespace`
+= el fichero).
 
 ## backups
 

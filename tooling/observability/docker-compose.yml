@@ -16,6 +16,9 @@ services:
       ZO_DATA_DIR: /data
       ZO_COMPACT_DATA_RETENTION_DAYS: ${O2_RETENTION_DAYS:-14}
       ZO_TELEMETRY: "false"
+      # vista nativa de bases de datos (Traces → Databases): deriva fingerprint, sistema e instancia
+      # de los spans con db.system.name al ingerir y los agrega por query y servicio
+      ZO_DB_MONITORING_ENABLED: "true"
     ports:
       - "172.17.0.1:5080:5080"
     volumes:
