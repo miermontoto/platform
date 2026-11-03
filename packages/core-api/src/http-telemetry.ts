@@ -16,6 +16,7 @@ import {
   type TextMapGetter,
 } from '@opentelemetry/api';
 import { createLogger, httpServerDuration, tracer } from '@platform/observability';
+import { REDACTED, tokenLike } from './redact.js';
 
 /** header de respuesta con el trace id de la request. */
 export const TRACE_HEADER = 'x-trace-id';
@@ -33,14 +34,10 @@ const CATCH_ALL_ROUTES = new Set(['', '*', '/*']);
 // parámetros de ruta cuyo valor es un secreto (enlaces de share, secretos de webhook en el
 // path): no deben llegar ni al access log ni al backend. la query nunca se registra.
 const SENSITIVE_PARAM = /token|secret|code|pass|sig|credential|session/i;
-const REDACTED = 'REDACTED';
 // segmento de plantilla que es un parámetro: `:name`, con patrón `{...}` u opcional `?`
 const PARAM_SEGMENT = /^:(\w+)/;
 // red de seguridad para segmentos que ninguna plantilla declara como parámetro (404, url de
-// webhook mal escrita): uno largo con alfabeto de token se trata como secreto. 32 cubre los
-// tokens de las apps (48 hex, 43 base64url) y deja pasar ids de spotify (22); los uuid son ids
-const TOKEN_LIKE_SEGMENT = /^[\w\-.~%]{32,}$/;
-const UUID_SEGMENT = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+// webhook mal escrita): uno con pinta de token se tapa (ver tokenLike en redact.ts)
 
 const log = createLogger('http');
 
@@ -62,11 +59,10 @@ export function loggablePath(c: Context): string {
   );
   const sensitive = new Set(params.filter((p) => p.sensitive).map((p) => p.i));
   const declared = new Set(params.map((p) => p.i));
-  const tokenLike = (segment: string, i: number) =>
-    !declared.has(i) && TOKEN_LIKE_SEGMENT.test(segment) && !UUID_SEGMENT.test(segment);
+  const undeclaredToken = (segment: string, i: number) => !declared.has(i) && tokenLike(segment);
   return c.req.path
     .split('/')
-    .map((segment, i) => (sensitive.has(i) || tokenLike(segment, i) ? REDACTED : segment))
+    .map((segment, i) => (sensitive.has(i) || undeclaredToken(segment, i) ? REDACTED : segment))
     .join('/');
 }
 

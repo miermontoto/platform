@@ -3,6 +3,9 @@
 // - a SU org (la del export otlp), diga lo que diga el cliente
 // - con el token de rum de esa org en vez del del bundle, que no lleva ninguno
 // - con el usr.id de la sesión (identify) en cada evento, nunca el que mande el cliente
+// - cada evento reconstruido desde las claves del esquema de rum (openobserve aplana: un `usr_id`
+//   o `ip` de primer nivel del cliente caería en la columna del servidor) y con las urls redactadas
+//   (tokens de share en el path, codes oauth en la query, fragmento) como los paths de las trazas
 // - con la ip y el user-agent del navegador, para la geo y el dispositivo del rum
 // createPlatformApp la registra ANTES que la telemetría http, cors y el gate de cada app: pre-auth
 // (la pantalla de login también se mide) y sin span ni access log propios, que serían una línea
@@ -12,6 +15,7 @@
 import type { Context, Env, Hono } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
 import { createLogger, openObserveTarget, RUM_LIMITS, RUM_PROXY_PATH, rumToken } from '@platform/observability';
+import { redactUrl } from './redact.js';
 
 export interface ClientTelemetryOptions {
   // usuario de la request (usr.id en el rum) desde la cookie de sesión de la app; el cliente nunca
@@ -35,11 +39,21 @@ const FORWARD_RE = /^\/rum\/v1\/[^/?]+\/rum\?(.*)$/;
 const TOKEN_PARAM = 'o2-api-key';
 // lotes comprimidos (compressIntakeRequests) no se pueden reescribir: el sdk se configura sin
 const ENCODING_PARAM = 'o2-evp-encoding';
+// claves de primer nivel de un evento de rum (esquema rum-events-format del que deriva el sdk, con
+// _o2 en vez de _dd). usr no está: lo pone el servidor. una clave desconocida se descarta y se avisa
+// una vez, para notar si una versión nueva del sdk añade alguna
+const RUM_EVENT_KEYS = new Set([
+  'type', 'date', 'application', 'service', 'version', 'build_version', 'build_id', 'source',
+  'session', 'view', 'action', 'resource', 'error', 'long_task', 'vital', 'stream', 'connectivity',
+  'display', 'synthetics', 'ci_test', 'os', 'device', 'context', 'container', 'feature_flags',
+  'privacy', 'account', '_o2',
+]);
 const SERVER_ERROR_STATUS = 500;
 const UPSTREAM_ERROR = 502;
 
 const log = createLogger('rum');
 const buckets = new Map<string, { tokens: number; at: number }>();
+const droppedKeys = new Set<string>();
 
 const allow = (client: string): boolean => {
   const t = Date.now();
@@ -65,16 +79,44 @@ const firstParty = (c: Context): boolean => {
   }
 };
 
-// cada línea es un evento json: el usr del cliente se descarta y se pone el de la sesión
-const withUser = (body: string, userId: string | undefined): string | null => {
+type Json = Record<string, unknown>;
+const isObject = (v: unknown): v is Json => typeof v === 'object' && v !== null && !Array.isArray(v);
+
+// redacta in situ las urls de un objeto anidado (view.url, resource.url, error.resource.url...)
+const redactIn = (parent: unknown, ...keys: string[]): void => {
+  if (!isObject(parent)) return;
+  keys.forEach((key) => {
+    if (key in parent) parent[key] = redactUrl(parent[key]);
+  });
+};
+
+// un evento del cliente → el que se guarda: solo claves del esquema, urls redactadas, usr del servidor
+const sanitize = (event: Json, userId: string | undefined): Json => {
+  const kept = Object.fromEntries(
+    Object.entries(event).filter(([key]) => {
+      if (RUM_EVENT_KEYS.has(key)) return true;
+      if (key !== 'usr' && !droppedKeys.has(key)) {
+        droppedKeys.add(key);
+        log.warn(`clave de rum desconocida descartada: ${key}`);
+      }
+      return false;
+    }),
+  );
+  redactIn(kept.view, 'url', 'referrer');
+  redactIn(kept.resource, 'url');
+  redactIn(isObject(kept.error) ? kept.error.resource : undefined, 'url');
+  return userId ? { ...kept, usr: { id: userId } } : kept;
+};
+
+// cada línea es un evento json; las que no parsean como objeto se descartan
+const rewrite = (body: string, userId: string | undefined): string | null => {
   const lines = body.split('\n').filter(Boolean);
   if (lines.length > RUM_LIMITS.events) return null;
   return lines
     .flatMap((line) => {
       try {
-        const event = JSON.parse(line) as Record<string, unknown>;
-        delete event.usr;
-        return [JSON.stringify(userId ? { ...event, usr: { id: userId } } : event)];
+        const event: unknown = JSON.parse(line);
+        return isObject(event) ? [JSON.stringify(sanitize(event, userId))] : [];
       } catch {
         return [];
       }
@@ -111,7 +153,7 @@ export function mountRumProxy<E extends Env>(app: Hono<E>, { identify }: ClientT
       // una sesión que no se puede resolver no tira el lote: llega como anónimo
       log.warn('identify falló:', err);
     }
-    const body = withUser(text, userId);
+    const body = rewrite(text, userId);
     if (body === null) return c.body(null, 413);
 
     try {
