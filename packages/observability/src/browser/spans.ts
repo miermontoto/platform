@@ -42,8 +42,23 @@ let active: ClientSpan | null = null;
 let route: string | undefined;
 let landingRoute: string | undefined;
 
+// lo que espera a la ruta de aterrizaje (las vitals que llegan antes del primer afterNavigate,
+// como ttfb): se suelta al conocerla o, en una app sin trackNavigations, a los MAX_ACTIVE_MS
+let landed = false;
+const onLanding: Array<(route: string | undefined) => void> = [];
+
+const land = (): void => {
+  landed = true;
+  onLanding.splice(0).forEach((callback) => callback(landingRoute));
+};
+
 export const currentRoute = (): string | undefined => route;
-export const landing = (): string | undefined => landingRoute;
+
+/** ejecuta callback con la ruta de aterrizaje en cuanto se conoce (al instante si ya se sabe). */
+export const whenLanded = (callback: (route: string | undefined) => void): void => {
+  if (landed) callback(landingRoute);
+  else onLanding.push(callback);
+};
 
 /** navegación en curso si sigue viva: los errores y fetch la toman como padre. */
 export const activeSpan = (): ClientSpan | null => (active && now() - active.start < MAX_ACTIVE_MS ? active : null);
@@ -83,6 +98,7 @@ const navigationTiming = (): WireAttrs => {
 /** abre el span de la carga inicial desde el inicio de la navegación del documento. */
 export function startPageload(): void {
   active = startSpan(PAGELOAD, { parent: null, start: performance.timeOrigin });
+  setTimeout(() => landed || land(), MAX_ACTIVE_MS);
 }
 
 // forma mínima de la navegación de sveltekit ($app/navigation) que se consume: sin importar
@@ -121,6 +137,7 @@ export function trackNavigations({ beforeNavigate, afterNavigate }: { beforeNavi
     if (pageload) {
       landingRoute = route;
       active.name = `${PAGELOAD} ${route}`;
+      land();
     }
     endSpan(active, { attrs: { 'app.route': route, ...(pageload && navigationTiming()) } });
     active = null;

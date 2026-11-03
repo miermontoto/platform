@@ -15,7 +15,7 @@ import {
   trace,
   type TextMapGetter,
 } from '@opentelemetry/api';
-import { createLogger, tracer } from '@platform/observability';
+import { createLogger, httpServerDuration, tracer } from '@platform/observability';
 
 /** header de respuesta con el trace id de la request. */
 export const TRACE_HEADER = 'x-trace-id';
@@ -24,6 +24,7 @@ export const TRACE_HEADER = 'x-trace-id';
 export const DEFAULT_QUIET_PATHS =
   /^\/(?!api\/)(?:_app\/|.*\.(?:js|mjs|css|map|png|jpe?g|gif|svg|ico|webp|avif|woff2?|ttf|webmanifest|txt|xml)$)|\/(?:health|healthz|version)$/;
 
+const MS_PER_S = 1000;
 // a partir de esta duración el access log sube a warn (HTTP_SLOW_MS lo sobrescribe)
 const DEFAULT_SLOW_MS = 1000;
 const SERVER_ERROR_STATUS = 500;
@@ -114,15 +115,23 @@ export function httpTelemetry(quietPaths: RegExp): MiddlewareHandler {
       } finally {
         const { status } = c.res;
         const route = routePath(c);
-        const ms = Math.round(performance.now() - start);
+        const elapsed = performance.now() - start;
+        const ms = Math.round(elapsed);
         // tras el routing: hasta aquí no se sabe qué segmentos son parámetros sensibles
         const safePath = loggablePath(c);
         span.setAttribute('url.path', safePath);
         span.setAttribute('http.response.status_code', status);
-        if (!CATCH_ALL_ROUTES.has(route)) {
+        const routed = !CATCH_ALL_ROUTES.has(route);
+        if (routed) {
           span.setAttribute('http.route', route);
           span.updateName(`${method} ${route}`);
         }
+        // la ruta plantilla (nunca el path) mantiene acotada la cardinalidad de la métrica
+        httpServerDuration.record(elapsed / MS_PER_S, {
+          'http.request.method': method,
+          'http.response.status_code': status,
+          ...(routed && { 'http.route': route }),
+        });
         if (status >= SERVER_ERROR_STATUS) span.setStatus({ code: SpanStatusCode.ERROR });
         // las respuestas construidas a mano (new Response) no heredan el header preparado.
         // un 101 de websocket no admite re-crear la respuesta: se queda sin header.

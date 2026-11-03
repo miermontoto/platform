@@ -8,7 +8,7 @@
 // la sesión entera): van con la ruta de aterrizaje, no con la actual.
 import type { MetricWithAttribution } from 'web-vitals/attribution';
 import type { WireAttrs } from '../wire.js';
-import { landing } from './spans.js';
+import { whenLanded } from './spans.js';
 import { enqueueEvent, now } from './transport.js';
 
 const SCOPE = 'web-vitals';
@@ -52,21 +52,24 @@ const attribution = (metric: MetricWithAttribution): WireAttrs => {
 
 const report = (metric: MetricWithAttribution): void => {
   const value = UNITLESS.has(metric.name) ? Math.round(metric.value * CLS_DECIMALS) / CLS_DECIMALS : Math.round(metric.value);
-  const route = landing();
-  enqueueEvent({
-    time: now(),
-    level: 'info',
-    scope: SCOPE,
-    msg: `${metric.name} ${value}${UNITLESS.has(metric.name) ? '' : 'ms'} ${metric.rating}`,
-    attrs: {
-      'web_vital.name': metric.name,
-      'web_vital.value': value,
-      'web_vital.rating': metric.rating,
-      'web_vital.navigation_type': metric.navigationType,
-      ...(route && { 'app.route': route }),
-      ...attribution(metric),
-    },
-  });
+  const time = now();
+  // ttfb (y a veces fcp) llega antes de que kit pinte la primera ruta: espera a saber cuál es
+  whenLanded((route) =>
+    enqueueEvent({
+      time,
+      level: 'info',
+      scope: SCOPE,
+      msg: `${metric.name} ${value}${UNITLESS.has(metric.name) ? '' : 'ms'} ${metric.rating}`,
+      attrs: {
+        'web_vital.name': metric.name,
+        'web_vital.value': value,
+        'web_vital.rating': metric.rating,
+        'web_vital.navigation_type': metric.navigationType,
+        ...(route && { 'app.route': route }),
+        ...attribution(metric),
+      },
+    }),
+  );
 };
 
 export function observeVitals(): void {

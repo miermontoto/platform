@@ -1,17 +1,22 @@
-// arranque de opentelemetry en las apis: tracer + logger providers, contexto async
+// arranque de opentelemetry en las apis: tracer, logger y meter providers, contexto async
 // (AsyncLocalStorage) y propagación w3c. el export otlp solo se activa con
 // OTEL_EXPORTER_OTLP_ENDPOINT (+ OTEL_EXPORTER_OTLP_HEADERS para la auth; ambos los leen
 // los propios exporters). sin endpoint las trazas siguen existiendo en proceso —trace_id
 // en los logs, x-trace-id en las respuestas— pero no salen de la máquina.
 // OTEL_SDK_DISABLED=true lo apaga todo salvo el logger.
+import { metrics } from '@opentelemetry/api';
 import { logs } from '@opentelemetry/api-logs';
 import { OTLPLogExporter } from '@opentelemetry/exporter-logs-otlp-http';
+import { OTLPMetricExporter } from '@opentelemetry/exporter-metrics-otlp-http';
 import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-http';
 import { resourceFromAttributes } from '@opentelemetry/resources';
 import { BatchLogRecordProcessor, LoggerProvider, type LogRecordProcessor } from '@opentelemetry/sdk-logs';
+import { MeterProvider, PeriodicExportingMetricReader } from '@opentelemetry/sdk-metrics';
 import { AlwaysOnSampler, BatchSpanProcessor, NodeTracerProvider, type SpanProcessor } from '@opentelemetry/sdk-trace-node';
 import { instrumentFetch } from './fetch.js';
 import { configureLogger, createLogger, installConsoleBridge } from './logger.js';
+import { createInstruments } from './metrics.js';
+import { TRACER_NAME } from './tracing.js';
 
 export interface TelemetryOptions {
   // service.name en el backend (nombre de la app)
@@ -26,6 +31,8 @@ const ATTRIBUTE_MAX_LENGTH = 4096;
 // espera máxima del flush al cerrar: un backend caído no debe bloquear el exit
 const SHUTDOWN_TIMEOUT_MS = 3000;
 const DEFAULT_ENVIRONMENT = 'development';
+// cada cuánto salen las métricas: la resolución de los rate()/histogram_quantile de promql
+const METRIC_EXPORT_INTERVAL_MS = 30_000;
 
 /**
  * destino de la telemetría de cliente (ingest.ts): los mismos processors del export de la api,
@@ -39,7 +46,7 @@ export interface ClientSink {
 }
 
 const log = createLogger('telemetry');
-let providers: { tracer: NodeTracerProvider; logger?: LoggerProvider } | null = null;
+let providers: { tracer: NodeTracerProvider; logger?: LoggerProvider; meter?: MeterProvider } | null = null;
 let sink: ClientSink | null = null;
 
 /** processors de export para la telemetría de cliente; null si no hay export otlp. */
@@ -82,7 +89,17 @@ export function initTelemetry({ service, version, bridgeConsole = true }: Teleme
   tracerProvider.register();
   const loggerProvider = logProcessor ? new LoggerProvider({ resource, processors: [logProcessor] }) : undefined;
   if (loggerProvider) logs.setGlobalLoggerProvider(loggerProvider);
-  providers = { tracer: tracerProvider, logger: loggerProvider };
+  const meterProvider = exporting
+    ? new MeterProvider({
+        resource,
+        readers: [new PeriodicExportingMetricReader({ exporter: new OTLPMetricExporter(), exportIntervalMillis: METRIC_EXPORT_INTERVAL_MS })],
+      })
+    : undefined;
+  if (meterProvider) {
+    metrics.setGlobalMeterProvider(meterProvider);
+    createInstruments(meterProvider.getMeter(TRACER_NAME));
+  }
+  providers = { tracer: tracerProvider, logger: loggerProvider, meter: meterProvider };
   if (spanProcessor && logProcessor) sink = { service, environment, spans: spanProcessor, logs: logProcessor };
 
   configureLogger({ service, exporting });
@@ -93,11 +110,11 @@ export function initTelemetry({ service, version, bridgeConsole = true }: Teleme
 /** vacía los buffers pendientes y cierra los exporters (como mucho SHUTDOWN_TIMEOUT_MS). */
 export async function shutdownTelemetry(): Promise<void> {
   if (!providers) return;
-  const { tracer, logger } = providers;
+  const { tracer, logger, meter } = providers;
   providers = null;
   sink = null;
   await Promise.race([
-    Promise.allSettled([tracer.shutdown(), logger?.shutdown()]),
+    Promise.allSettled([tracer.shutdown(), logger?.shutdown(), meter?.shutdown()]),
     new Promise((resolve) => setTimeout(resolve, SHUTDOWN_TIMEOUT_MS).unref()),
   ]);
 }

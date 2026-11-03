@@ -75,6 +75,14 @@ también en el de la api: tsup los deja externos). con eso, sin más código:
   manual pasa a ser el scope) salen con trace id; `LOG_LEVEL`, `LOG_FORMAT=json`.
 - **background**: los ticks de pollers/jobs se envuelven en
   `withSpan(name, fn, { root: true })` para tener traza propia.
+- **métricas** (cada 30s, página Metrics con promql): histogramas `http.server.request.duration`
+  (method, route plantilla, status) y `db.client.operation.duration` (operación, tabla), y gauges
+  `process.memory.usage`, `v8js.memory.heap.used`, `nodejs.eventloop.delay.p99`. p.ej.
+  `histogram_quantile(0.95, sum by (le) (rate(http_server_request_duration_bucket{service_name="sis"}[5m])))`.
+
+en openobserve los atributos van con los puntos como guiones bajos (`http.route` → `http_route`) y,
+en las trazas, los del resource llevan prefijo `service_` (`service_service_version`,
+`service_app_platform`); en los logs no.
 
 el export solo se activa con `OTEL_EXPORTER_OTLP_ENDPOINT`; sin él las trazas viven en
 proceso (trace id en logs y respuestas) y no salen de la máquina.

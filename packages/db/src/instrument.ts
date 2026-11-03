@@ -1,14 +1,15 @@
-// instrumentación de better-sqlite3: cronometra cada sentencia (run/get/all) y abre un
-// span CLIENT hijo cuando hay una traza activa (request http, tick de un poller). las que
-// superan el umbral se loguean siempre, haya traza o no: better-sqlite3 es síncrono, así
-// que una query lenta bloquea el event loop entero y es lo primero que hay que ver.
+// instrumentación de better-sqlite3: cronometra cada sentencia (run/get/all), la registra
+// siempre en el histograma db.client.operation.duration y abre un span CLIENT hijo cuando hay
+// una traza activa (request http, tick de un poller). las que superan el umbral se loguean
+// siempre, haya traza o no: better-sqlite3 es síncrono, así que una query lenta bloquea el
+// event loop entero y es lo primero que hay que ver.
 //
 // se parchea el prototipo de Statement (compartido por todas las conexiones del proceso)
 // en vez de envolver cada statement en un proxy: cero asignaciones extra por query.
 // iterate() no se cronometra (su coste se reparte entre las iteraciones del caller).
 import type Database from 'better-sqlite3';
 import { SpanKind, SpanStatusCode, trace } from '@opentelemetry/api';
-import { createLogger, tracer } from '@platform/observability';
+import { createLogger, dbOperationDuration, tracer } from '@platform/observability';
 
 /** umbral por defecto de query lenta en ms (DB_SLOW_QUERY_MS lo sobrescribe). */
 export const DEFAULT_SLOW_QUERY_MS = 100;
@@ -32,6 +33,13 @@ const ROWS: Record<Method, readonly [string, (result: unknown) => number]> = {
   all: ['db.response.returned_rows', (r) => (r as unknown[]).length],
 };
 
+const MS_PER_S = 1000;
+// atributos de la métrica por texto sql: las regex de describe() no corren en cada ejecución.
+// tope de sentencias distintas (sql generado con literales no debería llenarlo; si lo hace se
+// vacía y se recalcula, sin crecer)
+const MAX_CACHED_STATEMENTS = 1000;
+const metricAttrs = new Map<string, Record<string, string>>();
+
 const log = createLogger('db');
 // umbral global del proceso: el prototipo es compartido, así que manda la última conexión
 let slowMs = DEFAULT_SLOW_QUERY_MS;
@@ -40,6 +48,16 @@ const describe = (sql: string) => {
   const operation = OPERATION_RE.exec(sql)?.[1]?.toUpperCase() ?? 'SQL';
   const table = TABLE_RE.exec(sql)?.[1];
   return { name: table ? `${operation} ${table}` : operation, operation, table };
+};
+
+const attrsOf = (sql: string): Record<string, string> => {
+  const hit = metricAttrs.get(sql);
+  if (hit) return hit;
+  const { operation, table } = describe(sql);
+  const attrs = { 'db.system.name': DB_SYSTEM, 'db.operation.name': operation, ...(table && { 'db.collection.name': table }) };
+  if (metricAttrs.size >= MAX_CACHED_STATEMENTS) metricAttrs.clear();
+  metricAttrs.set(sql, attrs);
+  return attrs;
 };
 
 const startQuerySpan = (sql: string) => {
@@ -73,7 +91,9 @@ function timed(method: Method, original: Exec): Exec {
       throw err;
     } finally {
       span?.end();
-      const ms = Math.round(performance.now() - start);
+      const elapsed = performance.now() - start;
+      dbOperationDuration.record(elapsed / MS_PER_S, attrsOf(sql));
+      const ms = Math.round(elapsed);
       if (ms >= slowMs) {
         log.warn(`query lenta (${ms}ms): ${describe(sql).name}`, {
           'db.query.text': sql,
