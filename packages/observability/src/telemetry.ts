@@ -4,12 +4,17 @@
 // los propios exporters). sin endpoint las trazas siguen existiendo en proceso —trace_id
 // en los logs, x-trace-id en las respuestas— pero no salen de la máquina.
 // OTEL_SDK_DISABLED=true lo apaga todo salvo el logger.
+//
+// trazas y logs van en protobuf: otlp/json codifica los enteros de 64 bits como strings y
+// openobserve tipaba esas columnas como texto (http_response_status_code, db_response_returned_rows),
+// lo que rompe sus agregaciones (la vista de bases de datos hace sum() de las filas). las métricas
+// siguen en json: sus valores son números en cualquier codificación y sus labels, texto.
 import path from 'node:path';
 import { metrics } from '@opentelemetry/api';
 import { logs } from '@opentelemetry/api-logs';
-import { OTLPLogExporter } from '@opentelemetry/exporter-logs-otlp-http';
+import { OTLPLogExporter } from '@opentelemetry/exporter-logs-otlp-proto';
 import { OTLPMetricExporter } from '@opentelemetry/exporter-metrics-otlp-http';
-import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-http';
+import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-proto';
 import { resourceFromAttributes } from '@opentelemetry/resources';
 import { BatchLogRecordProcessor, LoggerProvider } from '@opentelemetry/sdk-logs';
 import { MeterProvider, PeriodicExportingMetricReader } from '@opentelemetry/sdk-metrics';

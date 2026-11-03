@@ -27,11 +27,15 @@ type Method = (typeof EXEC_METHODS)[number];
 type Exec = (this: Database.Statement, ...params: unknown[]) => unknown;
 type StatementProto = Record<Method, Exec> & { [PATCHED]?: boolean };
 
-// filas devueltas (get/all) o afectadas (run): distingue una query lenta por volumen
-const ROWS: Record<Method, readonly [string, (result: unknown) => number]> = {
-  run: ['db.response.affected_rows', (r) => (r as Database.RunResult).changes],
-  get: ['db.response.returned_rows', (r) => (r === undefined ? 0 : 1)],
-  all: ['db.response.returned_rows', (r) => (r as unknown[]).length],
+// filas devueltas (get/all) o afectadas (run): distingue una query lenta por volumen. van
+// en `db.rows` y no en los db.response.* de semconv: openobserve guarda los atributos de span
+// como texto y su vista de bases de datos hace sum(db_response_returned_rows), que falla con un
+// string y deja la vista vacía. con otro nombre la vista funciona y las filas siguen en el span
+const ROWS_ATTR = 'db.rows';
+const ROWS: Record<Method, (result: unknown) => number> = {
+  run: (r) => (r as Database.RunResult).changes,
+  get: (r) => (r === undefined ? 0 : 1),
+  all: (r) => (r as unknown[]).length,
 };
 
 const MS_PER_S = 1000;
@@ -79,7 +83,7 @@ const startQuerySpan = (sql: string, attrs: Record<string, string>) =>
   tracer.startSpan(describe(sql).name, { kind: SpanKind.CLIENT, attributes: { ...attrs, 'db.query.text': sql } });
 
 function timed(method: Method, original: Exec): Exec {
-  const [rowsAttr, countRows] = ROWS[method];
+  const countRows = ROWS[method];
   return function (this: Database.Statement, ...params: unknown[]) {
     const sql = this.source;
     const attrs = attrsOf(sql, namespaceOf(this));
@@ -89,7 +93,7 @@ function timed(method: Method, original: Exec): Exec {
     try {
       const result = original.apply(this, params);
       rows = countRows(result);
-      span?.setAttribute(rowsAttr, rows);
+      span?.setAttribute(ROWS_ATTR, rows);
       return result;
     } catch (err) {
       span?.recordException(err as Error);
@@ -104,7 +108,7 @@ function timed(method: Method, original: Exec): Exec {
         log.warn(`query lenta (${ms}ms): ${describe(sql).name}`, {
           'db.query.text': sql,
           duration_ms: ms,
-          ...(rows !== undefined && { [rowsAttr]: rows }),
+          ...(rows !== undefined && { [ROWS_ATTR]: rows }),
         });
       }
     }

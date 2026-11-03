@@ -29,8 +29,10 @@ const AUTH_HEADER = 'authorization';
 const SOURCE_MAP_EXT = '.map';
 const ZIP_NAME = 'sourcemaps.zip';
 const ZIP_TYPE = 'application/zip';
-// una caída de openobserve no debe colgar el arranque ni una request de rum
+// una caída de openobserve no debe colgar el arranque ni una request de rum; la subida de maps
+// (decenas de MB en las webs grandes) tiene su propio margen
 const REQUEST_TIMEOUT_MS = 10_000;
+const UPLOAD_TIMEOUT_MS = 120_000;
 
 const log = createLogger('openobserve');
 let target: OpenObserveTarget | null | undefined;
@@ -51,11 +53,11 @@ export function openObserveTarget(): OpenObserveTarget | null {
   return target;
 }
 
-const o2 = (t: OpenObserveTarget, apiPath: string, init: RequestInit = {}): Promise<Response> =>
+const o2 = (t: OpenObserveTarget, apiPath: string, init: RequestInit = {}, timeoutMs = REQUEST_TIMEOUT_MS): Promise<Response> =>
   fetch(`${t.base}/api/${t.org}${apiPath}`, {
     ...init,
     headers: { ...(t.authorization && { authorization: t.authorization }), ...init.headers },
-    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    signal: AbortSignal.timeout(timeoutMs),
   });
 
 /** token de rum de la org (el del usuario que exporta). se cachea; un fallo se reintenta en la siguiente. */
@@ -93,7 +95,7 @@ export async function publishSourceMaps({ service, version, env, dir }: SourceMa
     form.set('version', version);
     form.set('env', env);
     form.set('file', new Blob([zipSync(entries)], { type: ZIP_TYPE }), ZIP_NAME);
-    const res = await o2(t, '/sourcemaps', { method: 'POST', body: form });
+    const res = await o2(t, '/sourcemaps', { method: 'POST', body: form }, UPLOAD_TIMEOUT_MS);
     if (!res.ok) throw new Error(`HTTP ${res.status}: ${(await res.text()).slice(0, 200)}`);
     log.info(`source maps de ${service} ${version} publicados (${files.length})`);
   } catch (err) {
