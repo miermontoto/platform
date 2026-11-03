@@ -43,6 +43,9 @@ const DEFAULT_ENVIRONMENT = 'development';
 const DEFAULT_STATIC_DIR = 'static';
 /** sufijo del servicio del rum de la web de una app (`sis` → `sis-web`). */
 export const WEB_SERVICE_SUFFIX = '-web';
+// margen tras el arranque antes de publicar los source maps (no corre prisa: hacen falta al
+// primer error simbolizado, no al arrancar)
+const SOURCE_MAP_DELAY_MS = 30_000;
 // cada cuánto salen las métricas: la resolución de los rate()/histogram_quantile de promql
 const METRIC_EXPORT_INTERVAL_MS = 30_000;
 
@@ -98,8 +101,15 @@ export function initTelemetry({ service, version, staticDir = path.resolve(proce
   configureLogger({ service, exporting });
   instrumentFetch();
   log.info(exporting ? `export otlp → ${endpoint}` : 'export otlp desactivado (sin OTEL_EXPORTER_OTLP_ENDPOINT)');
-  // la web sirve el mismo build (misma versión): sus errores de rum se simbolizan con estos maps
-  if (exporting && version) void publishSourceMaps({ service: `${service}${WEB_SERVICE_SUFFIX}`, version, env: environment, dir: staticDir });
+  // la web sirve el mismo build (misma versión): sus errores de rum se simbolizan con estos maps.
+  // espera a que el arranque se asiente: un arranque que bloquea el event loop varios segundos
+  // (los barridos síncronos de sis) hacía saltar el timeout con la respuesta ya llegada
+  if (exporting && version) {
+    setTimeout(
+      () => void publishSourceMaps({ service: `${service}${WEB_SERVICE_SUFFIX}`, version, env: environment, dir: staticDir }),
+      SOURCE_MAP_DELAY_MS,
+    ).unref();
+  }
 }
 
 /** vacía los buffers pendientes y cierra los exporters (como mucho SHUTDOWN_TIMEOUT_MS). */

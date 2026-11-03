@@ -9,9 +9,14 @@
 // conexión y descarta las que ya no están abiertas. el cliente lo usa para no
 // reciclar el socket por inactividad (su watchdog espera ese ping).
 //
+// métrica: websocket.connections (up/down, label ws.hub) cuenta las conexiones registradas. toda baja
+// (onClose de la app, envío fallido, purga del heartbeat, stop) pasa por drop, así que no se descuadra.
+//
 // shutdown: stop() cierra todas las conexiones con 1012 (service restart). un ws abierto
 // mantiene vivo el http.Server y server.close() no termina nunca sin ese cierre; el código
 // le dice al cliente que reconecte en cuanto el servicio vuelva.
+
+import { defineUpDownCounter } from '@platform/observability';
 
 // readyState OPEN del estándar WebSocket (0 CONNECTING, 1 OPEN, 2 CLOSING, 3 CLOSED).
 // literal para no acoplar core-api a ninguna implementación de ws.
@@ -24,6 +29,9 @@ const PING_FRAME = '{"type":"ping"}';
 // cierre por reinicio del servicio (rfc 6455 1012): el cliente reconecta en cuanto vuelva
 const WS_CLOSE_SERVICE_RESTART = 1012;
 const WS_CLOSE_SERVICE_RESTART_REASON = 'service restart';
+const DEFAULT_HUB_NAME = 'realtime';
+
+const wsConnections = defineUpDownCounter('websocket.connections', { description: 'conexiones websocket abiertas por hub' });
 
 /** conexión ws mínima que el hub necesita. la app la adapta sobre su ws nativo. */
 export interface WsConnection {
@@ -41,6 +49,8 @@ export interface WsHubOptions {
   // periodo del ping de keep-alive en ms (default 25s; debe ser menor que el
   // watchdog del cliente). pasar 0 o negativo desactiva el heartbeat.
   heartbeatMs?: number;
+  // label ws.hub de la métrica de conexiones (default 'realtime')
+  name?: string;
 }
 
 export interface WsHub<T> {
@@ -52,9 +62,17 @@ export interface WsHub<T> {
   stop(): void;
 }
 
-export function createWsHub<T>({ heartbeatMs = 25_000 }: WsHubOptions = {}): WsHub<T> {
+export function createWsHub<T>({ heartbeatMs = 25_000, name = DEFAULT_HUB_NAME }: WsHubOptions = {}): WsHub<T> {
   // clave → conexiones vivas. un usuario puede tener varias (web + apk + pestañas).
   const conns = new Map<string, Set<WsConnection>>();
+  const labels = { 'ws.hub': name };
+
+  // única baja de una conexión: la saca de su clave y la descuenta si seguía registrada
+  const drop = (key: string, set: Set<WsConnection>, conn: WsConnection): void => {
+    if (!set.delete(conn)) return;
+    wsConnections.add(-1, labels);
+    if (set.size === 0) conns.delete(key);
+  };
 
   // envía a una conexión solo si está OPEN; si tira al enviar, la trata como muerta
   // para que el caller la purgue. devuelve true si el envío fue válido.
@@ -74,12 +92,13 @@ export function createWsHub<T>({ heartbeatMs = 25_000 }: WsHubOptions = {}): WsH
       set = new Set();
       conns.set(key, set);
     }
-    set.add(conn);
+    if (!set.has(conn)) {
+      set.add(conn);
+      wsConnections.add(1, labels);
+    }
     return () => {
       const s = conns.get(key);
-      if (!s) return;
-      s.delete(conn);
-      if (s.size === 0) conns.delete(key);
+      if (s) drop(key, s, conn);
     };
   };
 
@@ -89,9 +108,8 @@ export function createWsHub<T>({ heartbeatMs = 25_000 }: WsHubOptions = {}): WsH
     const data = JSON.stringify(msg);
     for (const conn of set) {
       // borrar de un Set durante su iteración es seguro en js
-      if (!trySend(conn, data)) set.delete(conn);
+      if (!trySend(conn, data)) drop(key, set, conn);
     }
-    if (set.size === 0) conns.delete(key);
   };
 
   // heartbeat: pinguea todo y purga lo que ya no está OPEN. unref para no mantener
@@ -101,9 +119,8 @@ export function createWsHub<T>({ heartbeatMs = 25_000 }: WsHubOptions = {}): WsH
     timer = setInterval(() => {
       for (const [key, set] of conns) {
         for (const conn of set) {
-          if (!trySend(conn, PING_FRAME)) set.delete(conn);
+          if (!trySend(conn, PING_FRAME)) drop(key, set, conn);
         }
-        if (set.size === 0) conns.delete(key);
       }
     }, heartbeatMs);
     timer.unref?.();
@@ -114,6 +131,7 @@ export function createWsHub<T>({ heartbeatMs = 25_000 }: WsHubOptions = {}): WsH
   const closeAll = (code: number, reason: string) => {
     const all = [...conns.values()].flatMap((set) => [...set]);
     conns.clear();
+    wsConnections.add(-all.length, labels);
     all.forEach((conn) => conn.close?.(code, reason));
   };
 
