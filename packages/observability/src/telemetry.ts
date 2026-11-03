@@ -5,10 +5,10 @@
 // en los logs, x-trace-id en las respuestas— pero no salen de la máquina.
 // OTEL_SDK_DISABLED=true lo apaga todo salvo el logger.
 //
-// trazas y logs van en protobuf: otlp/json codifica los enteros de 64 bits como strings y
-// openobserve tipaba esas columnas como texto (http_response_status_code, db_response_returned_rows),
-// lo que rompe sus agregaciones (la vista de bases de datos hace sum() de las filas). las métricas
-// siguen en json: sus valores son números en cualquier codificación y sus labels, texto.
+// trazas y logs van en protobuf, más compacto y barato de serializar que json. ojo: openobserve
+// guarda los atributos de span como texto en cualquier codificación (los de log sí los tipa), así
+// que nada que tenga que sumarse debe ir como atributo de span con un nombre que sus vistas agreguen
+// (ver db.rows en @platform/db). las métricas siguen en json: sus valores ya son números.
 import path from 'node:path';
 import { metrics } from '@opentelemetry/api';
 import { logs } from '@opentelemetry/api-logs';
