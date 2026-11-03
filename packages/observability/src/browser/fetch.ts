@@ -17,6 +17,9 @@ const TRACEPARENT = 'traceparent';
 // la ruta exacta la lleva el span de servidor hijo (http.route, url.path redactado)
 const ID_SEGMENT = /^(?:\d+|[0-9a-f-]{8,}|(?=[^/]*\d)[\w-]{12,})$/i;
 const ID_PLACEHOLDER = ':id';
+// recursos internos de sveltekit en el mismo origen (version.json del sondeo de deploys,
+// chunks): no son llamadas a la api y el sondeo de cada pestaña llenaría la traza de ruido
+const KIT_ASSETS_PREFIX = '/_app/';
 
 const requestUrl = (input: RequestInfo | URL): URL | null => {
   try {
@@ -38,7 +41,9 @@ export function instrumentFetch(isApi: (url: URL) => boolean): typeof fetch {
 
   globalThis.fetch = (input, init) => {
     const url = requestUrl(input);
-    if (!url || url.pathname === CLIENT_TELEMETRY_PATH || !isApi(url)) return original(input, init);
+    if (!url || url.pathname === CLIENT_TELEMETRY_PATH || url.pathname.startsWith(KIT_ASSETS_PREFIX) || !isApi(url)) {
+      return original(input, init);
+    }
 
     const method = (init?.method ?? (input instanceof Request ? input.method : 'GET')).toUpperCase();
     const path = templatePath(url.pathname);
@@ -57,7 +62,10 @@ export function instrumentFetch(isApi: (url: URL) => boolean): typeof fetch {
         return res;
       },
       (err: unknown) => {
-        // abortar (navegar fuera, un AbortController) es voluntario: no es un fallo
+        // abortar (un AbortController) es voluntario: no es un fallo. ojo: firefox cancela las
+        // peticiones en vuelo al recargar o salir con un TypeError de red, indistinguible de un
+        // fallo real de red; por eso el mensaje lleva el prefijo `network:` y los paneles separan
+        // esos ("sin respuesta") de los 5xx
         const aborted = err instanceof DOMException && err.name === 'AbortError';
         const reason = err instanceof Error ? err.message : String(err);
         endSpan(span, aborted ? { attrs: { 'http.aborted': true } } : { error: `network: ${reason}` });

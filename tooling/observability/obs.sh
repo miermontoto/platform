@@ -16,6 +16,8 @@
 #   services            requests por servicio en la ventana: volumen, errores 5xx, p95
 #   vitals              web vitals del cliente (lcp, inp, cls, fcp, ttfb) por ruta de
 #                       aterrizaje: p75 y % de muestras poor (servicios <app>-web)
+#   dashboard <json>    importa un dashboard (dashboards/<app>.dashboard.json) y sustituye
+#                       el que tenga el mismo título
 #   sql "<sql>"         sql libre sobre el stream "default" (--type logs|traces).
 #                       "-" lee el sql de stdin. columnas: los atributos otel con los
 #                       puntos como guiones bajos (http.route → http_route); duration
@@ -29,6 +31,7 @@
 #   obs.sh logs --service sis --scope poll --grep spotify --since 30m
 #   obs.sh errors --service duckhunt-web --since 1d    # errores de la web y las apps nativas
 #   obs.sh vitals --service sis-web --since 7d
+#   obs.sh dashboard dashboards/sis.dashboard.json
 #   obs.sh sql --type traces 'SELECT http_route, count(*) AS n FROM "default" GROUP BY http_route ORDER BY n DESC'
 #
 # flags:
@@ -65,7 +68,7 @@ STREAM="default"
 ENV_FILE="$(dirname "$0")/.env"
 
 usage() {
-  sed -n '2,47p' "$0" | sed 's/^# \{0,1\}//'
+  sed -n '2,50p' "$0" | sed 's/^# \{0,1\}//'
   exit "${1:-0}"
 }
 
@@ -132,6 +135,14 @@ window() {
   now=$(date +%s)
   END_US=$((now * 1000000))
   START_US=$(((now - $(to_seconds "${SINCE:-$1}")) * 1000000))
+}
+
+# api de gestión de openobserve (dashboards); la auth viaja por un fd, como en search
+o2() {
+  local method="$1" path="$2"
+  shift 2
+  curl -sS --max-time 30 -X "$method" "$O2_URL/api/$O2_ORG/$path" -H 'content-type: application/json' \
+    -H @<(printf 'Authorization: Basic %s' "$(printf '%s:%s' "$O2_USER" "$O2_PASSWORD" | base64 -w0)") "$@"
 }
 
 # literal sql seguro: comillas simples duplicadas
@@ -270,6 +281,16 @@ case "$COMMAND" in
       compact 'map({metric: .web_vital_name, route: .app_route, samples, p75: (.p75 * 1000 | round / 1000), poor_pct: (.poor * 100 / .samples | round)})'
     ;;
 
+  dashboard)
+    file="${1:-}"
+    [[ -f "$file" ]] || die "falta el json del dashboard (p.ej. $(dirname "$0")/dashboards/sis.dashboard.json)"
+    title=$(jq -er '.title' "$file") || die "json sin título: $file"
+    # el post siempre crea uno nuevo: se borra antes el del mismo título para no duplicarlo
+    o2 GET dashboards | jq -r --arg t "$title" '.dashboards[]? | select((.v8.title // .title) == $t) | (.v8.dashboardId // .dashboardId)' |
+      while read -r id; do o2 DELETE "dashboards/$id" >/dev/null; done
+    o2 POST dashboards --data-binary @"$file" | jq -c '{title: (.v8.title // .title), id: (.v8.dashboardId // .dashboardId // .message)}'
+    ;;
+
   sql)
     sql="${1:-}"
     [[ "$sql" == "-" ]] && sql=$(cat)
@@ -279,5 +300,5 @@ case "$COMMAND" in
     search "$TYPE" "$sql"
     ;;
 
-  *) die "comando desconocido: $COMMAND (errors|logs|slow|queries|trace|services|vitals|sql)" ;;
+  *) die "comando desconocido: $COMMAND (errors|logs|slow|queries|trace|services|vitals|dashboard|sql)" ;;
 esac

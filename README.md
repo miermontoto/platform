@@ -103,6 +103,12 @@ tooling/observability/obs.sh queries --service sis
 tooling/observability/obs.sh trace <trace_id>
 ```
 
+ui en https://obs.mier.info (vhost de nginx-proxy; la ingesta otlp/bulk/rum da 403 desde fuera,
+las apps exportan por 172.17.0.1). un dashboard por app (`tooling/observability/dashboards/`):
+resumen (tráfico, 5xx, latencia, memoria, event loop), base de datos (queries/s, p95 por
+tabla, errores busy/locked, lentas, n+1) y rum (sesiones, vitals, carga, la api vista desde el
+cliente, errores por build y plataforma). `obs.sh dashboard <json>` lo (re)importa.
+
 ### cliente (web y apps nativas)
 
 la web y las apps capacitor mandan sus errores, web vitals y spans a la api de la propia app
