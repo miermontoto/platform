@@ -48,12 +48,16 @@ const RUM_EVENT_KEYS = new Set([
   'display', 'synthetics', 'ci_test', 'os', 'device', 'context', 'container', 'feature_flags',
   'privacy', 'account', '_o2',
 ]);
+// aviso de clave desconocida: solo para las que parecen del esquema (un sdk nuevo) y como mucho
+// MAX_REPORTED_KEYS por proceso; un cliente que manda claves inventadas no infla la memoria ni el log
+const REPORTABLE_KEY = /^[a-z_][a-z0-9_]{0,63}$/i;
+const MAX_REPORTED_KEYS = 64;
 const SERVER_ERROR_STATUS = 500;
 const UPSTREAM_ERROR = 502;
 
 const log = createLogger('rum');
 const buckets = new Map<string, { tokens: number; at: number }>();
-const droppedKeys = new Set<string>();
+const reportedKeys = new Set<string>();
 
 const allow = (client: string): boolean => {
   const t = Date.now();
@@ -95,9 +99,9 @@ const sanitize = (event: Json, userId: string | undefined): Json => {
   const kept = Object.fromEntries(
     Object.entries(event).filter(([key]) => {
       if (RUM_EVENT_KEYS.has(key)) return true;
-      if (key !== 'usr' && !droppedKeys.has(key)) {
-        droppedKeys.add(key);
-        log.warn(`clave de rum desconocida descartada: ${key}`);
+      if (key !== 'usr' && REPORTABLE_KEY.test(key) && reportedKeys.size < MAX_REPORTED_KEYS && !reportedKeys.has(key)) {
+        reportedKeys.add(key);
+        log.warn(`clave de rum desconocida descartada: ${JSON.stringify(key)}`);
       }
       return false;
     }),
