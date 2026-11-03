@@ -28,6 +28,8 @@ export interface Histogram {
 
 const noop = createNoopMeter();
 let meter: Meter | null = null;
+// gauges definidos antes del init: se registran en el meter real cuando llega
+const pendingGauges: Array<(m: Meter) => void> = [];
 
 // el instrumento real se crea una vez, al primer uso con meter; antes, el noop (que no se cachea)
 const lazy = <I>(create: (m: Meter) => I, fallback: I): (() => I) => {
@@ -53,6 +55,24 @@ export function defineHistogram(name: string, options?: MetricOptions): Histogra
   return { record: (value, attrs) => get().record(value, attrs) };
 }
 
+/**
+ * gauge observable: `observe` se llama en cada export y devuelve las lecturas `[valor, atributos]`
+ * (p.ej. runs por estado con un GROUP BY). un fallo de la lectura deja ese export sin valores.
+ */
+export function defineGauge(name: string, options: MetricOptions, observe: () => ReadonlyArray<readonly [number, Attributes?]>): void {
+  const register = (m: Meter): void => {
+    m.createObservableGauge(name, options).addCallback((result) => {
+      try {
+        observe().forEach(([value, attrs]) => result.observe(value, attrs));
+      } catch {
+        // sin lectura este ciclo: el siguiente export lo reintenta
+      }
+    });
+  };
+  if (meter) register(meter);
+  else pendingGauges.push(register);
+}
+
 /** duración de cada request http servida (s): method, route, status. lo registra http-telemetry. */
 export const httpServerDuration = defineHistogram('http.server.request.duration', {
   unit: 's',
@@ -70,6 +90,7 @@ export const dbOperationDuration = defineHistogram('db.client.operation.duration
 /** activa los instrumentos sobre el meter del provider registrado y los gauges del runtime. lo llama initTelemetry. */
 export function createInstruments(real: Meter): void {
   meter = real;
+  pendingGauges.splice(0).forEach((register) => register(real));
   // lag del event loop: el síntoma directo de una query síncrona o un cálculo que bloquea
   const loop = monitorEventLoopDelay({ resolution: EVENT_LOOP_RESOLUTION_MS });
   loop.enable();

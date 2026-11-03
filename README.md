@@ -72,8 +72,18 @@ también en el de la api: tsup los deja externos). con eso, sin más código:
   destino (p.ej. el login oidc contra mier.info). query params sensibles redactados.
 - **logs**: `createLogger(scope)` y los `console.*` existentes (bridge: el `[scope]`
   manual pasa a ser el scope) salen con trace id; `LOG_LEVEL`, `LOG_FORMAT=json`.
-- **background**: los ticks de pollers/jobs se envuelven en
-  `withSpan(name, fn, { root: true })` para tener traza propia.
+- **trabajo de fondo**: `every(name, ms, fn)` programa un trabajo periódico (sin solapes, `align` al
+  reloj, `job.nextIn(ms)` para un reintento) y `runJob(name, fn)` ejecuta uno suelto (arranque,
+  diferidos). cada ejecución es la raíz de su traza y deja `job.duration` (`job.name`, `job.outcome`,
+  `labels` como el `provider` de un poller; `attrs` solo al span). un trabajo que captura sus errores
+  los marca con `job.fail(err)`. nombres de baja cardinalidad: `sweep media`, `poll jira`.
+- **mcp**: `traceMcpOperation({ method: 'tools/call', tool }, fn)` alrededor del handler de la llamada:
+  span `tools/call <tool>` (semconv mcp, `error.type` = `tool_error` si `isError`) y
+  `mcp.server.operation.duration`. hija de la request http o raíz por stdio.
+- **websockets**: `createWsHub({ name })` cuenta `websocket.connections` por hub.
+- **métricas de la app**: `defineCounter`, `defineUpDownCounter`, `defineHistogram` y `defineGauge`
+  (observable, se lee en cada export) se pueden definir al importar el módulo: se atan al meter real
+  tras `initTelemetry`.
 - **métricas** (cada 30s, página Metrics con promql): histogramas `http.server.request.duration`
   (method, route plantilla, status) y `db.client.operation.duration` (operación, tabla), y gauges
   `process.memory.usage`, `v8js.memory.heap.used`, `nodejs.eventloop.delay.p99`. p.ej.
