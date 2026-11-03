@@ -9,6 +9,8 @@
 // extensión de asset conocida) es 404: el chunk de un build anterior debe fallar rápido para
 // que sveltekit recargue, no cachearse como html bajo una url .js. la lista de extensiones es
 // cerrada a propósito: hay rutas con puntos en el parámetro (ids de usuario de spotify en sis).
+// source maps: el build los trae (hidden) para que la api simbolice los errores del cliente
+// (ver client-telemetry.ts), pero nunca se sirven: expondrían el fuente original.
 import { serveStatic } from '@hono/node-server/serve-static';
 import fs from 'fs';
 import path from 'path';
@@ -22,6 +24,10 @@ const CACHE_CONTROL = 'Cache-Control';
 const CACHE_IMMUTABLE = 'public, max-age=31536000, immutable';
 const CACHE_REVALIDATE = 'no-cache';
 const ASSET_EXT_RE = /\.(?:m?js|css|map|json|webmanifest|html|png|jpe?g|gif|svg|ico|webp|avif|woff2?|ttf|otf|txt|xml|wasm)$/i;
+const SOURCEMAP_EXT = '.map';
+
+/** build estático por defecto (./static relativo a cwd): lo comparten mountSpa y la ingesta de cliente. */
+export const DEFAULT_STATIC_DIR = path.resolve(process.cwd(), 'static');
 
 export interface MountSpaOptions {
   // directorio absoluto del build estático (default: ./static relativo a cwd)
@@ -32,7 +38,7 @@ export interface MountSpaOptions {
 
 export function mountSpa<E extends Env>(
   app: Hono<E>,
-  { staticDir = path.resolve(process.cwd(), 'static'), root = './static' }: MountSpaOptions = {},
+  { staticDir = DEFAULT_STATIC_DIR, root = './static' }: MountSpaOptions = {},
 ): void {
   // sin build estático (dev con vite aparte) no se monta nada
   if (!fs.existsSync(staticDir)) return;
@@ -42,6 +48,7 @@ export function mountSpa<E extends Env>(
   // sigue la cadena (notFound) y no devuelve una Response.
   const statics = serveStatic({ root });
   app.use('/*', async (c, next) => {
+    if (c.req.path.endsWith(SOURCEMAP_EXT)) return c.text('not found', 404);
     const found = await statics(c, next);
     if (!(found instanceof Response)) return;
     found.headers.set(CACHE_CONTROL, c.req.path.startsWith(IMMUTABLE_PREFIX) ? CACHE_IMMUTABLE : CACHE_REVALIDATE);

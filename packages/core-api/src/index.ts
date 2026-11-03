@@ -3,6 +3,7 @@ export { loadAppEnv } from './env.js';
 export { createPlatformApp, type PlatformAppOptions } from './create-app.js';
 export { TRACE_HEADER, DEFAULT_QUIET_PATHS, loggablePath } from './http-telemetry.js';
 export { sessionGate, type SessionGateOptions } from './session-gate.js';
-export { mountSpa, type MountSpaOptions } from './spa.js';
+export { mountSpa, DEFAULT_STATIC_DIR, type MountSpaOptions } from './spa.js';
+export { type ClientTelemetryOptions } from './client-telemetry.js';
 export { startApiServer, type StartServerOptions } from './server.js';
 export { createWsHub, type WsHub, type WsHubOptions, type WsConnection } from './ws-hub.js';

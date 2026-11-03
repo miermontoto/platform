@@ -15,7 +15,9 @@ packages/
               spans por query y log de queries lentas)
   observability/
               opentelemetry: trazas + logs estructurados, logger con scope,
-              bridge de console.*, fetch saliente con traceparent, withSpan
+              bridge de console.*, fetch saliente con traceparent, withSpan +
+              sdk de navegador (./browser: errores, web vitals, spans de cliente)
+              e ingesta de lo que manda, con stacks simbolizados
   auth/       tabla canónica de sesiones + servicio de ciclo de vida
   ui/         componentes svelte compartidos (SettingsTabs, SessionsPanel,
               PrivacyPolicy, Support, LanguageSwitcher) + http + i18n +
@@ -92,6 +94,52 @@ tooling/observability/obs.sh slow --kind http --min-ms 500
 tooling/observability/obs.sh queries --service sis
 tooling/observability/obs.sh trace <trace_id>
 ```
+
+### cliente (web y apps nativas)
+
+la web y las apps capacitor mandan sus errores, web vitals y spans a la api de la propia app
+(`POST /api/_client`, pre-auth, montada por `createPlatformApp`), que los valida y los mete en
+el mismo export como servicio `<app>-web`. el cliente nunca ve openobserve ni sus credenciales,
+y en la web es una petición al mismo origen (csp `'self'`). sin export la ruta da 404 y el
+cliente deja de enviar.
+
+- **trazas de punta a punta**: el sdk parchea `fetch` y manda `traceparent` a la api (solo a
+  ella), así que una navegación queda como `navigate /albums/[id]` → `GET /api/albums/:id`
+  (cliente) → span de servidor → queries. también la carga inicial (`pageload /ruta`).
+- **errores**: excepciones, promesas sin handler, chunks que no cargan y el `handleError` de
+  sveltekit, con la ruta plantilla y el trace id de la navegación en curso. salen en
+  `obs.sh errors` junto a los del servidor. los stacks se simbolizan al llegar con los source
+  maps `hidden` que el preset de vite deja en `static/` (`mountSpa` no los sirve); un frame de
+  otro build (pestaña vieja, app nativa) se queda minificado.
+- **web vitals**: lcp, inp, cls, fcp y ttfb con atribución (elemento, subpartes), por ruta de
+  aterrizaje: `obs.sh vitals --service <app>-web`.
+- **identidad**: `user.id` lo resuelve el servidor (`identify`), nunca el cliente; `session.id`
+  agrupa una carga de página, `service.version` es la del bundle y `app.platform` web|ios|android.
+
+```ts
+// api: app.ts
+const app = createPlatformApp<AppEnv>({
+  clientTelemetry: { identify: (c) => validate(getCookie(c, SESSION_COOKIE))?.userId },
+});
+
+// web: svelte.config.js → versión de la api en $app/environment
+import { appVersion } from '@platform/config/version';
+kit: { version: { name: appVersion() } }
+
+// web: src/hooks.client.ts
+import { version } from '$app/environment';
+import { captureError, initBrowserTelemetry } from '@platform/observability/browser';
+initBrowserTelemetry({ version, apiOrigin: import.meta.env.VITE_API_BASE }); // '' en la web
+export const handleError: HandleClientError = ({ error, status }) => {
+  if (status !== 404) captureError(error, { 'http.response.status_code': status });
+};
+
+// web: +layout.svelte raíz
+trackNavigations({ beforeNavigate, afterNavigate });
+```
+
+deps: la web declara `@platform/observability` y la api `@jridgewell/trace-mapping` (externo en
+tsup, como los `@opentelemetry/*`). los scripts `mobile:*` construyen sin source maps.
 
 ## backups
 

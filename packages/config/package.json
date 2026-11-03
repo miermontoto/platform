@@ -6,7 +6,8 @@
   "type": "module",
   "exports": {
     "./tsconfig.base.json": "./tsconfig.base.json",
-    "./vite": "./vite.js"
+    "./vite": "./vite.js",
+    "./version": "./version.js"
   },
   "peerDependencies": {
     "@inlang/paraglide-js": ">=2",

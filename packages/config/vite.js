@@ -2,6 +2,20 @@
 import { sveltekit } from '@sveltejs/kit/vite';
 import { defineConfig, loadEnv } from 'vite';
 
+// scripts de las apps que construyen la spa para empaquetarla en ios/android (mobile:build...)
+const MOBILE_SCRIPT_PREFIX = 'mobile:';
+
+/**
+ * source maps por defecto: `hidden` (sin comentario sourceMappingURL, el navegador no los pide)
+ * para que la api simbolice los stacks de error del cliente con el build que tiene en static/
+ * (mountSpa nunca los sirve). en los builds móviles no se generan: irían dentro del ipa/apk, y
+ * la api no los tiene (VITE_API_BASE cambia los hashes de los chunks), así que no sirven.
+ * pnpm expone el script en curso en npm_lifecycle_event, también en los anidados (mobile:apk
+ * llama a mobile:build) y en ci (ios-release.yml, android-release.yml usan esos scripts).
+ * @returns {'hidden' | false}
+ */
+const defaultSourcemap = () => (process.env.npm_lifecycle_event?.startsWith(MOBILE_SCRIPT_PREFIX) ? false : 'hidden');
+
 /**
  * construye las opciones de SvelteKitPWA con los defaults de la plataforma
  * (sw autoUpdate, display standalone, NetworkOnly para rutas de api).
@@ -75,6 +89,9 @@ export function createPwaOptions({
   return {
     ...base,
     workbox: {
+      // el sw generado no reporta errores a la telemetría: su map solo sería un 404 (mountSpa
+      // no sirve .map) referenciado desde sw.js
+      sourcemap: false,
       globPatterns: ['**/*.{js,css,html,png,svg,woff,woff2}'],
       navigateFallback: '200.html',
       navigateFallbackDenylist: networkOnly.map((p) => new RegExp(`^${p.replace(/\/$/, '')}/`)),
@@ -98,8 +115,10 @@ export function createPwaOptions({
  * @param {true | { project?: string, outdir?: string, strategy?: string[] }} [options.i18n]
  *        activa i18n con paraglide (inlang). true = defaults; objeto para override. la app
  *        debe tener `@inlang/paraglide-js` instalado + `project.inlang` + `messages/`.
+ * @param {boolean | 'hidden' | 'inline'} [options.sourcemap]  default: 'hidden', salvo en los
+ *        scripts mobile:* (false). ver defaultSourcemap.
  */
-export function createWebConfig({ pwa, proxy = ['/api', '/auth'], envDir, plugins: extraPlugins = [], i18n } = {}) {
+export function createWebConfig({ pwa, proxy = ['/api', '/auth'], envDir, plugins: extraPlugins = [], i18n, sourcemap = defaultSourcemap() } = {}) {
   return defineConfig(async ({ mode }) => {
     const env = loadEnv(mode, envDir ?? process.cwd() + '/../..', '');
     const apiUrl = `http://localhost:${env.PORT || 3000}`;
@@ -133,6 +152,7 @@ export function createWebConfig({ pwa, proxy = ['/api', '/auth'], envDir, plugin
 
     return {
       plugins,
+      build: { sourcemap },
       server: {
         host: '127.0.0.1',
         proxy: Object.fromEntries(proxy.map((p) => [p, apiUrl])),

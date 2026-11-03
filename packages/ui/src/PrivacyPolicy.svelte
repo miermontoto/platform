@@ -2,7 +2,8 @@
   // política de privacidad compartida por todas las herramientas de la plataforma.
   // el copy por defecto refleja lo que las apps tratan de verdad (ver @platform/auth
   // y @platform/mobile): cuenta + sesiones (token hasheado, fechas, user-agent) en
-  // sqlite local, sin analítica ni sdks de terceros. cada app la monta en /privacy
+  // sqlite local y diagnóstico técnico propio (@platform/observability: errores y rendimiento,
+  // 14 días en el backend), sin analítica ni sdks de terceros. cada app la monta en /privacy
   // pasando su nombre, contacto y, si usa login de terceros, su proveedor.
   //
   // bilingüe (es/en): sis va en inglés, duckhunt/carreterinas en español. para
@@ -79,12 +80,13 @@
           login,
           'Para mantener tu sesión iniciada guardamos un identificador de sesión (un token almacenado de forma hasheada), las fechas de inicio y caducidad de la sesión, y el identificador del navegador o dispositivo (user-agent). Esto te permite ver y cerrar tus sesiones activas desde los ajustes.',
           `Además tratamos los datos que generas al usar ${app}: el contenido y las acciones propias de la herramienta, necesarios para que funcione.`,
+          'Para detectar y corregir fallos, la web y las apps envían a nuestro propio servidor datos técnicos de diagnóstico: los errores que se producen, los tiempos de carga y de respuesta, la pantalla en la que ocurren, la versión de la app, el navegador o dispositivo y la dirección IP. Si has iniciado sesión, se asocian a tu cuenta.',
         ],
       },
       {
         title: 'Para qué los usamos',
         body: [
-          'Usamos estos datos exclusivamente para autenticarte, mantener tu sesión, prestarte el servicio y mantener su seguridad (por ejemplo, detectar accesos no autorizados). No los usamos para ninguna otra finalidad sin tu consentimiento.',
+          'Usamos estos datos exclusivamente para autenticarte, mantener tu sesión, prestarte el servicio, mantener su seguridad (por ejemplo, detectar accesos no autorizados) y diagnosticar y corregir sus fallos. No los usamos para ninguna otra finalidad sin tu consentimiento.',
           tracking,
         ],
       },
@@ -100,6 +102,7 @@
         body: [
           'Las sesiones caducan automáticamente y se eliminan al hacerlo o cuando cierras sesión. Los códigos temporales que se emiten durante el inicio de sesión en la app móvil viven solo unos segundos y se descartan tras un único uso.',
           'Los datos de tu cuenta se conservan mientras la mantengas activa. Si solicitas la baja, se eliminan salvo que debamos conservar algo por una obligación legal.',
+          'Los datos técnicos de diagnóstico se eliminan automáticamente a los 14 días.',
         ],
       },
       {
@@ -146,12 +149,13 @@
           login,
           'To keep you signed in we store a session identifier (a token kept in hashed form), the session start and expiry dates, and your browser or device identifier (user-agent). This lets you review and revoke your active sessions from settings.',
           `We also process the data you generate while using ${app}: the content and actions that are part of the tool itself, needed for it to work.`,
+          'To detect and fix problems, the web and mobile apps send technical diagnostic data to our own server: the errors that occur, load and response times, the screen where they happen, the app version, your browser or device and your IP address. If you are signed in, it is linked to your account.',
         ],
       },
       {
         title: 'How we use it',
         body: [
-          'We use this data solely to authenticate you, keep your session, provide the service and keep it secure (for example, detecting unauthorized access). We do not use it for any other purpose without your consent.',
+          'We use this data solely to authenticate you, keep your session, provide the service, keep it secure (for example, detecting unauthorized access) and diagnose and fix its problems. We do not use it for any other purpose without your consent.',
           tracking,
         ],
       },
@@ -167,6 +171,7 @@
         body: [
           'Sessions expire automatically and are deleted when they do, or when you log out. The temporary codes issued during sign-in on the mobile app live for only a few seconds and are discarded after a single use.',
           'Your account data is kept while your account stays active. If you ask to close it, the data is deleted unless we must retain something to meet a legal obligation.',
+          'Technical diagnostic data is deleted automatically after 14 days.',
         ],
       },
       {

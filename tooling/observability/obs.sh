@@ -14,6 +14,8 @@
 #   trace <trace_id>    árbol de spans de una traza (todos los servicios) + sus logs
 #   logs                logs filtrados por --level/--scope/--grep/--trace
 #   services            requests por servicio en la ventana: volumen, errores 5xx, p95
+#   vitals              web vitals del cliente (lcp, inp, cls, fcp, ttfb) por ruta de
+#                       aterrizaje: p75 y % de muestras poor (servicios <app>-web)
 #   sql "<sql>"         sql libre sobre el stream "default" (--type logs|traces).
 #                       "-" lee el sql de stdin. columnas: los atributos otel con los
 #                       puntos como guiones bajos (http.route → http_route); duration
@@ -25,11 +27,14 @@
 #   obs.sh queries --service sis --since 6h
 #   obs.sh trace 756325d7eadf18bfb9d4d44c4470042e
 #   obs.sh logs --service sis --scope poll --grep spotify --since 30m
+#   obs.sh errors --service duckhunt-web --since 1d    # errores de la web y las apps nativas
+#   obs.sh vitals --service sis-web --since 7d
 #   obs.sh sql --type traces 'SELECT http_route, count(*) AS n FROM "default" GROUP BY http_route ORDER BY n DESC'
 #
 # flags:
 #   --since DUR       ventana hacia atrás: 45s, 30m, 6h, 2d (default 1h; trace: 7d)
-#   --service NAME    filtra por service.name (sis, duckhunt, carreterinas, mier.info, fantasy)
+#   --service NAME    filtra por service.name (sis, duckhunt, carreterinas, mier.info, fantasy;
+#                     <app>-web = su cliente web/ios/android)
 #   --limit N         máximo de filas (default 50)
 #   --level LVL       logs: debug|info|warn|error
 #   --scope NAME      logs: scope del logger (el [scope] de la línea)
@@ -60,7 +65,7 @@ STREAM="default"
 ENV_FILE="$(dirname "$0")/.env"
 
 usage() {
-  sed -n '2,43p' "$0" | sed 's/^# \{0,1\}//'
+  sed -n '2,47p' "$0" | sed 's/^# \{0,1\}//'
   exit "${1:-0}"
 }
 
@@ -256,6 +261,12 @@ case "$COMMAND" in
       compact 'map({service: .service_name, requests, errors, p50_ms: (.p50 | ms), p95_ms: (.p95 | ms)})'
     ;;
 
+  vitals)
+    window 1d
+    search logs "SELECT web_vital_name, app_route, count(*) AS samples, approx_percentile_cont(web_vital_value, 0.75) AS p75, sum(CASE WHEN web_vital_rating = 'poor' THEN 1 ELSE 0 END) AS poor FROM \"$STREAM\" $(where "scope = 'web-vitals'") GROUP BY web_vital_name, app_route ORDER BY web_vital_name, samples DESC" |
+      compact 'map({metric: .web_vital_name, route: .app_route, samples, p75: (.p75 * 1000 | round / 1000), poor_pct: (.poor * 100 / .samples | round)})'
+    ;;
+
   sql)
     sql="${1:-}"
     [[ "$sql" == "-" ]] && sql=$(cat)
@@ -265,5 +276,5 @@ case "$COMMAND" in
     search "$TYPE" "$sql"
     ;;
 
-  *) die "comando desconocido: $COMMAND (errors|logs|slow|queries|trace|services|sql)" ;;
+  *) die "comando desconocido: $COMMAND (errors|logs|slow|queries|trace|services|vitals|sql)" ;;
 esac

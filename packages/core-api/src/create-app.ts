@@ -1,11 +1,12 @@
-// factoría del hono base de la plataforma: telemetría http (span + access log), cors en
-// /api/* y errores estructurados con trace id
+// factoría del hono base de la plataforma: ingesta de telemetría de cliente, telemetría http
+// (span + access log), cors en /api/* y errores estructurados con trace id
 import { Hono } from 'hono';
 import type { Env } from 'hono';
 import { cors } from 'hono/cors';
 import { HTTPException } from 'hono/http-exception';
 import { trace } from '@opentelemetry/api';
 import { createLogger, currentTraceId } from '@platform/observability';
+import { mountClientTelemetry, type ClientTelemetryOptions } from './client-telemetry.js';
 import { DEFAULT_QUIET_PATHS, TRACE_HEADER, httpTelemetry, loggablePath } from './http-telemetry.js';
 
 export interface PlatformAppOptions {
@@ -13,6 +14,9 @@ export interface PlatformAppOptions {
   configErrorPrefixes?: RegExp;
   // rutas sin span ni access log (default: assets estáticos de la spa y sondas de salud)
   quietPaths?: RegExp;
+  // errores, web vitals y spans de la web y las apps nativas (CLIENT_TELEMETRY_PATH). activa
+  // por defecto; `identify` le pone user.id desde la sesión. false la desmonta
+  clientTelemetry?: ClientTelemetryOptions | false;
 }
 
 const log = createLogger('api');
@@ -26,6 +30,8 @@ const ANY_ORIGIN = '*';
 export function createPlatformApp<E extends Env>(opts: PlatformAppOptions = {}): Hono<E> {
   const app = new Hono<E>();
 
+  // antes que todo lo demás: responde sin pasar por el span http, cors ni el gate de la app
+  if (opts.clientTelemetry !== false) mountClientTelemetry(app, opts.clientTelemetry);
   app.use('*', httpTelemetry(opts.quietPaths ?? DEFAULT_QUIET_PATHS));
   // x-trace-id expuesto a los clientes cross-origin (app nativa contra la api remota)
   app.use('/api/*', cors({ origin: ANY_ORIGIN, exposeHeaders: [TRACE_HEADER] }));
