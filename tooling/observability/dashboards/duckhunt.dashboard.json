@@ -1,1543 +1,2004 @@
 {
-  "version": 8,
-  "title": "duckhunt",
-  "description": "api (duckhunt) y su sqlite: trazas, logs y métricas de @platform/observability. el cliente está en la sección RUM nativa (servicio duckhunt-web) y las queries por fingerprint en Traces → Databases",
-  "tabs": [
+ "version": 8,
+ "title": "duckhunt",
+ "description": "api (duckhunt) y su sqlite: trazas, logs y métricas de @platform/observability. el cliente está en la sección RUM nativa (servicio duckhunt-web) y las queries por fingerprint en Traces → Databases",
+ "tabs": [
+  {
+   "tabId": "resumen",
+   "name": "Resumen",
+   "panels": [
     {
-      "tabId": "resumen",
-      "name": "Resumen",
-      "panels": [
-        {
-          "id": "r-req",
-          "type": "metric",
-          "title": "Requests",
-          "description": "Requests http atendidas por la api.",
-          "config": {
-            "show_legends": true,
-            "legends_position": "bottom",
-            "unit": "short",
-            "decimals": 0,
-            "axis_border_show": false,
-            "show_gridlines": true,
-            "connect_nulls": false,
-            "no_value_replacement": "0",
-            "table_pagination": true,
-            "table_pagination_rows_per_page": 15,
-            "table_filtering": true,
-            "drilldown": [],
-            "mark_line": [],
-            "override_config": []
-          },
-          "layout": {
-            "x": 0,
-            "y": 0,
-            "w": 48,
-            "h": 8,
-            "i": 1
-          },
-          "htmlContent": "",
-          "markdownContent": "",
-          "queryType": "sql",
-          "queries": [
-            {
-              "query": "SELECT count(*) AS value FROM \"default\" WHERE service_name = 'duckhunt' AND span_kind = '2'",
-              "vrlFunctionQuery": "",
-              "customQuery": true,
-              "fields": {
-                "stream": "default",
-                "stream_type": "traces",
-                "x": [],
-                "y": [
-                  {
-                    "label": "Requests",
-                    "alias": "value",
-                    "column": "value",
-                    "color": null,
-                    "aggregationFunction": null,
-                    "isDerived": false
-                  }
-                ],
-                "z": [],
-                "breakdown": [],
-                "filter": {
-                  "filterType": "group",
-                  "logicalOperator": "AND",
-                  "conditions": []
-                }
-              },
-              "config": {
-                "promql_legend": "",
-                "layer_type": "scatter",
-                "weight_fixed": 1
-              }
-            }
-          ]
-        },
-        {
-          "id": "r-5xx",
-          "type": "metric",
-          "title": "5xx",
-          "description": "Requests que acabaron en error de servidor.",
-          "config": {
-            "show_legends": true,
-            "legends_position": "bottom",
-            "unit": "short",
-            "decimals": 0,
-            "axis_border_show": false,
-            "show_gridlines": true,
-            "connect_nulls": false,
-            "no_value_replacement": "0",
-            "table_pagination": true,
-            "table_pagination_rows_per_page": 15,
-            "table_filtering": true,
-            "drilldown": [],
-            "mark_line": [],
-            "override_config": []
-          },
-          "layout": {
-            "x": 48,
-            "y": 0,
-            "w": 48,
-            "h": 8,
-            "i": 2
-          },
-          "htmlContent": "",
-          "markdownContent": "",
-          "queryType": "sql",
-          "queries": [
-            {
-              "query": "SELECT count(*) AS value FROM \"default\" WHERE service_name = 'duckhunt' AND span_kind = '2' AND span_status = 'ERROR'",
-              "vrlFunctionQuery": "",
-              "customQuery": true,
-              "fields": {
-                "stream": "default",
-                "stream_type": "traces",
-                "x": [],
-                "y": [
-                  {
-                    "label": "5xx",
-                    "alias": "value",
-                    "column": "value",
-                    "color": null,
-                    "aggregationFunction": null,
-                    "isDerived": false
-                  }
-                ],
-                "z": [],
-                "breakdown": [],
-                "filter": {
-                  "filterType": "group",
-                  "logicalOperator": "AND",
-                  "conditions": []
-                }
-              },
-              "config": {
-                "promql_legend": "",
-                "layer_type": "scatter",
-                "weight_fixed": 1
-              }
-            }
-          ]
-        },
-        {
-          "id": "r-p95",
-          "type": "metric",
-          "title": "p95 (ms)",
-          "description": "Percentil 95 de las requests (trazas).",
-          "config": {
-            "show_legends": true,
-            "legends_position": "bottom",
-            "unit": "ms",
-            "decimals": 0,
-            "axis_border_show": false,
-            "show_gridlines": true,
-            "connect_nulls": false,
-            "no_value_replacement": "0",
-            "table_pagination": true,
-            "table_pagination_rows_per_page": 15,
-            "table_filtering": true,
-            "drilldown": [],
-            "mark_line": [],
-            "override_config": []
-          },
-          "layout": {
-            "x": 96,
-            "y": 0,
-            "w": 48,
-            "h": 8,
-            "i": 3
-          },
-          "htmlContent": "",
-          "markdownContent": "",
-          "queryType": "sql",
-          "queries": [
-            {
-              "query": "SELECT approx_percentile_cont(duration, 0.95) / 1000 AS value FROM \"default\" WHERE service_name = 'duckhunt' AND span_kind = '2'",
-              "vrlFunctionQuery": "",
-              "customQuery": true,
-              "fields": {
-                "stream": "default",
-                "stream_type": "traces",
-                "x": [],
-                "y": [
-                  {
-                    "label": "ms",
-                    "alias": "value",
-                    "column": "value",
-                    "color": null,
-                    "aggregationFunction": null,
-                    "isDerived": false
-                  }
-                ],
-                "z": [],
-                "breakdown": [],
-                "filter": {
-                  "filterType": "group",
-                  "logicalOperator": "AND",
-                  "conditions": []
-                }
-              },
-              "config": {
-                "promql_legend": "",
-                "layer_type": "scatter",
-                "weight_fixed": 1
-              }
-            }
-          ]
-        },
-        {
-          "id": "r-err",
-          "type": "metric",
-          "title": "Logs de error",
-          "description": "Errores de la api (duckhunt) y del cliente (duckhunt-web).",
-          "config": {
-            "show_legends": true,
-            "legends_position": "bottom",
-            "unit": "short",
-            "decimals": 0,
-            "axis_border_show": false,
-            "show_gridlines": true,
-            "connect_nulls": false,
-            "no_value_replacement": "0",
-            "table_pagination": true,
-            "table_pagination_rows_per_page": 15,
-            "table_filtering": true,
-            "drilldown": [],
-            "mark_line": [],
-            "override_config": []
-          },
-          "layout": {
-            "x": 144,
-            "y": 0,
-            "w": 48,
-            "h": 8,
-            "i": 4
-          },
-          "htmlContent": "",
-          "markdownContent": "",
-          "queryType": "sql",
-          "queries": [
-            {
-              "query": "SELECT count(*) AS value FROM \"default\" WHERE service_name IN ('duckhunt', 'duckhunt-web') AND severity = 'ERROR'",
-              "vrlFunctionQuery": "",
-              "customQuery": true,
-              "fields": {
-                "stream": "default",
-                "stream_type": "logs",
-                "x": [],
-                "y": [
-                  {
-                    "label": "Errores",
-                    "alias": "value",
-                    "column": "value",
-                    "color": null,
-                    "aggregationFunction": null,
-                    "isDerived": false
-                  }
-                ],
-                "z": [],
-                "breakdown": [],
-                "filter": {
-                  "filterType": "group",
-                  "logicalOperator": "AND",
-                  "conditions": []
-                }
-              },
-              "config": {
-                "promql_legend": "",
-                "layer_type": "scatter",
-                "weight_fixed": 1
-              }
-            }
-          ]
-        },
-        {
-          "id": "r-rps",
-          "type": "line",
-          "title": "Requests/s",
-          "description": "Tráfico total y 5xx (métrica http.server.request.duration).",
-          "config": {
-            "show_legends": true,
-            "legends_position": "bottom",
-            "unit": "short",
-            "decimals": 2,
-            "axis_border_show": false,
-            "show_gridlines": true,
-            "connect_nulls": false,
-            "no_value_replacement": "0",
-            "table_pagination": true,
-            "table_pagination_rows_per_page": 15,
-            "table_filtering": true,
-            "drilldown": [],
-            "mark_line": [],
-            "override_config": []
-          },
-          "layout": {
-            "x": 0,
-            "y": 8,
-            "w": 96,
-            "h": 16,
-            "i": 5
-          },
-          "htmlContent": "",
-          "markdownContent": "",
-          "queryType": "promql",
-          "queries": [
-            {
-              "query": "sum(rate(http_server_request_duration_count{service_name=\"duckhunt\"}[5m]))",
-              "vrlFunctionQuery": "",
-              "customQuery": true,
-              "fields": {
-                "stream": "http_server_request_duration_count",
-                "stream_type": "metrics",
-                "x": [],
-                "y": [],
-                "z": [],
-                "breakdown": [],
-                "filter": {
-                  "filterType": "group",
-                  "logicalOperator": "AND",
-                  "conditions": []
-                }
-              },
-              "config": {
-                "promql_legend": "total",
-                "layer_type": "scatter",
-                "weight_fixed": 1
-              }
-            },
-            {
-              "query": "sum(rate(http_server_request_duration_count{service_name=\"duckhunt\",http_response_status_code=~\"5..\"}[5m]))",
-              "vrlFunctionQuery": "",
-              "customQuery": true,
-              "fields": {
-                "stream": "http_server_request_duration_count",
-                "stream_type": "metrics",
-                "x": [],
-                "y": [],
-                "z": [],
-                "breakdown": [],
-                "filter": {
-                  "filterType": "group",
-                  "logicalOperator": "AND",
-                  "conditions": []
-                }
-              },
-              "config": {
-                "promql_legend": "5xx",
-                "layer_type": "scatter",
-                "weight_fixed": 1
-              }
-            }
-          ]
-        },
-        {
-          "id": "r-lat",
-          "type": "line",
-          "title": "Latencia (s)",
-          "description": "Percentiles de duración de las requests.",
-          "config": {
-            "show_legends": true,
-            "legends_position": "bottom",
-            "unit": "seconds",
-            "decimals": 2,
-            "axis_border_show": false,
-            "show_gridlines": true,
-            "connect_nulls": false,
-            "no_value_replacement": "0",
-            "table_pagination": true,
-            "table_pagination_rows_per_page": 15,
-            "table_filtering": true,
-            "drilldown": [],
-            "mark_line": [],
-            "override_config": []
-          },
-          "layout": {
-            "x": 96,
-            "y": 8,
-            "w": 96,
-            "h": 16,
-            "i": 6
-          },
-          "htmlContent": "",
-          "markdownContent": "",
-          "queryType": "promql",
-          "queries": [
-            {
-              "query": "histogram_quantile(0.5, sum by (le) (rate(http_server_request_duration_bucket{service_name=\"duckhunt\"}[5m])))",
-              "vrlFunctionQuery": "",
-              "customQuery": true,
-              "fields": {
-                "stream": "http_server_request_duration_bucket",
-                "stream_type": "metrics",
-                "x": [],
-                "y": [],
-                "z": [],
-                "breakdown": [],
-                "filter": {
-                  "filterType": "group",
-                  "logicalOperator": "AND",
-                  "conditions": []
-                }
-              },
-              "config": {
-                "promql_legend": "p50",
-                "layer_type": "scatter",
-                "weight_fixed": 1
-              }
-            },
-            {
-              "query": "histogram_quantile(0.95, sum by (le) (rate(http_server_request_duration_bucket{service_name=\"duckhunt\"}[5m])))",
-              "vrlFunctionQuery": "",
-              "customQuery": true,
-              "fields": {
-                "stream": "http_server_request_duration_bucket",
-                "stream_type": "metrics",
-                "x": [],
-                "y": [],
-                "z": [],
-                "breakdown": [],
-                "filter": {
-                  "filterType": "group",
-                  "logicalOperator": "AND",
-                  "conditions": []
-                }
-              },
-              "config": {
-                "promql_legend": "p95",
-                "layer_type": "scatter",
-                "weight_fixed": 1
-              }
-            },
-            {
-              "query": "histogram_quantile(0.99, sum by (le) (rate(http_server_request_duration_bucket{service_name=\"duckhunt\"}[5m])))",
-              "vrlFunctionQuery": "",
-              "customQuery": true,
-              "fields": {
-                "stream": "http_server_request_duration_bucket",
-                "stream_type": "metrics",
-                "x": [],
-                "y": [],
-                "z": [],
-                "breakdown": [],
-                "filter": {
-                  "filterType": "group",
-                  "logicalOperator": "AND",
-                  "conditions": []
-                }
-              },
-              "config": {
-                "promql_legend": "p99",
-                "layer_type": "scatter",
-                "weight_fixed": 1
-              }
-            }
-          ]
-        },
-        {
-          "id": "r-mem",
-          "type": "line",
-          "title": "Memoria",
-          "description": "Memoria residente (rss) y heap de v8 en uso.",
-          "config": {
-            "show_legends": true,
-            "legends_position": "bottom",
-            "unit": "bytes",
-            "decimals": 2,
-            "axis_border_show": false,
-            "show_gridlines": true,
-            "connect_nulls": false,
-            "no_value_replacement": "0",
-            "table_pagination": true,
-            "table_pagination_rows_per_page": 15,
-            "table_filtering": true,
-            "drilldown": [],
-            "mark_line": [],
-            "override_config": []
-          },
-          "layout": {
-            "x": 0,
-            "y": 24,
-            "w": 96,
-            "h": 16,
-            "i": 7
-          },
-          "htmlContent": "",
-          "markdownContent": "",
-          "queryType": "promql",
-          "queries": [
-            {
-              "query": "max(process_memory_usage{service_name=\"duckhunt\"})",
-              "vrlFunctionQuery": "",
-              "customQuery": true,
-              "fields": {
-                "stream": "process_memory_usage",
-                "stream_type": "metrics",
-                "x": [],
-                "y": [],
-                "z": [],
-                "breakdown": [],
-                "filter": {
-                  "filterType": "group",
-                  "logicalOperator": "AND",
-                  "conditions": []
-                }
-              },
-              "config": {
-                "promql_legend": "rss",
-                "layer_type": "scatter",
-                "weight_fixed": 1
-              }
-            },
-            {
-              "query": "max(v8js_memory_heap_used{service_name=\"duckhunt\"})",
-              "vrlFunctionQuery": "",
-              "customQuery": true,
-              "fields": {
-                "stream": "v8js_memory_heap_used",
-                "stream_type": "metrics",
-                "x": [],
-                "y": [],
-                "z": [],
-                "breakdown": [],
-                "filter": {
-                  "filterType": "group",
-                  "logicalOperator": "AND",
-                  "conditions": []
-                }
-              },
-              "config": {
-                "promql_legend": "heap",
-                "layer_type": "scatter",
-                "weight_fixed": 1
-              }
-            }
-          ]
-        },
-        {
-          "id": "r-loop",
-          "type": "line",
-          "title": "Lag del event loop p99 (s)",
-          "description": "Si sube, algo síncrono (una query, un cálculo) bloquea el proceso.",
-          "config": {
-            "show_legends": true,
-            "legends_position": "bottom",
-            "unit": "seconds",
-            "decimals": 2,
-            "axis_border_show": false,
-            "show_gridlines": true,
-            "connect_nulls": false,
-            "no_value_replacement": "0",
-            "table_pagination": true,
-            "table_pagination_rows_per_page": 15,
-            "table_filtering": true,
-            "drilldown": [],
-            "mark_line": [],
-            "override_config": []
-          },
-          "layout": {
-            "x": 96,
-            "y": 24,
-            "w": 96,
-            "h": 16,
-            "i": 8
-          },
-          "htmlContent": "",
-          "markdownContent": "",
-          "queryType": "promql",
-          "queries": [
-            {
-              "query": "max(nodejs_eventloop_delay_p99{service_name=\"duckhunt\"})",
-              "vrlFunctionQuery": "",
-              "customQuery": true,
-              "fields": {
-                "stream": "nodejs_eventloop_delay_p99",
-                "stream_type": "metrics",
-                "x": [],
-                "y": [],
-                "z": [],
-                "breakdown": [],
-                "filter": {
-                  "filterType": "group",
-                  "logicalOperator": "AND",
-                  "conditions": []
-                }
-              },
-              "config": {
-                "promql_legend": "p99",
-                "layer_type": "scatter",
-                "weight_fixed": 1
-              }
-            }
-          ]
-        },
-        {
-          "id": "r-endpoints",
-          "type": "table",
-          "title": "Endpoints",
-          "description": "Por p95, con volumen y errores (trazas).",
-          "config": {
-            "show_legends": true,
-            "legends_position": "bottom",
-            "unit": "short",
-            "decimals": 2,
-            "axis_border_show": false,
-            "show_gridlines": true,
-            "connect_nulls": false,
-            "no_value_replacement": "0",
-            "table_pagination": true,
-            "table_pagination_rows_per_page": 15,
-            "table_filtering": true,
-            "drilldown": [],
-            "mark_line": [],
-            "override_config": []
-          },
-          "layout": {
-            "x": 0,
-            "y": 40,
-            "w": 96,
-            "h": 22,
-            "i": 9
-          },
-          "htmlContent": "",
-          "markdownContent": "",
-          "queryType": "sql",
-          "queries": [
-            {
-              "query": "SELECT http_route, count(*) AS requests, approx_percentile_cont(duration, 0.5) / 1000 AS p50_ms, approx_percentile_cont(duration, 0.95) / 1000 AS p95_ms, sum(CASE WHEN span_status = 'ERROR' THEN 1 ELSE 0 END) AS errores FROM \"default\" WHERE service_name = 'duckhunt' AND span_kind = '2' AND http_route IS NOT NULL GROUP BY http_route ORDER BY p95_ms DESC LIMIT 50",
-              "vrlFunctionQuery": "",
-              "customQuery": true,
-              "fields": {
-                "stream": "default",
-                "stream_type": "traces",
-                "x": [
-                  {
-                    "label": "Ruta",
-                    "alias": "http_route",
-                    "column": "http_route",
-                    "color": null,
-                    "aggregationFunction": null,
-                    "isDerived": false
-                  },
-                  {
-                    "label": "Requests",
-                    "alias": "requests",
-                    "column": "requests",
-                    "color": null,
-                    "aggregationFunction": null,
-                    "isDerived": false
-                  },
-                  {
-                    "label": "p50 ms",
-                    "alias": "p50_ms",
-                    "column": "p50_ms",
-                    "color": null,
-                    "aggregationFunction": null,
-                    "isDerived": false
-                  },
-                  {
-                    "label": "p95 ms",
-                    "alias": "p95_ms",
-                    "column": "p95_ms",
-                    "color": null,
-                    "aggregationFunction": null,
-                    "isDerived": false
-                  },
-                  {
-                    "label": "5xx",
-                    "alias": "errores",
-                    "column": "errores",
-                    "color": null,
-                    "aggregationFunction": null,
-                    "isDerived": false
-                  }
-                ],
-                "y": [],
-                "z": [],
-                "breakdown": [],
-                "filter": {
-                  "filterType": "group",
-                  "logicalOperator": "AND",
-                  "conditions": []
-                }
-              },
-              "config": {
-                "promql_legend": "",
-                "layer_type": "scatter",
-                "weight_fixed": 1
-              }
-            }
-          ]
-        },
-        {
-          "id": "r-recent",
-          "type": "table",
-          "title": "Últimos errores",
-          "description": "Copia el trace_id en Traces para ver la request entera.",
-          "config": {
-            "show_legends": true,
-            "legends_position": "bottom",
-            "unit": "short",
-            "decimals": 2,
-            "axis_border_show": false,
-            "show_gridlines": true,
-            "connect_nulls": false,
-            "no_value_replacement": "0",
-            "table_pagination": true,
-            "table_pagination_rows_per_page": 15,
-            "table_filtering": true,
-            "drilldown": [],
-            "mark_line": [],
-            "override_config": []
-          },
-          "layout": {
-            "x": 96,
-            "y": 40,
-            "w": 96,
-            "h": 22,
-            "i": 10
-          },
-          "htmlContent": "",
-          "markdownContent": "",
-          "queryType": "sql",
-          "queries": [
-            {
-              "query": "SELECT _timestamp, service_name, scope, body, trace_id FROM \"default\" WHERE service_name IN ('duckhunt', 'duckhunt-web') AND severity = 'ERROR' ORDER BY _timestamp DESC LIMIT 50",
-              "vrlFunctionQuery": "",
-              "customQuery": true,
-              "fields": {
-                "stream": "default",
-                "stream_type": "logs",
-                "x": [
-                  {
-                    "label": "Hora",
-                    "alias": "_timestamp",
-                    "column": "_timestamp",
-                    "color": null,
-                    "aggregationFunction": null,
-                    "isDerived": false
-                  },
-                  {
-                    "label": "Servicio",
-                    "alias": "service_name",
-                    "column": "service_name",
-                    "color": null,
-                    "aggregationFunction": null,
-                    "isDerived": false
-                  },
-                  {
-                    "label": "Scope",
-                    "alias": "scope",
-                    "column": "scope",
-                    "color": null,
-                    "aggregationFunction": null,
-                    "isDerived": false
-                  },
-                  {
-                    "label": "Mensaje",
-                    "alias": "body",
-                    "column": "body",
-                    "color": null,
-                    "aggregationFunction": null,
-                    "isDerived": false
-                  },
-                  {
-                    "label": "Trace",
-                    "alias": "trace_id",
-                    "column": "trace_id",
-                    "color": null,
-                    "aggregationFunction": null,
-                    "isDerived": false
-                  }
-                ],
-                "y": [],
-                "z": [],
-                "breakdown": [],
-                "filter": {
-                  "filterType": "group",
-                  "logicalOperator": "AND",
-                  "conditions": []
-                }
-              },
-              "config": {
-                "promql_legend": "",
-                "layer_type": "scatter",
-                "weight_fixed": 1
-              }
-            }
-          ]
+     "id": "r-req",
+     "type": "metric",
+     "title": "Requests",
+     "description": "Requests http atendidas por la api.",
+     "config": {
+      "show_legends": true,
+      "legends_position": "bottom",
+      "unit": "short",
+      "decimals": 0,
+      "axis_border_show": false,
+      "show_gridlines": true,
+      "connect_nulls": false,
+      "no_value_replacement": "0",
+      "table_pagination": true,
+      "table_pagination_rows_per_page": 15,
+      "table_filtering": true,
+      "drilldown": [],
+      "mark_line": [],
+      "override_config": []
+     },
+     "layout": {
+      "x": 0,
+      "y": 0,
+      "w": 48,
+      "h": 8,
+      "i": 1
+     },
+     "htmlContent": "",
+     "markdownContent": "",
+     "queryType": "sql",
+     "queries": [
+      {
+       "query": "SELECT count(*) AS value FROM \"default\" WHERE service_name = 'duckhunt' AND span_kind = '2'",
+       "vrlFunctionQuery": "",
+       "customQuery": true,
+       "fields": {
+        "stream": "default",
+        "stream_type": "traces",
+        "x": [],
+        "y": [
+         {
+          "label": "Requests",
+          "alias": "value",
+          "column": "value",
+          "color": null,
+          "aggregationFunction": null,
+          "isDerived": false
+         }
+        ],
+        "z": [],
+        "breakdown": [],
+        "filter": {
+         "filterType": "group",
+         "logicalOperator": "AND",
+         "conditions": []
         }
-      ]
+       },
+       "config": {
+        "promql_legend": "",
+        "layer_type": "scatter",
+        "weight_fixed": 1
+       }
+      }
+     ]
     },
     {
-      "tabId": "db",
-      "name": "Base de datos",
-      "panels": [
-        {
-          "id": "d-qps",
-          "type": "metric",
-          "title": "Queries/s",
-          "description": "Sentencias sqlite por segundo (5m).",
-          "config": {
-            "show_legends": true,
-            "legends_position": "bottom",
-            "unit": "short",
-            "decimals": 0,
-            "axis_border_show": false,
-            "show_gridlines": true,
-            "connect_nulls": false,
-            "no_value_replacement": "0",
-            "table_pagination": true,
-            "table_pagination_rows_per_page": 15,
-            "table_filtering": true,
-            "drilldown": [],
-            "mark_line": [],
-            "override_config": []
-          },
-          "layout": {
-            "x": 0,
-            "y": 0,
-            "w": 48,
-            "h": 8,
-            "i": 1
-          },
-          "htmlContent": "",
-          "markdownContent": "",
-          "queryType": "promql",
-          "queries": [
-            {
-              "query": "sum(rate(db_client_operation_duration_count{service_name=\"duckhunt\"}[5m]))",
-              "vrlFunctionQuery": "",
-              "customQuery": true,
-              "fields": {
-                "stream": "db_client_operation_duration_count",
-                "stream_type": "metrics",
-                "x": [],
-                "y": [],
-                "z": [],
-                "breakdown": [],
-                "filter": {
-                  "filterType": "group",
-                  "logicalOperator": "AND",
-                  "conditions": []
-                }
-              },
-              "config": {
-                "promql_legend": "q/s",
-                "layer_type": "scatter",
-                "weight_fixed": 1
-              }
-            }
-          ]
-        },
-        {
-          "id": "d-p95",
-          "type": "metric",
-          "title": "p95 query (s)",
-          "description": "Percentil 95 de las sentencias (5m).",
-          "config": {
-            "show_legends": true,
-            "legends_position": "bottom",
-            "unit": "seconds",
-            "decimals": 0,
-            "axis_border_show": false,
-            "show_gridlines": true,
-            "connect_nulls": false,
-            "no_value_replacement": "0",
-            "table_pagination": true,
-            "table_pagination_rows_per_page": 15,
-            "table_filtering": true,
-            "drilldown": [],
-            "mark_line": [],
-            "override_config": []
-          },
-          "layout": {
-            "x": 48,
-            "y": 0,
-            "w": 48,
-            "h": 8,
-            "i": 2
-          },
-          "htmlContent": "",
-          "markdownContent": "",
-          "queryType": "promql",
-          "queries": [
-            {
-              "query": "histogram_quantile(0.95, sum by (le) (rate(db_client_operation_duration_bucket{service_name=\"duckhunt\"}[5m])))",
-              "vrlFunctionQuery": "",
-              "customQuery": true,
-              "fields": {
-                "stream": "db_client_operation_duration_bucket",
-                "stream_type": "metrics",
-                "x": [],
-                "y": [],
-                "z": [],
-                "breakdown": [],
-                "filter": {
-                  "filterType": "group",
-                  "logicalOperator": "AND",
-                  "conditions": []
-                }
-              },
-              "config": {
-                "promql_legend": "p95",
-                "layer_type": "scatter",
-                "weight_fixed": 1
-              }
-            }
-          ]
-        },
-        {
-          "id": "d-err",
-          "type": "metric",
-          "title": "Errores de sqlite",
-          "description": "Sentencias fallidas (incluye busy/locked: escrituras que no consiguen el lock).",
-          "config": {
-            "show_legends": true,
-            "legends_position": "bottom",
-            "unit": "short",
-            "decimals": 0,
-            "axis_border_show": false,
-            "show_gridlines": true,
-            "connect_nulls": false,
-            "no_value_replacement": "0",
-            "table_pagination": true,
-            "table_pagination_rows_per_page": 15,
-            "table_filtering": true,
-            "drilldown": [],
-            "mark_line": [],
-            "override_config": []
-          },
-          "layout": {
-            "x": 96,
-            "y": 0,
-            "w": 48,
-            "h": 8,
-            "i": 3
-          },
-          "htmlContent": "",
-          "markdownContent": "",
-          "queryType": "sql",
-          "queries": [
-            {
-              "query": "SELECT count(*) AS value FROM \"default\" WHERE service_name = 'duckhunt' AND db_system_name = 'sqlite' AND span_status = 'ERROR'",
-              "vrlFunctionQuery": "",
-              "customQuery": true,
-              "fields": {
-                "stream": "default",
-                "stream_type": "traces",
-                "x": [],
-                "y": [
-                  {
-                    "label": "Errores",
-                    "alias": "value",
-                    "column": "value",
-                    "color": null,
-                    "aggregationFunction": null,
-                    "isDerived": false
-                  }
-                ],
-                "z": [],
-                "breakdown": [],
-                "filter": {
-                  "filterType": "group",
-                  "logicalOperator": "AND",
-                  "conditions": []
-                }
-              },
-              "config": {
-                "promql_legend": "",
-                "layer_type": "scatter",
-                "weight_fixed": 1
-              }
-            }
-          ]
-        },
-        {
-          "id": "d-slow",
-          "type": "metric",
-          "title": "Queries lentas",
-          "description": "Sentencias por encima de DB_SLOW_QUERY_MS (100 por defecto).",
-          "config": {
-            "show_legends": true,
-            "legends_position": "bottom",
-            "unit": "short",
-            "decimals": 0,
-            "axis_border_show": false,
-            "show_gridlines": true,
-            "connect_nulls": false,
-            "no_value_replacement": "0",
-            "table_pagination": true,
-            "table_pagination_rows_per_page": 15,
-            "table_filtering": true,
-            "drilldown": [],
-            "mark_line": [],
-            "override_config": []
-          },
-          "layout": {
-            "x": 144,
-            "y": 0,
-            "w": 48,
-            "h": 8,
-            "i": 4
-          },
-          "htmlContent": "",
-          "markdownContent": "",
-          "queryType": "sql",
-          "queries": [
-            {
-              "query": "SELECT count(*) AS value FROM \"default\" WHERE service_name = 'duckhunt' AND scope = 'db' AND body LIKE 'query lenta%'",
-              "vrlFunctionQuery": "",
-              "customQuery": true,
-              "fields": {
-                "stream": "default",
-                "stream_type": "logs",
-                "x": [],
-                "y": [
-                  {
-                    "label": "Lentas",
-                    "alias": "value",
-                    "column": "value",
-                    "color": null,
-                    "aggregationFunction": null,
-                    "isDerived": false
-                  }
-                ],
-                "z": [],
-                "breakdown": [],
-                "filter": {
-                  "filterType": "group",
-                  "logicalOperator": "AND",
-                  "conditions": []
-                }
-              },
-              "config": {
-                "promql_legend": "",
-                "layer_type": "scatter",
-                "weight_fixed": 1
-              }
-            }
-          ]
-        },
-        {
-          "id": "d-ops",
-          "type": "line",
-          "title": "Queries/s por operación",
-          "description": "SELECT, INSERT, UPDATE...",
-          "config": {
-            "show_legends": true,
-            "legends_position": "bottom",
-            "unit": "short",
-            "decimals": 2,
-            "axis_border_show": false,
-            "show_gridlines": true,
-            "connect_nulls": false,
-            "no_value_replacement": "0",
-            "table_pagination": true,
-            "table_pagination_rows_per_page": 15,
-            "table_filtering": true,
-            "drilldown": [],
-            "mark_line": [],
-            "override_config": []
-          },
-          "layout": {
-            "x": 0,
-            "y": 8,
-            "w": 96,
-            "h": 16,
-            "i": 5
-          },
-          "htmlContent": "",
-          "markdownContent": "",
-          "queryType": "promql",
-          "queries": [
-            {
-              "query": "sum by (db_operation_name) (rate(db_client_operation_duration_count{service_name=\"duckhunt\"}[5m]))",
-              "vrlFunctionQuery": "",
-              "customQuery": true,
-              "fields": {
-                "stream": "db_client_operation_duration_count",
-                "stream_type": "metrics",
-                "x": [],
-                "y": [],
-                "z": [],
-                "breakdown": [],
-                "filter": {
-                  "filterType": "group",
-                  "logicalOperator": "AND",
-                  "conditions": []
-                }
-              },
-              "config": {
-                "promql_legend": "{db_operation_name}",
-                "layer_type": "scatter",
-                "weight_fixed": 1
-              }
-            }
-          ]
-        },
-        {
-          "id": "d-tables",
-          "type": "line",
-          "title": "p95 por tabla (s)",
-          "description": "Qué tablas tardan más.",
-          "config": {
-            "show_legends": true,
-            "legends_position": "bottom",
-            "unit": "seconds",
-            "decimals": 2,
-            "axis_border_show": false,
-            "show_gridlines": true,
-            "connect_nulls": false,
-            "no_value_replacement": "0",
-            "table_pagination": true,
-            "table_pagination_rows_per_page": 15,
-            "table_filtering": true,
-            "drilldown": [],
-            "mark_line": [],
-            "override_config": []
-          },
-          "layout": {
-            "x": 96,
-            "y": 8,
-            "w": 96,
-            "h": 16,
-            "i": 6
-          },
-          "htmlContent": "",
-          "markdownContent": "",
-          "queryType": "promql",
-          "queries": [
-            {
-              "query": "histogram_quantile(0.95, sum by (le, db_collection_name) (rate(db_client_operation_duration_bucket{service_name=\"duckhunt\"}[5m])))",
-              "vrlFunctionQuery": "",
-              "customQuery": true,
-              "fields": {
-                "stream": "db_client_operation_duration_bucket",
-                "stream_type": "metrics",
-                "x": [],
-                "y": [],
-                "z": [],
-                "breakdown": [],
-                "filter": {
-                  "filterType": "group",
-                  "logicalOperator": "AND",
-                  "conditions": []
-                }
-              },
-              "config": {
-                "promql_legend": "{db_collection_name}",
-                "layer_type": "scatter",
-                "weight_fixed": 1
-              }
-            }
-          ]
-        },
-        {
-          "id": "d-total",
-          "type": "table",
-          "title": "SQL por tiempo total",
-          "description": "Hotspots: sentencias (con ?) por tiempo acumulado (las que corren dentro de una traza).",
-          "config": {
-            "show_legends": true,
-            "legends_position": "bottom",
-            "unit": "short",
-            "decimals": 2,
-            "axis_border_show": false,
-            "show_gridlines": true,
-            "connect_nulls": false,
-            "no_value_replacement": "0",
-            "table_pagination": true,
-            "table_pagination_rows_per_page": 15,
-            "table_filtering": true,
-            "drilldown": [],
-            "mark_line": [],
-            "override_config": []
-          },
-          "layout": {
-            "x": 0,
-            "y": 24,
-            "w": 96,
-            "h": 22,
-            "i": 7
-          },
-          "htmlContent": "",
-          "markdownContent": "",
-          "queryType": "sql",
-          "queries": [
-            {
-              "query": "SELECT db_query_text, count(*) AS llamadas, sum(duration) / 1000 AS total_ms, avg(duration) / 1000 AS media_ms, max(duration) / 1000 AS max_ms FROM \"default\" WHERE service_name = 'duckhunt' AND db_system_name = 'sqlite' GROUP BY db_query_text ORDER BY total_ms DESC LIMIT 30",
-              "vrlFunctionQuery": "",
-              "customQuery": true,
-              "fields": {
-                "stream": "default",
-                "stream_type": "traces",
-                "x": [
-                  {
-                    "label": "SQL",
-                    "alias": "db_query_text",
-                    "column": "db_query_text",
-                    "color": null,
-                    "aggregationFunction": null,
-                    "isDerived": false
-                  },
-                  {
-                    "label": "Llamadas",
-                    "alias": "llamadas",
-                    "column": "llamadas",
-                    "color": null,
-                    "aggregationFunction": null,
-                    "isDerived": false
-                  },
-                  {
-                    "label": "Total ms",
-                    "alias": "total_ms",
-                    "column": "total_ms",
-                    "color": null,
-                    "aggregationFunction": null,
-                    "isDerived": false
-                  },
-                  {
-                    "label": "Media ms",
-                    "alias": "media_ms",
-                    "column": "media_ms",
-                    "color": null,
-                    "aggregationFunction": null,
-                    "isDerived": false
-                  },
-                  {
-                    "label": "Máx ms",
-                    "alias": "max_ms",
-                    "column": "max_ms",
-                    "color": null,
-                    "aggregationFunction": null,
-                    "isDerived": false
-                  }
-                ],
-                "y": [],
-                "z": [],
-                "breakdown": [],
-                "filter": {
-                  "filterType": "group",
-                  "logicalOperator": "AND",
-                  "conditions": []
-                }
-              },
-              "config": {
-                "promql_legend": "",
-                "layer_type": "scatter",
-                "weight_fixed": 1
-              }
-            }
-          ]
-        },
-        {
-          "id": "d-n1",
-          "type": "table",
-          "title": "Sospechosas de n+1",
-          "description": "Sentencias que se repiten muchas veces dentro de una misma traza.",
-          "config": {
-            "show_legends": true,
-            "legends_position": "bottom",
-            "unit": "short",
-            "decimals": 2,
-            "axis_border_show": false,
-            "show_gridlines": true,
-            "connect_nulls": false,
-            "no_value_replacement": "0",
-            "table_pagination": true,
-            "table_pagination_rows_per_page": 15,
-            "table_filtering": true,
-            "drilldown": [],
-            "mark_line": [],
-            "override_config": []
-          },
-          "layout": {
-            "x": 96,
-            "y": 24,
-            "w": 96,
-            "h": 22,
-            "i": 8
-          },
-          "htmlContent": "",
-          "markdownContent": "",
-          "queryType": "sql",
-          "queries": [
-            {
-              "query": "SELECT db_query_text, count(*) AS llamadas, count(DISTINCT trace_id) AS trazas, count(*) / count(DISTINCT trace_id) AS por_traza FROM \"default\" WHERE service_name = 'duckhunt' AND db_system_name = 'sqlite' GROUP BY db_query_text HAVING count(*) / count(DISTINCT trace_id) >= 5 ORDER BY por_traza DESC LIMIT 30",
-              "vrlFunctionQuery": "",
-              "customQuery": true,
-              "fields": {
-                "stream": "default",
-                "stream_type": "traces",
-                "x": [
-                  {
-                    "label": "SQL",
-                    "alias": "db_query_text",
-                    "column": "db_query_text",
-                    "color": null,
-                    "aggregationFunction": null,
-                    "isDerived": false
-                  },
-                  {
-                    "label": "Llamadas",
-                    "alias": "llamadas",
-                    "column": "llamadas",
-                    "color": null,
-                    "aggregationFunction": null,
-                    "isDerived": false
-                  },
-                  {
-                    "label": "Trazas",
-                    "alias": "trazas",
-                    "column": "trazas",
-                    "color": null,
-                    "aggregationFunction": null,
-                    "isDerived": false
-                  },
-                  {
-                    "label": "Por traza",
-                    "alias": "por_traza",
-                    "column": "por_traza",
-                    "color": null,
-                    "aggregationFunction": null,
-                    "isDerived": false
-                  }
-                ],
-                "y": [],
-                "z": [],
-                "breakdown": [],
-                "filter": {
-                  "filterType": "group",
-                  "logicalOperator": "AND",
-                  "conditions": []
-                }
-              },
-              "config": {
-                "promql_legend": "",
-                "layer_type": "scatter",
-                "weight_fixed": 1
-              }
-            }
-          ]
-        },
-        {
-          "id": "d-slowlog",
-          "type": "table",
-          "title": "Queries lentas",
-          "description": "Log [db] query lenta: también las de fuera de una traza (pollers, arranque).",
-          "config": {
-            "show_legends": true,
-            "legends_position": "bottom",
-            "unit": "short",
-            "decimals": 2,
-            "axis_border_show": false,
-            "show_gridlines": true,
-            "connect_nulls": false,
-            "no_value_replacement": "0",
-            "table_pagination": true,
-            "table_pagination_rows_per_page": 15,
-            "table_filtering": true,
-            "drilldown": [],
-            "mark_line": [],
-            "override_config": []
-          },
-          "layout": {
-            "x": 0,
-            "y": 46,
-            "w": 96,
-            "h": 20,
-            "i": 9
-          },
-          "htmlContent": "",
-          "markdownContent": "",
-          "queryType": "sql",
-          "queries": [
-            {
-              "query": "SELECT _timestamp, duration_ms, db_query_text, trace_id FROM \"default\" WHERE service_name = 'duckhunt' AND scope = 'db' AND body LIKE 'query lenta%' ORDER BY _timestamp DESC LIMIT 50",
-              "vrlFunctionQuery": "",
-              "customQuery": true,
-              "fields": {
-                "stream": "default",
-                "stream_type": "logs",
-                "x": [
-                  {
-                    "label": "Hora",
-                    "alias": "_timestamp",
-                    "column": "_timestamp",
-                    "color": null,
-                    "aggregationFunction": null,
-                    "isDerived": false
-                  },
-                  {
-                    "label": "ms",
-                    "alias": "duration_ms",
-                    "column": "duration_ms",
-                    "color": null,
-                    "aggregationFunction": null,
-                    "isDerived": false
-                  },
-                  {
-                    "label": "SQL",
-                    "alias": "db_query_text",
-                    "column": "db_query_text",
-                    "color": null,
-                    "aggregationFunction": null,
-                    "isDerived": false
-                  },
-                  {
-                    "label": "Trace",
-                    "alias": "trace_id",
-                    "column": "trace_id",
-                    "color": null,
-                    "aggregationFunction": null,
-                    "isDerived": false
-                  }
-                ],
-                "y": [],
-                "z": [],
-                "breakdown": [],
-                "filter": {
-                  "filterType": "group",
-                  "logicalOperator": "AND",
-                  "conditions": []
-                }
-              },
-              "config": {
-                "promql_legend": "",
-                "layer_type": "scatter",
-                "weight_fixed": 1
-              }
-            }
-          ]
-        },
-        {
-          "id": "d-errors",
-          "type": "table",
-          "title": "Errores de sqlite",
-          "description": "Con su mensaje (SQLITE_BUSY / database is locked = contención de escritura).",
-          "config": {
-            "show_legends": true,
-            "legends_position": "bottom",
-            "unit": "short",
-            "decimals": 2,
-            "axis_border_show": false,
-            "show_gridlines": true,
-            "connect_nulls": false,
-            "no_value_replacement": "0",
-            "table_pagination": true,
-            "table_pagination_rows_per_page": 15,
-            "table_filtering": true,
-            "drilldown": [],
-            "mark_line": [],
-            "override_config": []
-          },
-          "layout": {
-            "x": 96,
-            "y": 46,
-            "w": 96,
-            "h": 20,
-            "i": 10
-          },
-          "htmlContent": "",
-          "markdownContent": "",
-          "queryType": "sql",
-          "queries": [
-            {
-              "query": "SELECT _timestamp, operation_name, status_message, db_query_text, trace_id FROM \"default\" WHERE service_name = 'duckhunt' AND db_system_name = 'sqlite' AND span_status = 'ERROR' ORDER BY _timestamp DESC LIMIT 50",
-              "vrlFunctionQuery": "",
-              "customQuery": true,
-              "fields": {
-                "stream": "default",
-                "stream_type": "traces",
-                "x": [
-                  {
-                    "label": "Hora",
-                    "alias": "_timestamp",
-                    "column": "_timestamp",
-                    "color": null,
-                    "aggregationFunction": null,
-                    "isDerived": false
-                  },
-                  {
-                    "label": "Sentencia",
-                    "alias": "operation_name",
-                    "column": "operation_name",
-                    "color": null,
-                    "aggregationFunction": null,
-                    "isDerived": false
-                  },
-                  {
-                    "label": "Error",
-                    "alias": "status_message",
-                    "column": "status_message",
-                    "color": null,
-                    "aggregationFunction": null,
-                    "isDerived": false
-                  },
-                  {
-                    "label": "SQL",
-                    "alias": "db_query_text",
-                    "column": "db_query_text",
-                    "color": null,
-                    "aggregationFunction": null,
-                    "isDerived": false
-                  },
-                  {
-                    "label": "Trace",
-                    "alias": "trace_id",
-                    "column": "trace_id",
-                    "color": null,
-                    "aggregationFunction": null,
-                    "isDerived": false
-                  }
-                ],
-                "y": [],
-                "z": [],
-                "breakdown": [],
-                "filter": {
-                  "filterType": "group",
-                  "logicalOperator": "AND",
-                  "conditions": []
-                }
-              },
-              "config": {
-                "promql_legend": "",
-                "layer_type": "scatter",
-                "weight_fixed": 1
-              }
-            }
-          ]
+     "id": "r-5xx",
+     "type": "metric",
+     "title": "5xx",
+     "description": "Requests que acabaron en error de servidor.",
+     "config": {
+      "show_legends": true,
+      "legends_position": "bottom",
+      "unit": "short",
+      "decimals": 0,
+      "axis_border_show": false,
+      "show_gridlines": true,
+      "connect_nulls": false,
+      "no_value_replacement": "0",
+      "table_pagination": true,
+      "table_pagination_rows_per_page": 15,
+      "table_filtering": true,
+      "drilldown": [],
+      "mark_line": [],
+      "override_config": []
+     },
+     "layout": {
+      "x": 48,
+      "y": 0,
+      "w": 48,
+      "h": 8,
+      "i": 2
+     },
+     "htmlContent": "",
+     "markdownContent": "",
+     "queryType": "sql",
+     "queries": [
+      {
+       "query": "SELECT count(*) AS value FROM \"default\" WHERE service_name = 'duckhunt' AND span_kind = '2' AND span_status = 'ERROR'",
+       "vrlFunctionQuery": "",
+       "customQuery": true,
+       "fields": {
+        "stream": "default",
+        "stream_type": "traces",
+        "x": [],
+        "y": [
+         {
+          "label": "5xx",
+          "alias": "value",
+          "column": "value",
+          "color": null,
+          "aggregationFunction": null,
+          "isDerived": false
+         }
+        ],
+        "z": [],
+        "breakdown": [],
+        "filter": {
+         "filterType": "group",
+         "logicalOperator": "AND",
+         "conditions": []
         }
-      ]
+       },
+       "config": {
+        "promql_legend": "",
+        "layer_type": "scatter",
+        "weight_fixed": 1
+       }
+      }
+     ]
+    },
+    {
+     "id": "r-p95",
+     "type": "metric",
+     "title": "p95 (ms)",
+     "description": "Percentil 95 de las requests (trazas).",
+     "config": {
+      "show_legends": true,
+      "legends_position": "bottom",
+      "unit": "ms",
+      "decimals": 0,
+      "axis_border_show": false,
+      "show_gridlines": true,
+      "connect_nulls": false,
+      "no_value_replacement": "0",
+      "table_pagination": true,
+      "table_pagination_rows_per_page": 15,
+      "table_filtering": true,
+      "drilldown": [],
+      "mark_line": [],
+      "override_config": []
+     },
+     "layout": {
+      "x": 96,
+      "y": 0,
+      "w": 48,
+      "h": 8,
+      "i": 3
+     },
+     "htmlContent": "",
+     "markdownContent": "",
+     "queryType": "sql",
+     "queries": [
+      {
+       "query": "SELECT approx_percentile_cont(duration, 0.95) / 1000 AS value FROM \"default\" WHERE service_name = 'duckhunt' AND span_kind = '2'",
+       "vrlFunctionQuery": "",
+       "customQuery": true,
+       "fields": {
+        "stream": "default",
+        "stream_type": "traces",
+        "x": [],
+        "y": [
+         {
+          "label": "ms",
+          "alias": "value",
+          "column": "value",
+          "color": null,
+          "aggregationFunction": null,
+          "isDerived": false
+         }
+        ],
+        "z": [],
+        "breakdown": [],
+        "filter": {
+         "filterType": "group",
+         "logicalOperator": "AND",
+         "conditions": []
+        }
+       },
+       "config": {
+        "promql_legend": "",
+        "layer_type": "scatter",
+        "weight_fixed": 1
+       }
+      }
+     ]
+    },
+    {
+     "id": "r-err",
+     "type": "metric",
+     "title": "Logs de error",
+     "description": "Errores de la api (duckhunt) y del cliente (duckhunt-web).",
+     "config": {
+      "show_legends": true,
+      "legends_position": "bottom",
+      "unit": "short",
+      "decimals": 0,
+      "axis_border_show": false,
+      "show_gridlines": true,
+      "connect_nulls": false,
+      "no_value_replacement": "0",
+      "table_pagination": true,
+      "table_pagination_rows_per_page": 15,
+      "table_filtering": true,
+      "drilldown": [],
+      "mark_line": [],
+      "override_config": []
+     },
+     "layout": {
+      "x": 144,
+      "y": 0,
+      "w": 48,
+      "h": 8,
+      "i": 4
+     },
+     "htmlContent": "",
+     "markdownContent": "",
+     "queryType": "sql",
+     "queries": [
+      {
+       "query": "SELECT count(*) AS value FROM \"default\" WHERE service_name IN ('duckhunt', 'duckhunt-web') AND severity = 'ERROR'",
+       "vrlFunctionQuery": "",
+       "customQuery": true,
+       "fields": {
+        "stream": "default",
+        "stream_type": "logs",
+        "x": [],
+        "y": [
+         {
+          "label": "Errores",
+          "alias": "value",
+          "column": "value",
+          "color": null,
+          "aggregationFunction": null,
+          "isDerived": false
+         }
+        ],
+        "z": [],
+        "breakdown": [],
+        "filter": {
+         "filterType": "group",
+         "logicalOperator": "AND",
+         "conditions": []
+        }
+       },
+       "config": {
+        "promql_legend": "",
+        "layer_type": "scatter",
+        "weight_fixed": 1
+       }
+      }
+     ]
+    },
+    {
+     "id": "r-rps",
+     "type": "line",
+     "title": "Requests/s",
+     "description": "Tráfico total y 5xx (métrica http.server.request.duration).",
+     "config": {
+      "show_legends": true,
+      "legends_position": "bottom",
+      "unit": "short",
+      "decimals": 2,
+      "axis_border_show": false,
+      "show_gridlines": true,
+      "connect_nulls": false,
+      "no_value_replacement": "0",
+      "table_pagination": true,
+      "table_pagination_rows_per_page": 15,
+      "table_filtering": true,
+      "drilldown": [],
+      "mark_line": [],
+      "override_config": []
+     },
+     "layout": {
+      "x": 0,
+      "y": 8,
+      "w": 96,
+      "h": 16,
+      "i": 5
+     },
+     "htmlContent": "",
+     "markdownContent": "",
+     "queryType": "promql",
+     "queries": [
+      {
+       "query": "sum(rate(http_server_request_duration_count{service_name=\"duckhunt\"}[5m]))",
+       "vrlFunctionQuery": "",
+       "customQuery": true,
+       "fields": {
+        "stream": "http_server_request_duration_count",
+        "stream_type": "metrics",
+        "x": [],
+        "y": [],
+        "z": [],
+        "breakdown": [],
+        "filter": {
+         "filterType": "group",
+         "logicalOperator": "AND",
+         "conditions": []
+        }
+       },
+       "config": {
+        "promql_legend": "total",
+        "layer_type": "scatter",
+        "weight_fixed": 1
+       }
+      },
+      {
+       "query": "sum(rate(http_server_request_duration_count{service_name=\"duckhunt\",http_response_status_code=~\"5..\"}[5m]))",
+       "vrlFunctionQuery": "",
+       "customQuery": true,
+       "fields": {
+        "stream": "http_server_request_duration_count",
+        "stream_type": "metrics",
+        "x": [],
+        "y": [],
+        "z": [],
+        "breakdown": [],
+        "filter": {
+         "filterType": "group",
+         "logicalOperator": "AND",
+         "conditions": []
+        }
+       },
+       "config": {
+        "promql_legend": "5xx",
+        "layer_type": "scatter",
+        "weight_fixed": 1
+       }
+      }
+     ]
+    },
+    {
+     "id": "r-lat",
+     "type": "line",
+     "title": "Latencia (s)",
+     "description": "Percentiles de duración de las requests.",
+     "config": {
+      "show_legends": true,
+      "legends_position": "bottom",
+      "unit": "seconds",
+      "decimals": 2,
+      "axis_border_show": false,
+      "show_gridlines": true,
+      "connect_nulls": false,
+      "no_value_replacement": "0",
+      "table_pagination": true,
+      "table_pagination_rows_per_page": 15,
+      "table_filtering": true,
+      "drilldown": [],
+      "mark_line": [],
+      "override_config": []
+     },
+     "layout": {
+      "x": 96,
+      "y": 8,
+      "w": 96,
+      "h": 16,
+      "i": 6
+     },
+     "htmlContent": "",
+     "markdownContent": "",
+     "queryType": "promql",
+     "queries": [
+      {
+       "query": "histogram_quantile(0.5, sum by (le) (rate(http_server_request_duration_bucket{service_name=\"duckhunt\"}[5m])))",
+       "vrlFunctionQuery": "",
+       "customQuery": true,
+       "fields": {
+        "stream": "http_server_request_duration_bucket",
+        "stream_type": "metrics",
+        "x": [],
+        "y": [],
+        "z": [],
+        "breakdown": [],
+        "filter": {
+         "filterType": "group",
+         "logicalOperator": "AND",
+         "conditions": []
+        }
+       },
+       "config": {
+        "promql_legend": "p50",
+        "layer_type": "scatter",
+        "weight_fixed": 1
+       }
+      },
+      {
+       "query": "histogram_quantile(0.95, sum by (le) (rate(http_server_request_duration_bucket{service_name=\"duckhunt\"}[5m])))",
+       "vrlFunctionQuery": "",
+       "customQuery": true,
+       "fields": {
+        "stream": "http_server_request_duration_bucket",
+        "stream_type": "metrics",
+        "x": [],
+        "y": [],
+        "z": [],
+        "breakdown": [],
+        "filter": {
+         "filterType": "group",
+         "logicalOperator": "AND",
+         "conditions": []
+        }
+       },
+       "config": {
+        "promql_legend": "p95",
+        "layer_type": "scatter",
+        "weight_fixed": 1
+       }
+      },
+      {
+       "query": "histogram_quantile(0.99, sum by (le) (rate(http_server_request_duration_bucket{service_name=\"duckhunt\"}[5m])))",
+       "vrlFunctionQuery": "",
+       "customQuery": true,
+       "fields": {
+        "stream": "http_server_request_duration_bucket",
+        "stream_type": "metrics",
+        "x": [],
+        "y": [],
+        "z": [],
+        "breakdown": [],
+        "filter": {
+         "filterType": "group",
+         "logicalOperator": "AND",
+         "conditions": []
+        }
+       },
+       "config": {
+        "promql_legend": "p99",
+        "layer_type": "scatter",
+        "weight_fixed": 1
+       }
+      }
+     ]
+    },
+    {
+     "id": "r-mem",
+     "type": "line",
+     "title": "Memoria",
+     "description": "Memoria residente (rss) y heap de v8 en uso.",
+     "config": {
+      "show_legends": true,
+      "legends_position": "bottom",
+      "unit": "bytes",
+      "decimals": 2,
+      "axis_border_show": false,
+      "show_gridlines": true,
+      "connect_nulls": false,
+      "no_value_replacement": "0",
+      "table_pagination": true,
+      "table_pagination_rows_per_page": 15,
+      "table_filtering": true,
+      "drilldown": [],
+      "mark_line": [],
+      "override_config": []
+     },
+     "layout": {
+      "x": 0,
+      "y": 24,
+      "w": 96,
+      "h": 16,
+      "i": 7
+     },
+     "htmlContent": "",
+     "markdownContent": "",
+     "queryType": "promql",
+     "queries": [
+      {
+       "query": "max(process_memory_usage{service_name=\"duckhunt\"})",
+       "vrlFunctionQuery": "",
+       "customQuery": true,
+       "fields": {
+        "stream": "process_memory_usage",
+        "stream_type": "metrics",
+        "x": [],
+        "y": [],
+        "z": [],
+        "breakdown": [],
+        "filter": {
+         "filterType": "group",
+         "logicalOperator": "AND",
+         "conditions": []
+        }
+       },
+       "config": {
+        "promql_legend": "rss",
+        "layer_type": "scatter",
+        "weight_fixed": 1
+       }
+      },
+      {
+       "query": "max(v8js_memory_heap_used{service_name=\"duckhunt\"})",
+       "vrlFunctionQuery": "",
+       "customQuery": true,
+       "fields": {
+        "stream": "v8js_memory_heap_used",
+        "stream_type": "metrics",
+        "x": [],
+        "y": [],
+        "z": [],
+        "breakdown": [],
+        "filter": {
+         "filterType": "group",
+         "logicalOperator": "AND",
+         "conditions": []
+        }
+       },
+       "config": {
+        "promql_legend": "heap",
+        "layer_type": "scatter",
+        "weight_fixed": 1
+       }
+      }
+     ]
+    },
+    {
+     "id": "r-loop",
+     "type": "line",
+     "title": "Lag del event loop p99 (s)",
+     "description": "Si sube, algo síncrono (una query, un cálculo) bloquea el proceso.",
+     "config": {
+      "show_legends": true,
+      "legends_position": "bottom",
+      "unit": "seconds",
+      "decimals": 2,
+      "axis_border_show": false,
+      "show_gridlines": true,
+      "connect_nulls": false,
+      "no_value_replacement": "0",
+      "table_pagination": true,
+      "table_pagination_rows_per_page": 15,
+      "table_filtering": true,
+      "drilldown": [],
+      "mark_line": [],
+      "override_config": []
+     },
+     "layout": {
+      "x": 96,
+      "y": 24,
+      "w": 96,
+      "h": 16,
+      "i": 8
+     },
+     "htmlContent": "",
+     "markdownContent": "",
+     "queryType": "promql",
+     "queries": [
+      {
+       "query": "max(nodejs_eventloop_delay_p99{service_name=\"duckhunt\"})",
+       "vrlFunctionQuery": "",
+       "customQuery": true,
+       "fields": {
+        "stream": "nodejs_eventloop_delay_p99",
+        "stream_type": "metrics",
+        "x": [],
+        "y": [],
+        "z": [],
+        "breakdown": [],
+        "filter": {
+         "filterType": "group",
+         "logicalOperator": "AND",
+         "conditions": []
+        }
+       },
+       "config": {
+        "promql_legend": "p99",
+        "layer_type": "scatter",
+        "weight_fixed": 1
+       }
+      }
+     ]
+    },
+    {
+     "id": "r-endpoints",
+     "type": "table",
+     "title": "Endpoints",
+     "description": "Por p95, con volumen y errores (trazas).",
+     "config": {
+      "show_legends": true,
+      "legends_position": "bottom",
+      "unit": "short",
+      "decimals": 2,
+      "axis_border_show": false,
+      "show_gridlines": true,
+      "connect_nulls": false,
+      "no_value_replacement": "0",
+      "table_pagination": true,
+      "table_pagination_rows_per_page": 15,
+      "table_filtering": true,
+      "drilldown": [],
+      "mark_line": [],
+      "override_config": []
+     },
+     "layout": {
+      "x": 0,
+      "y": 40,
+      "w": 96,
+      "h": 22,
+      "i": 9
+     },
+     "htmlContent": "",
+     "markdownContent": "",
+     "queryType": "sql",
+     "queries": [
+      {
+       "query": "SELECT http_route, count(*) AS requests, approx_percentile_cont(duration, 0.5) / 1000 AS p50_ms, approx_percentile_cont(duration, 0.95) / 1000 AS p95_ms, sum(CASE WHEN span_status = 'ERROR' THEN 1 ELSE 0 END) AS errores FROM \"default\" WHERE service_name = 'duckhunt' AND span_kind = '2' AND http_route IS NOT NULL GROUP BY http_route ORDER BY p95_ms DESC LIMIT 50",
+       "vrlFunctionQuery": "",
+       "customQuery": true,
+       "fields": {
+        "stream": "default",
+        "stream_type": "traces",
+        "x": [
+         {
+          "label": "Ruta",
+          "alias": "http_route",
+          "column": "http_route",
+          "color": null,
+          "aggregationFunction": null,
+          "isDerived": false
+         },
+         {
+          "label": "Requests",
+          "alias": "requests",
+          "column": "requests",
+          "color": null,
+          "aggregationFunction": null,
+          "isDerived": false
+         },
+         {
+          "label": "p50 ms",
+          "alias": "p50_ms",
+          "column": "p50_ms",
+          "color": null,
+          "aggregationFunction": null,
+          "isDerived": false
+         },
+         {
+          "label": "p95 ms",
+          "alias": "p95_ms",
+          "column": "p95_ms",
+          "color": null,
+          "aggregationFunction": null,
+          "isDerived": false
+         },
+         {
+          "label": "5xx",
+          "alias": "errores",
+          "column": "errores",
+          "color": null,
+          "aggregationFunction": null,
+          "isDerived": false
+         }
+        ],
+        "y": [],
+        "z": [],
+        "breakdown": [],
+        "filter": {
+         "filterType": "group",
+         "logicalOperator": "AND",
+         "conditions": []
+        }
+       },
+       "config": {
+        "promql_legend": "",
+        "layer_type": "scatter",
+        "weight_fixed": 1
+       }
+      }
+     ]
+    },
+    {
+     "id": "r-recent",
+     "type": "table",
+     "title": "Últimos errores",
+     "description": "Copia el trace_id en Traces para ver la request entera.",
+     "config": {
+      "show_legends": true,
+      "legends_position": "bottom",
+      "unit": "short",
+      "decimals": 2,
+      "axis_border_show": false,
+      "show_gridlines": true,
+      "connect_nulls": false,
+      "no_value_replacement": "0",
+      "table_pagination": true,
+      "table_pagination_rows_per_page": 15,
+      "table_filtering": true,
+      "drilldown": [],
+      "mark_line": [],
+      "override_config": []
+     },
+     "layout": {
+      "x": 96,
+      "y": 40,
+      "w": 96,
+      "h": 22,
+      "i": 10
+     },
+     "htmlContent": "",
+     "markdownContent": "",
+     "queryType": "sql",
+     "queries": [
+      {
+       "query": "SELECT _timestamp, service_name, scope, body, trace_id FROM \"default\" WHERE service_name IN ('duckhunt', 'duckhunt-web') AND severity = 'ERROR' ORDER BY _timestamp DESC LIMIT 50",
+       "vrlFunctionQuery": "",
+       "customQuery": true,
+       "fields": {
+        "stream": "default",
+        "stream_type": "logs",
+        "x": [
+         {
+          "label": "Hora",
+          "alias": "_timestamp",
+          "column": "_timestamp",
+          "color": null,
+          "aggregationFunction": null,
+          "isDerived": false
+         },
+         {
+          "label": "Servicio",
+          "alias": "service_name",
+          "column": "service_name",
+          "color": null,
+          "aggregationFunction": null,
+          "isDerived": false
+         },
+         {
+          "label": "Scope",
+          "alias": "scope",
+          "column": "scope",
+          "color": null,
+          "aggregationFunction": null,
+          "isDerived": false
+         },
+         {
+          "label": "Mensaje",
+          "alias": "body",
+          "column": "body",
+          "color": null,
+          "aggregationFunction": null,
+          "isDerived": false
+         },
+         {
+          "label": "Trace",
+          "alias": "trace_id",
+          "column": "trace_id",
+          "color": null,
+          "aggregationFunction": null,
+          "isDerived": false
+         }
+        ],
+        "y": [],
+        "z": [],
+        "breakdown": [],
+        "filter": {
+         "filterType": "group",
+         "logicalOperator": "AND",
+         "conditions": []
+        }
+       },
+       "config": {
+        "promql_legend": "",
+        "layer_type": "scatter",
+        "weight_fixed": 1
+       }
+      }
+     ]
     }
-  ],
-  "variables": {
-    "list": [],
-    "showDynamicFilters": true
+   ]
   },
-  "defaultDatetimeDuration": {
-    "type": "relative",
-    "relativeTimePeriod": "6h"
+  {
+   "tabId": "db",
+   "name": "Base de datos",
+   "panels": [
+    {
+     "id": "d-qps",
+     "type": "metric",
+     "title": "Queries/s",
+     "description": "Sentencias sqlite por segundo (5m).",
+     "config": {
+      "show_legends": true,
+      "legends_position": "bottom",
+      "unit": "short",
+      "decimals": 0,
+      "axis_border_show": false,
+      "show_gridlines": true,
+      "connect_nulls": false,
+      "no_value_replacement": "0",
+      "table_pagination": true,
+      "table_pagination_rows_per_page": 15,
+      "table_filtering": true,
+      "drilldown": [],
+      "mark_line": [],
+      "override_config": []
+     },
+     "layout": {
+      "x": 0,
+      "y": 0,
+      "w": 48,
+      "h": 8,
+      "i": 1
+     },
+     "htmlContent": "",
+     "markdownContent": "",
+     "queryType": "promql",
+     "queries": [
+      {
+       "query": "sum(rate(db_client_operation_duration_count{service_name=\"duckhunt\"}[5m]))",
+       "vrlFunctionQuery": "",
+       "customQuery": true,
+       "fields": {
+        "stream": "db_client_operation_duration_count",
+        "stream_type": "metrics",
+        "x": [],
+        "y": [],
+        "z": [],
+        "breakdown": [],
+        "filter": {
+         "filterType": "group",
+         "logicalOperator": "AND",
+         "conditions": []
+        }
+       },
+       "config": {
+        "promql_legend": "q/s",
+        "layer_type": "scatter",
+        "weight_fixed": 1
+       }
+      }
+     ]
+    },
+    {
+     "id": "d-p95",
+     "type": "metric",
+     "title": "p95 query (s)",
+     "description": "Percentil 95 de las sentencias (5m).",
+     "config": {
+      "show_legends": true,
+      "legends_position": "bottom",
+      "unit": "seconds",
+      "decimals": 0,
+      "axis_border_show": false,
+      "show_gridlines": true,
+      "connect_nulls": false,
+      "no_value_replacement": "0",
+      "table_pagination": true,
+      "table_pagination_rows_per_page": 15,
+      "table_filtering": true,
+      "drilldown": [],
+      "mark_line": [],
+      "override_config": []
+     },
+     "layout": {
+      "x": 48,
+      "y": 0,
+      "w": 48,
+      "h": 8,
+      "i": 2
+     },
+     "htmlContent": "",
+     "markdownContent": "",
+     "queryType": "promql",
+     "queries": [
+      {
+       "query": "histogram_quantile(0.95, sum by (le) (rate(db_client_operation_duration_bucket{service_name=\"duckhunt\"}[5m])))",
+       "vrlFunctionQuery": "",
+       "customQuery": true,
+       "fields": {
+        "stream": "db_client_operation_duration_bucket",
+        "stream_type": "metrics",
+        "x": [],
+        "y": [],
+        "z": [],
+        "breakdown": [],
+        "filter": {
+         "filterType": "group",
+         "logicalOperator": "AND",
+         "conditions": []
+        }
+       },
+       "config": {
+        "promql_legend": "p95",
+        "layer_type": "scatter",
+        "weight_fixed": 1
+       }
+      }
+     ]
+    },
+    {
+     "id": "d-err",
+     "type": "metric",
+     "title": "Errores de sqlite",
+     "description": "Sentencias fallidas (incluye busy/locked: escrituras que no consiguen el lock).",
+     "config": {
+      "show_legends": true,
+      "legends_position": "bottom",
+      "unit": "short",
+      "decimals": 0,
+      "axis_border_show": false,
+      "show_gridlines": true,
+      "connect_nulls": false,
+      "no_value_replacement": "0",
+      "table_pagination": true,
+      "table_pagination_rows_per_page": 15,
+      "table_filtering": true,
+      "drilldown": [],
+      "mark_line": [],
+      "override_config": []
+     },
+     "layout": {
+      "x": 96,
+      "y": 0,
+      "w": 48,
+      "h": 8,
+      "i": 3
+     },
+     "htmlContent": "",
+     "markdownContent": "",
+     "queryType": "sql",
+     "queries": [
+      {
+       "query": "SELECT count(*) AS value FROM \"default\" WHERE service_name = 'duckhunt' AND db_system_name = 'sqlite' AND span_status = 'ERROR'",
+       "vrlFunctionQuery": "",
+       "customQuery": true,
+       "fields": {
+        "stream": "default",
+        "stream_type": "traces",
+        "x": [],
+        "y": [
+         {
+          "label": "Errores",
+          "alias": "value",
+          "column": "value",
+          "color": null,
+          "aggregationFunction": null,
+          "isDerived": false
+         }
+        ],
+        "z": [],
+        "breakdown": [],
+        "filter": {
+         "filterType": "group",
+         "logicalOperator": "AND",
+         "conditions": []
+        }
+       },
+       "config": {
+        "promql_legend": "",
+        "layer_type": "scatter",
+        "weight_fixed": 1
+       }
+      }
+     ]
+    },
+    {
+     "id": "d-slow",
+     "type": "metric",
+     "title": "Queries lentas",
+     "description": "Sentencias por encima de DB_SLOW_QUERY_MS (100 por defecto).",
+     "config": {
+      "show_legends": true,
+      "legends_position": "bottom",
+      "unit": "short",
+      "decimals": 0,
+      "axis_border_show": false,
+      "show_gridlines": true,
+      "connect_nulls": false,
+      "no_value_replacement": "0",
+      "table_pagination": true,
+      "table_pagination_rows_per_page": 15,
+      "table_filtering": true,
+      "drilldown": [],
+      "mark_line": [],
+      "override_config": []
+     },
+     "layout": {
+      "x": 144,
+      "y": 0,
+      "w": 48,
+      "h": 8,
+      "i": 4
+     },
+     "htmlContent": "",
+     "markdownContent": "",
+     "queryType": "sql",
+     "queries": [
+      {
+       "query": "SELECT count(*) AS value FROM \"default\" WHERE service_name = 'duckhunt' AND scope = 'db' AND body LIKE 'query lenta%'",
+       "vrlFunctionQuery": "",
+       "customQuery": true,
+       "fields": {
+        "stream": "default",
+        "stream_type": "logs",
+        "x": [],
+        "y": [
+         {
+          "label": "Lentas",
+          "alias": "value",
+          "column": "value",
+          "color": null,
+          "aggregationFunction": null,
+          "isDerived": false
+         }
+        ],
+        "z": [],
+        "breakdown": [],
+        "filter": {
+         "filterType": "group",
+         "logicalOperator": "AND",
+         "conditions": []
+        }
+       },
+       "config": {
+        "promql_legend": "",
+        "layer_type": "scatter",
+        "weight_fixed": 1
+       }
+      }
+     ]
+    },
+    {
+     "id": "d-ops",
+     "type": "line",
+     "title": "Queries/s por operación",
+     "description": "SELECT, INSERT, UPDATE...",
+     "config": {
+      "show_legends": true,
+      "legends_position": "bottom",
+      "unit": "short",
+      "decimals": 2,
+      "axis_border_show": false,
+      "show_gridlines": true,
+      "connect_nulls": false,
+      "no_value_replacement": "0",
+      "table_pagination": true,
+      "table_pagination_rows_per_page": 15,
+      "table_filtering": true,
+      "drilldown": [],
+      "mark_line": [],
+      "override_config": []
+     },
+     "layout": {
+      "x": 0,
+      "y": 8,
+      "w": 96,
+      "h": 16,
+      "i": 5
+     },
+     "htmlContent": "",
+     "markdownContent": "",
+     "queryType": "promql",
+     "queries": [
+      {
+       "query": "sum by (db_operation_name) (rate(db_client_operation_duration_count{service_name=\"duckhunt\"}[5m]))",
+       "vrlFunctionQuery": "",
+       "customQuery": true,
+       "fields": {
+        "stream": "db_client_operation_duration_count",
+        "stream_type": "metrics",
+        "x": [],
+        "y": [],
+        "z": [],
+        "breakdown": [],
+        "filter": {
+         "filterType": "group",
+         "logicalOperator": "AND",
+         "conditions": []
+        }
+       },
+       "config": {
+        "promql_legend": "{db_operation_name}",
+        "layer_type": "scatter",
+        "weight_fixed": 1
+       }
+      }
+     ]
+    },
+    {
+     "id": "d-tables",
+     "type": "line",
+     "title": "p95 por tabla (s)",
+     "description": "Qué tablas tardan más.",
+     "config": {
+      "show_legends": true,
+      "legends_position": "bottom",
+      "unit": "seconds",
+      "decimals": 2,
+      "axis_border_show": false,
+      "show_gridlines": true,
+      "connect_nulls": false,
+      "no_value_replacement": "0",
+      "table_pagination": true,
+      "table_pagination_rows_per_page": 15,
+      "table_filtering": true,
+      "drilldown": [],
+      "mark_line": [],
+      "override_config": []
+     },
+     "layout": {
+      "x": 96,
+      "y": 8,
+      "w": 96,
+      "h": 16,
+      "i": 6
+     },
+     "htmlContent": "",
+     "markdownContent": "",
+     "queryType": "promql",
+     "queries": [
+      {
+       "query": "histogram_quantile(0.95, sum by (le, db_collection_name) (rate(db_client_operation_duration_bucket{service_name=\"duckhunt\"}[5m])))",
+       "vrlFunctionQuery": "",
+       "customQuery": true,
+       "fields": {
+        "stream": "db_client_operation_duration_bucket",
+        "stream_type": "metrics",
+        "x": [],
+        "y": [],
+        "z": [],
+        "breakdown": [],
+        "filter": {
+         "filterType": "group",
+         "logicalOperator": "AND",
+         "conditions": []
+        }
+       },
+       "config": {
+        "promql_legend": "{db_collection_name}",
+        "layer_type": "scatter",
+        "weight_fixed": 1
+       }
+      }
+     ]
+    },
+    {
+     "id": "d-total",
+     "type": "table",
+     "title": "SQL por tiempo total",
+     "description": "Hotspots: sentencias (con ?) por tiempo acumulado (las que corren dentro de una traza).",
+     "config": {
+      "show_legends": true,
+      "legends_position": "bottom",
+      "unit": "short",
+      "decimals": 2,
+      "axis_border_show": false,
+      "show_gridlines": true,
+      "connect_nulls": false,
+      "no_value_replacement": "0",
+      "table_pagination": true,
+      "table_pagination_rows_per_page": 15,
+      "table_filtering": true,
+      "drilldown": [],
+      "mark_line": [],
+      "override_config": []
+     },
+     "layout": {
+      "x": 0,
+      "y": 24,
+      "w": 96,
+      "h": 22,
+      "i": 7
+     },
+     "htmlContent": "",
+     "markdownContent": "",
+     "queryType": "sql",
+     "queries": [
+      {
+       "query": "SELECT db_query_text, count(*) AS llamadas, sum(duration) / 1000 AS total_ms, avg(duration) / 1000 AS media_ms, max(duration) / 1000 AS max_ms FROM \"default\" WHERE service_name = 'duckhunt' AND db_system_name = 'sqlite' GROUP BY db_query_text ORDER BY total_ms DESC LIMIT 30",
+       "vrlFunctionQuery": "",
+       "customQuery": true,
+       "fields": {
+        "stream": "default",
+        "stream_type": "traces",
+        "x": [
+         {
+          "label": "SQL",
+          "alias": "db_query_text",
+          "column": "db_query_text",
+          "color": null,
+          "aggregationFunction": null,
+          "isDerived": false
+         },
+         {
+          "label": "Llamadas",
+          "alias": "llamadas",
+          "column": "llamadas",
+          "color": null,
+          "aggregationFunction": null,
+          "isDerived": false
+         },
+         {
+          "label": "Total ms",
+          "alias": "total_ms",
+          "column": "total_ms",
+          "color": null,
+          "aggregationFunction": null,
+          "isDerived": false
+         },
+         {
+          "label": "Media ms",
+          "alias": "media_ms",
+          "column": "media_ms",
+          "color": null,
+          "aggregationFunction": null,
+          "isDerived": false
+         },
+         {
+          "label": "Máx ms",
+          "alias": "max_ms",
+          "column": "max_ms",
+          "color": null,
+          "aggregationFunction": null,
+          "isDerived": false
+         }
+        ],
+        "y": [],
+        "z": [],
+        "breakdown": [],
+        "filter": {
+         "filterType": "group",
+         "logicalOperator": "AND",
+         "conditions": []
+        }
+       },
+       "config": {
+        "promql_legend": "",
+        "layer_type": "scatter",
+        "weight_fixed": 1
+       }
+      }
+     ]
+    },
+    {
+     "id": "d-n1",
+     "type": "table",
+     "title": "Sospechosas de n+1",
+     "description": "Sentencias que se repiten muchas veces dentro de una misma traza.",
+     "config": {
+      "show_legends": true,
+      "legends_position": "bottom",
+      "unit": "short",
+      "decimals": 2,
+      "axis_border_show": false,
+      "show_gridlines": true,
+      "connect_nulls": false,
+      "no_value_replacement": "0",
+      "table_pagination": true,
+      "table_pagination_rows_per_page": 15,
+      "table_filtering": true,
+      "drilldown": [],
+      "mark_line": [],
+      "override_config": []
+     },
+     "layout": {
+      "x": 96,
+      "y": 24,
+      "w": 96,
+      "h": 22,
+      "i": 8
+     },
+     "htmlContent": "",
+     "markdownContent": "",
+     "queryType": "sql",
+     "queries": [
+      {
+       "query": "SELECT db_query_text, count(*) AS llamadas, count(DISTINCT trace_id) AS trazas, count(*) / count(DISTINCT trace_id) AS por_traza FROM \"default\" WHERE service_name = 'duckhunt' AND db_system_name = 'sqlite' GROUP BY db_query_text HAVING count(*) / count(DISTINCT trace_id) >= 5 ORDER BY por_traza DESC LIMIT 30",
+       "vrlFunctionQuery": "",
+       "customQuery": true,
+       "fields": {
+        "stream": "default",
+        "stream_type": "traces",
+        "x": [
+         {
+          "label": "SQL",
+          "alias": "db_query_text",
+          "column": "db_query_text",
+          "color": null,
+          "aggregationFunction": null,
+          "isDerived": false
+         },
+         {
+          "label": "Llamadas",
+          "alias": "llamadas",
+          "column": "llamadas",
+          "color": null,
+          "aggregationFunction": null,
+          "isDerived": false
+         },
+         {
+          "label": "Trazas",
+          "alias": "trazas",
+          "column": "trazas",
+          "color": null,
+          "aggregationFunction": null,
+          "isDerived": false
+         },
+         {
+          "label": "Por traza",
+          "alias": "por_traza",
+          "column": "por_traza",
+          "color": null,
+          "aggregationFunction": null,
+          "isDerived": false
+         }
+        ],
+        "y": [],
+        "z": [],
+        "breakdown": [],
+        "filter": {
+         "filterType": "group",
+         "logicalOperator": "AND",
+         "conditions": []
+        }
+       },
+       "config": {
+        "promql_legend": "",
+        "layer_type": "scatter",
+        "weight_fixed": 1
+       }
+      }
+     ]
+    },
+    {
+     "id": "d-slowlog",
+     "type": "table",
+     "title": "Queries lentas",
+     "description": "Log [db] query lenta: también las de fuera de una traza (pollers, arranque).",
+     "config": {
+      "show_legends": true,
+      "legends_position": "bottom",
+      "unit": "short",
+      "decimals": 2,
+      "axis_border_show": false,
+      "show_gridlines": true,
+      "connect_nulls": false,
+      "no_value_replacement": "0",
+      "table_pagination": true,
+      "table_pagination_rows_per_page": 15,
+      "table_filtering": true,
+      "drilldown": [],
+      "mark_line": [],
+      "override_config": []
+     },
+     "layout": {
+      "x": 0,
+      "y": 46,
+      "w": 96,
+      "h": 20,
+      "i": 9
+     },
+     "htmlContent": "",
+     "markdownContent": "",
+     "queryType": "sql",
+     "queries": [
+      {
+       "query": "SELECT _timestamp, duration_ms, db_query_text, trace_id FROM \"default\" WHERE service_name = 'duckhunt' AND scope = 'db' AND body LIKE 'query lenta%' ORDER BY _timestamp DESC LIMIT 50",
+       "vrlFunctionQuery": "",
+       "customQuery": true,
+       "fields": {
+        "stream": "default",
+        "stream_type": "logs",
+        "x": [
+         {
+          "label": "Hora",
+          "alias": "_timestamp",
+          "column": "_timestamp",
+          "color": null,
+          "aggregationFunction": null,
+          "isDerived": false
+         },
+         {
+          "label": "ms",
+          "alias": "duration_ms",
+          "column": "duration_ms",
+          "color": null,
+          "aggregationFunction": null,
+          "isDerived": false
+         },
+         {
+          "label": "SQL",
+          "alias": "db_query_text",
+          "column": "db_query_text",
+          "color": null,
+          "aggregationFunction": null,
+          "isDerived": false
+         },
+         {
+          "label": "Trace",
+          "alias": "trace_id",
+          "column": "trace_id",
+          "color": null,
+          "aggregationFunction": null,
+          "isDerived": false
+         }
+        ],
+        "y": [],
+        "z": [],
+        "breakdown": [],
+        "filter": {
+         "filterType": "group",
+         "logicalOperator": "AND",
+         "conditions": []
+        }
+       },
+       "config": {
+        "promql_legend": "",
+        "layer_type": "scatter",
+        "weight_fixed": 1
+       }
+      }
+     ]
+    },
+    {
+     "id": "d-errors",
+     "type": "table",
+     "title": "Errores de sqlite",
+     "description": "Con su mensaje (SQLITE_BUSY / database is locked = contención de escritura).",
+     "config": {
+      "show_legends": true,
+      "legends_position": "bottom",
+      "unit": "short",
+      "decimals": 2,
+      "axis_border_show": false,
+      "show_gridlines": true,
+      "connect_nulls": false,
+      "no_value_replacement": "0",
+      "table_pagination": true,
+      "table_pagination_rows_per_page": 15,
+      "table_filtering": true,
+      "drilldown": [],
+      "mark_line": [],
+      "override_config": []
+     },
+     "layout": {
+      "x": 96,
+      "y": 46,
+      "w": 96,
+      "h": 20,
+      "i": 10
+     },
+     "htmlContent": "",
+     "markdownContent": "",
+     "queryType": "sql",
+     "queries": [
+      {
+       "query": "SELECT _timestamp, operation_name, status_message, db_query_text, trace_id FROM \"default\" WHERE service_name = 'duckhunt' AND db_system_name = 'sqlite' AND span_status = 'ERROR' ORDER BY _timestamp DESC LIMIT 50",
+       "vrlFunctionQuery": "",
+       "customQuery": true,
+       "fields": {
+        "stream": "default",
+        "stream_type": "traces",
+        "x": [
+         {
+          "label": "Hora",
+          "alias": "_timestamp",
+          "column": "_timestamp",
+          "color": null,
+          "aggregationFunction": null,
+          "isDerived": false
+         },
+         {
+          "label": "Sentencia",
+          "alias": "operation_name",
+          "column": "operation_name",
+          "color": null,
+          "aggregationFunction": null,
+          "isDerived": false
+         },
+         {
+          "label": "Error",
+          "alias": "status_message",
+          "column": "status_message",
+          "color": null,
+          "aggregationFunction": null,
+          "isDerived": false
+         },
+         {
+          "label": "SQL",
+          "alias": "db_query_text",
+          "column": "db_query_text",
+          "color": null,
+          "aggregationFunction": null,
+          "isDerived": false
+         },
+         {
+          "label": "Trace",
+          "alias": "trace_id",
+          "column": "trace_id",
+          "color": null,
+          "aggregationFunction": null,
+          "isDerived": false
+         }
+        ],
+        "y": [],
+        "z": [],
+        "breakdown": [],
+        "filter": {
+         "filterType": "group",
+         "logicalOperator": "AND",
+         "conditions": []
+        }
+       },
+       "config": {
+        "promql_legend": "",
+        "layer_type": "scatter",
+        "weight_fixed": 1
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "tabId": "jobs",
+   "name": "Trabajos",
+   "panels": [
+    {
+     "id": "j-rate",
+     "type": "line",
+     "title": "Ejecuciones por trabajo (/min)",
+     "description": "Cada tick de un sweeper, poll o tarea de arranque (job.duration).",
+     "config": {
+      "show_legends": true,
+      "legends_position": "bottom",
+      "unit": "short",
+      "decimals": 2,
+      "axis_border_show": false,
+      "show_gridlines": true,
+      "connect_nulls": false,
+      "no_value_replacement": "0",
+      "drilldown": [],
+      "mark_line": [],
+      "override_config": []
+     },
+     "queryType": "promql",
+     "queries": [
+      {
+       "query": "sum by (job_name) (rate(job_duration_count{service_name=\"duckhunt\"}[15m])) * 60",
+       "vrlFunctionQuery": "",
+       "customQuery": true,
+       "fields": {
+        "stream": "job_duration_count",
+        "stream_type": "metrics",
+        "x": [],
+        "y": [],
+        "z": [],
+        "breakdown": [],
+        "filter": {
+         "filterType": "group",
+         "logicalOperator": "AND",
+         "conditions": []
+        }
+       },
+       "config": {
+        "promql_legend": "{job_name}",
+        "layer_type": "scatter",
+        "weight_fixed": 1
+       }
+      }
+     ],
+     "layout": {
+      "x": 0,
+      "y": 0,
+      "w": 96,
+      "h": 16,
+      "i": 1
+     },
+     "htmlContent": "",
+     "markdownContent": ""
+    },
+    {
+     "id": "j-errors",
+     "type": "line",
+     "title": "Fallos por trabajo (/h)",
+     "description": "job.outcome=error: lo que lanzó o marcó job.fail.",
+     "config": {
+      "show_legends": true,
+      "legends_position": "bottom",
+      "unit": "short",
+      "decimals": 2,
+      "axis_border_show": false,
+      "show_gridlines": true,
+      "connect_nulls": false,
+      "no_value_replacement": "0",
+      "drilldown": [],
+      "mark_line": [],
+      "override_config": []
+     },
+     "queryType": "promql",
+     "queries": [
+      {
+       "query": "sum by (job_name) (rate(job_duration_count{service_name=\"duckhunt\",job_outcome=\"error\"}[1h])) * 3600",
+       "vrlFunctionQuery": "",
+       "customQuery": true,
+       "fields": {
+        "stream": "job_duration_count",
+        "stream_type": "metrics",
+        "x": [],
+        "y": [],
+        "z": [],
+        "breakdown": [],
+        "filter": {
+         "filterType": "group",
+         "logicalOperator": "AND",
+         "conditions": []
+        }
+       },
+       "config": {
+        "promql_legend": "{job_name}",
+        "layer_type": "scatter",
+        "weight_fixed": 1
+       }
+      }
+     ],
+     "layout": {
+      "x": 96,
+      "y": 0,
+      "w": 96,
+      "h": 16,
+      "i": 2
+     },
+     "htmlContent": "",
+     "markdownContent": ""
+    },
+    {
+     "id": "j-p95",
+     "type": "line",
+     "title": "Duración p95 por trabajo (s)",
+     "description": "Qué trabajo tarda más (y bloquea el event loop si es síncrono).",
+     "config": {
+      "show_legends": true,
+      "legends_position": "bottom",
+      "unit": "seconds",
+      "decimals": 2,
+      "axis_border_show": false,
+      "show_gridlines": true,
+      "connect_nulls": false,
+      "no_value_replacement": "0",
+      "drilldown": [],
+      "mark_line": [],
+      "override_config": []
+     },
+     "queryType": "promql",
+     "queries": [
+      {
+       "query": "histogram_quantile(0.95, sum by (le, job_name) (rate(job_duration_bucket{service_name=\"duckhunt\"}[1h])))",
+       "vrlFunctionQuery": "",
+       "customQuery": true,
+       "fields": {
+        "stream": "job_duration_bucket",
+        "stream_type": "metrics",
+        "x": [],
+        "y": [],
+        "z": [],
+        "breakdown": [],
+        "filter": {
+         "filterType": "group",
+         "logicalOperator": "AND",
+         "conditions": []
+        }
+       },
+       "config": {
+        "promql_legend": "{job_name}",
+        "layer_type": "scatter",
+        "weight_fixed": 1
+       }
+      }
+     ],
+     "layout": {
+      "x": 0,
+      "y": 16,
+      "w": 96,
+      "h": 16,
+      "i": 3
+     },
+     "htmlContent": "",
+     "markdownContent": ""
+    },
+    {
+     "id": "j-providers",
+     "type": "line",
+     "title": "Polls y fallos por proveedor (/h)",
+     "description": "Trabajos con la label provider (poll <proveedor>).",
+     "config": {
+      "show_legends": true,
+      "legends_position": "bottom",
+      "unit": "short",
+      "decimals": 2,
+      "axis_border_show": false,
+      "show_gridlines": true,
+      "connect_nulls": false,
+      "no_value_replacement": "0",
+      "drilldown": [],
+      "mark_line": [],
+      "override_config": []
+     },
+     "queryType": "promql",
+     "queries": [
+      {
+       "query": "sum by (provider) (rate(job_duration_count{service_name=\"duckhunt\",provider!=\"\"}[1h])) * 3600",
+       "vrlFunctionQuery": "",
+       "customQuery": true,
+       "fields": {
+        "stream": "job_duration_count",
+        "stream_type": "metrics",
+        "x": [],
+        "y": [],
+        "z": [],
+        "breakdown": [],
+        "filter": {
+         "filterType": "group",
+         "logicalOperator": "AND",
+         "conditions": []
+        }
+       },
+       "config": {
+        "promql_legend": "{provider}",
+        "layer_type": "scatter",
+        "weight_fixed": 1
+       }
+      },
+      {
+       "query": "sum by (provider) (rate(job_duration_count{service_name=\"duckhunt\",provider!=\"\",job_outcome=\"error\"}[1h])) * 3600",
+       "vrlFunctionQuery": "",
+       "customQuery": true,
+       "fields": {
+        "stream": "job_duration_count",
+        "stream_type": "metrics",
+        "x": [],
+        "y": [],
+        "z": [],
+        "breakdown": [],
+        "filter": {
+         "filterType": "group",
+         "logicalOperator": "AND",
+         "conditions": []
+        }
+       },
+       "config": {
+        "promql_legend": "{provider} fallos",
+        "layer_type": "scatter",
+        "weight_fixed": 1
+       }
+      }
+     ],
+     "layout": {
+      "x": 96,
+      "y": 16,
+      "w": 96,
+      "h": 16,
+      "i": 4
+     },
+     "htmlContent": "",
+     "markdownContent": ""
+    },
+    {
+     "id": "j-mcp",
+     "type": "line",
+     "title": "Llamadas mcp por herramienta (/h)",
+     "description": "tools/call <tool> (mcp.server.operation.duration).",
+     "config": {
+      "show_legends": true,
+      "legends_position": "bottom",
+      "unit": "short",
+      "decimals": 2,
+      "axis_border_show": false,
+      "show_gridlines": true,
+      "connect_nulls": false,
+      "no_value_replacement": "0",
+      "drilldown": [],
+      "mark_line": [],
+      "override_config": []
+     },
+     "queryType": "promql",
+     "queries": [
+      {
+       "query": "sum by (gen_ai_tool_name) (rate(mcp_server_operation_duration_count{service_name=\"duckhunt\"}[1h])) * 3600",
+       "vrlFunctionQuery": "",
+       "customQuery": true,
+       "fields": {
+        "stream": "mcp_server_operation_duration_count",
+        "stream_type": "metrics",
+        "x": [],
+        "y": [],
+        "z": [],
+        "breakdown": [],
+        "filter": {
+         "filterType": "group",
+         "logicalOperator": "AND",
+         "conditions": []
+        }
+       },
+       "config": {
+        "promql_legend": "{gen_ai_tool_name}",
+        "layer_type": "scatter",
+        "weight_fixed": 1
+       }
+      }
+     ],
+     "layout": {
+      "x": 0,
+      "y": 32,
+      "w": 96,
+      "h": 16,
+      "i": 5
+     },
+     "htmlContent": "",
+     "markdownContent": ""
+    },
+    {
+     "id": "j-mcp-errors",
+     "type": "line",
+     "title": "Errores mcp por herramienta (/h)",
+     "description": "error.type: tool_error (isError) o el nombre de la excepción.",
+     "config": {
+      "show_legends": true,
+      "legends_position": "bottom",
+      "unit": "short",
+      "decimals": 2,
+      "axis_border_show": false,
+      "show_gridlines": true,
+      "connect_nulls": false,
+      "no_value_replacement": "0",
+      "drilldown": [],
+      "mark_line": [],
+      "override_config": []
+     },
+     "queryType": "promql",
+     "queries": [
+      {
+       "query": "sum by (gen_ai_tool_name, error_type) (rate(mcp_server_operation_duration_count{service_name=\"duckhunt\",error_type!=\"\"}[1h])) * 3600",
+       "vrlFunctionQuery": "",
+       "customQuery": true,
+       "fields": {
+        "stream": "mcp_server_operation_duration_count",
+        "stream_type": "metrics",
+        "x": [],
+        "y": [],
+        "z": [],
+        "breakdown": [],
+        "filter": {
+         "filterType": "group",
+         "logicalOperator": "AND",
+         "conditions": []
+        }
+       },
+       "config": {
+        "promql_legend": "{gen_ai_tool_name} {error_type}",
+        "layer_type": "scatter",
+        "weight_fixed": 1
+       }
+      }
+     ],
+     "layout": {
+      "x": 96,
+      "y": 32,
+      "w": 96,
+      "h": 16,
+      "i": 6
+     },
+     "htmlContent": "",
+     "markdownContent": ""
+    },
+    {
+     "id": "j-runs",
+     "type": "line",
+     "title": "Agent runs por estado",
+     "description": "Gauge que lee la tabla: queued/running/waiting/lost son la cola; los terminales, el histórico.",
+     "config": {
+      "show_legends": true,
+      "legends_position": "bottom",
+      "unit": "short",
+      "decimals": 2,
+      "axis_border_show": false,
+      "show_gridlines": true,
+      "connect_nulls": false,
+      "no_value_replacement": "0",
+      "drilldown": [],
+      "mark_line": [],
+      "override_config": []
+     },
+     "queryType": "promql",
+     "queries": [
+      {
+       "query": "max by (status) (agent_runs{service_name=\"duckhunt\"})",
+       "vrlFunctionQuery": "",
+       "customQuery": true,
+       "fields": {
+        "stream": "agent_runs",
+        "stream_type": "metrics",
+        "x": [],
+        "y": [],
+        "z": [],
+        "breakdown": [],
+        "filter": {
+         "filterType": "group",
+         "logicalOperator": "AND",
+         "conditions": []
+        }
+       },
+       "config": {
+        "promql_legend": "{status}",
+        "layer_type": "scatter",
+        "weight_fixed": 1
+       }
+      }
+     ],
+     "layout": {
+      "x": 0,
+      "y": 48,
+      "w": 96,
+      "h": 16,
+      "i": 7
+     },
+     "htmlContent": "",
+     "markdownContent": ""
+    },
+    {
+     "id": "j-ws",
+     "type": "line",
+     "title": "Conexiones websocket",
+     "description": "websocket.connections por hub (realtime).",
+     "config": {
+      "show_legends": true,
+      "legends_position": "bottom",
+      "unit": "short",
+      "decimals": 2,
+      "axis_border_show": false,
+      "show_gridlines": true,
+      "connect_nulls": false,
+      "no_value_replacement": "0",
+      "drilldown": [],
+      "mark_line": [],
+      "override_config": []
+     },
+     "queryType": "promql",
+     "queries": [
+      {
+       "query": "sum by (ws_hub) (websocket_connections{service_name=\"duckhunt\"})",
+       "vrlFunctionQuery": "",
+       "customQuery": true,
+       "fields": {
+        "stream": "websocket_connections",
+        "stream_type": "metrics",
+        "x": [],
+        "y": [],
+        "z": [],
+        "breakdown": [],
+        "filter": {
+         "filterType": "group",
+         "logicalOperator": "AND",
+         "conditions": []
+        }
+       },
+       "config": {
+        "promql_legend": "{ws_hub}",
+        "layer_type": "scatter",
+        "weight_fixed": 1
+       }
+      }
+     ],
+     "layout": {
+      "x": 96,
+      "y": 48,
+      "w": 96,
+      "h": 16,
+      "i": 8
+     },
+     "htmlContent": "",
+     "markdownContent": ""
+    }
+   ]
   }
+ ],
+ "variables": {
+  "list": [],
+  "showDynamicFilters": true
+ },
+ "defaultDatetimeDuration": {
+  "type": "relative",
+  "relativeTimePeriod": "6h"
+ }
 }
