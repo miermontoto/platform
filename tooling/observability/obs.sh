@@ -156,8 +156,10 @@ search() {
     -H 'content-type: application/json' \
     -H @<(printf 'Authorization: Basic %s' "$(printf '%s:%s' "$O2_USER" "$O2_PASSWORD" | base64 -w0)") \
     -d "$body") || die "openobserve no responde en $O2_URL"
-  if jq -e 'has("hits") | not' >/dev/null 2>&1 <<<"$res"; then
-    jq -c '{error: (.message // .error // .)}' <<<"$res" 2>/dev/null || echo "{\"error\": $(jq -Rs . <<<"$res")}"
+  # sin hits es un error; openobserve a veces lo manda como string json pelado (p.ej. "Search
+  # stream not found" en una instancia recién creada, antes de recibir datos)
+  if ! jq -e 'type == "object" and has("hits")' >/dev/null 2>&1 <<<"$res"; then
+    jq -c '{error: (if type == "object" then (.message // .error // .) else . end)}' <<<"$res" 2>/dev/null || echo "{\"error\": $(jq -Rs . <<<"$res")}"
     exit 1
   fi
   jq -c '.hits' <<<"$res"
@@ -187,7 +189,8 @@ def span_shape: {
 | with_entries(select(.value != null));
 '
 
-compact() { jq -c --argjson sl "$STACK_LINES" "$JQ_COMMON $1"; }
+# un {error} de search pasa tal cual: search corre en un pipe y su exit no corta lo que sigue
+compact() { jq -c --argjson sl "$STACK_LINES" "$JQ_COMMON if type == \"object\" and has(\"error\") then . else ($1) end"; }
 
 case "$COMMAND" in
   errors)
