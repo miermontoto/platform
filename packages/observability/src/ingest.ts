@@ -12,7 +12,7 @@ import { SeverityNumber } from '@opentelemetry/api-logs';
 import { resourceFromAttributes } from '@opentelemetry/resources';
 import type { ReadableLogRecord, ReadWriteLogRecord } from '@opentelemetry/sdk-logs';
 import type { ReadableSpan } from '@opentelemetry/sdk-trace-node';
-import { symbolicate } from './sourcemaps.js';
+import { createSymbolicator } from './sourcemaps.js';
 import { clientSink } from './telemetry.js';
 import { clip, WIRE_LIMITS, type WireAttrs, type WireEvent, type WireLevel, type WirePlatform, type WireSpan } from './wire.js';
 
@@ -33,7 +33,9 @@ const SPAN_ID = /^[0-9a-f]{16}$/;
 // w3c: el id todo ceros es inválido
 const ZERO_ID = /^0+$/;
 const SESSION_ID = /^[0-9a-f]{16}$/;
-const ATTR_KEY = /^[\w.-]{1,64}$/;
+// claves de atributo del cliente: solo los espacios de nombres del sdk (los de una app van bajo
+// app.*), en minúsculas
+const ATTR_KEY = /^(?:app|http|web_vital|navigation|error|url|server)\.[a-z0-9_.]{1,48}$/;
 const VERSION_MAX = 64;
 const SCOPE_MAX = 64;
 // relojes de dispositivo sincronizados por ntp difieren en ms; por debajo de esto no se corrige
@@ -50,8 +52,28 @@ const SEVERITY: Record<WireLevel, SeverityNumber> = {
   warn: SeverityNumber.WARN,
   error: SeverityNumber.ERROR,
 };
-// atributos que solo pone el servidor: el cliente no puede suplantar a otro usuario
-const RESERVED_ATTRS = new Set(['user.id', 'session.id', 'client.address', 'scope']);
+// openobserve aplana los puntos a guiones bajos (user.id → columna user_id): las claves se
+// comparan aplanadas, o `user_id` desde el cliente caería en la misma columna que el user.id
+const flatten = (key: string): string => key.replace(/\./g, '_');
+// columnas que pone el servidor (identidad, scope, exception.*, resource): el cliente no puede
+// suplantar a otro usuario ni falsear de qué build o plataforma viene un registro
+const RESERVED_COLUMNS = new Set(
+  [
+    'user.id',
+    'session.id',
+    'client.address',
+    'scope',
+    'exception.type',
+    'exception.message',
+    'exception.stacktrace',
+    'service.name',
+    'service.version',
+    'deployment.environment.name',
+    'telemetry.sdk.language',
+    'app.platform',
+    'user_agent.original',
+  ].map(flatten),
+);
 // identidad estable del scope: el transformer otlp agrupa por referencia
 const INSTRUMENTATION_SCOPE = { name: '@platform/observability/browser' };
 
@@ -72,7 +94,7 @@ const sanitizeAttrs = (input: unknown): Attributes =>
         Object.entries(input)
           .filter(
             (entry): entry is [string, string | number | boolean] =>
-              ATTR_KEY.test(entry[0]) && !RESERVED_ATTRS.has(entry[0]) && (typeof entry[1] === 'boolean' || isTime(entry[1]) || typeof entry[1] === 'string'),
+              ATTR_KEY.test(entry[0]) && !RESERVED_COLUMNS.has(flatten(entry[0])) && (typeof entry[1] === 'boolean' || isTime(entry[1]) || typeof entry[1] === 'string'),
           )
           .slice(0, WIRE_LIMITS.attrs)
           .map(([k, v]) => [k, typeof v === 'string' ? clip(v) : v]),
@@ -96,6 +118,7 @@ export async function ingestClientBatch(batch: unknown, ctx: ClientContext): Pro
   const at = (ms: number): number => ms + offset;
   const inWindow = (ms: number): boolean => at(ms) >= received - MAX_AGE_MS && at(ms) <= received + CLOCK_SKEW_TOLERANCE_MS;
 
+  const symbolicate = createSymbolicator(ctx.staticDir);
   const platform = PLATFORMS.has(batch.platform as WirePlatform) ? (batch.platform as WirePlatform) : 'web';
   const resource = resourceFromAttributes({
     'service.name': `${sink.service}${CLIENT_SERVICE_SUFFIX}`,
@@ -116,7 +139,8 @@ export async function ingestClientBatch(batch: unknown, ctx: ClientContext): Pro
     if (!isObject(input)) return null;
     const s = input as Partial<WireSpan>;
     if (!isId(s.traceId, TRACE_ID) || !isId(s.spanId, SPAN_ID) || !isString(s.name) || !isTime(s.start) || !isTime(s.end)) return null;
-    if (!inWindow(s.start) || s.end < s.start) return null;
+    // duración acotada como la edad: un end forjado no puede estirar un span años
+    if (!inWindow(s.start) || s.end < s.start || s.end - s.start > MAX_AGE_MS) return null;
     const ctxSpan = sampled(s.traceId, s.spanId);
     return {
       name: clip(s.name),
@@ -144,7 +168,7 @@ export async function ingestClientBatch(batch: unknown, ctx: ClientContext): Pro
     const e = input as Partial<WireEvent>;
     if (!isTime(e.time) || !inWindow(e.time) || !isString(e.msg) || !(typeof e.level === 'string' && Object.hasOwn(SEVERITY, e.level))) return null;
     const error = isObject(e.error) && isString(e.error.message) ? e.error : undefined;
-    const stack = error && isString(error.stack) ? await symbolicate(clip(error.stack, WIRE_LIMITS.stack), ctx.staticDir) : undefined;
+    const stack = error && isString(error.stack) ? await symbolicate(clip(error.stack, WIRE_LIMITS.stack)) : undefined;
     return {
       hrTime: toHr(at(e.time)),
       hrTimeObserved: toHr(received),

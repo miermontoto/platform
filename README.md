@@ -113,8 +113,10 @@ cliente deja de enviar.
   otro build (pestaña vieja, app nativa) se queda minificado.
 - **web vitals**: lcp, inp, cls, fcp y ttfb con atribución (elemento, subpartes), por ruta de
   aterrizaje: `obs.sh vitals --service <app>-web`.
-- **identidad**: `user.id` lo resuelve el servidor (`identify`), nunca el cliente; `session.id`
+- **identidad**: `user.id` lo resuelve el servidor (`identify`, solo para peticiones sin `Origin`
+  o del propio host: un lote desde otra web entra anónimo), nunca el cliente; `session.id`
   agrupa una carga de página, `service.version` es la del bundle y `app.platform` web|ios|android.
+  los atributos propios que pase una app (`captureError(err, attrs)`) van bajo `app.*`.
 
 ```ts
 // api: app.ts

@@ -27,6 +27,8 @@ const REFILL_PER_S = 0.5;
 const MAX_TRACKED_CLIENTS = 10_000;
 const MS_PER_S = 1_000;
 const UNKNOWN_CLIENT = 'unknown';
+// origen del webview de ios; el de android (https://app.<dominio>) manda por CapacitorHttp, sin Origin
+const NATIVE_ORIGIN_PROTOCOL = 'capacitor:';
 
 const log = createLogger('client-telemetry');
 const buckets = new Map<string, { tokens: number; at: number }>();
@@ -38,6 +40,21 @@ const allow = (client: string): boolean => {
   if (buckets.size >= MAX_TRACKED_CLIENTS) buckets.clear();
   buckets.set(client, { tokens: tokens >= 1 ? tokens - 1 : tokens, at: t });
   return tokens >= 1;
+};
+
+// identidad solo para lotes de la propia app: sin Origin (CapacitorHttp nativo), del mismo host
+// que la api o del webview de ios. text/plain no dispara preflight, así que una página ajena sí
+// puede mandar un lote con las cookies de quien la visita (si no son SameSite=Lax): entra como
+// anónimo y no puede firmar errores a nombre de nadie. "null" (iframe sandbox) no parsea: ajeno
+const firstParty = (c: Context): boolean => {
+  const origin = c.req.header('origin');
+  if (!origin) return true;
+  try {
+    const url = new URL(origin);
+    return url.protocol === NATIVE_ORIGIN_PROTOCOL || url.host === c.req.header('host');
+  } catch {
+    return false;
+  }
 };
 
 export function mountClientTelemetry<E extends Env>(app: Hono<E>, { identify, staticDir = DEFAULT_STATIC_DIR }: ClientTelemetryOptions = {}): void {
@@ -67,7 +84,7 @@ export function mountClientTelemetry<E extends Env>(app: Hono<E>, { identify, st
       }
       let userId: string | undefined;
       try {
-        const id = identify?.(c);
+        const id = firstParty(c) ? identify?.(c) : undefined;
         userId = id === null || id === undefined ? undefined : String(id);
       } catch (err) {
         // una sesión que no se puede resolver no tira el lote: llega como anónimo

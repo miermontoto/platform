@@ -65,7 +65,10 @@ const report = (wire: WireError, attrs: WireAttrs): void => {
   );
 };
 
-/** registra un error (Error o cualquier valor lanzado). `attrs` añade contexto consultable. */
+/**
+ * registra un error (Error o cualquier valor lanzado). `attrs` añade contexto consultable: las
+ * claves propias de la app van bajo `app.*` (el servidor descarta las de otros espacios).
+ */
 export function captureError(error: unknown, attrs: WireAttrs = {}): void {
   report(normalize(error), attrs);
 }
