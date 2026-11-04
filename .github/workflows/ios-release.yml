@@ -23,15 +23,11 @@
 #         upload: true
 #       secrets: inherit
 #
-# XCODE: por defecto la imagen `xcode-27` y su Xcode más nuevo que App Store Connect acepte
-# (en 2026-11, el 27.1 final: el 27.2 de la imagen es el release candidate 27B48 y apple ya
-# publicó la final 27B52): sdk ios 27.1, el que da pantalla completa en el iPhone Duo y su
+# XCODE: por defecto la imagen `xcode-27` y su Xcode más nuevo que no sea beta (en 2026-10, el
+# 27.1 release candidate): sdk ios 27.1, el que da pantalla completa en el iPhone Duo y su
 # verticalBarEdge (el rail de @platform/capacitor-native-tabs). esa imagen trae también
-# betas y release candidates. App Store Connect rechaza las betas, y un rc solo sirve hasta
-# que apple publica su final con otra build: las builds del 27.2 rc subidas después de la
-# final dieron "UPLOAD SUCCEEDED" y nunca aparecieron en App Store Connect. la selección
-# automática resuelve cada symlink, descarta las betas y cruza la build de cada Xcode con el
-# feed de releases de apple para saltar los rc reemplazados; xcode_version fija uno a mano.
+# betas y release candidates, y App Store Connect rechaza builds de betas (no de rc): la
+# selección automática las descarta resolviendo cada symlink, y xcode_version fija uno a mano.
 # compilar con el sdk ios 27+ EXIGE el ciclo de vida UIScene (TN3187: sin él la app no
 # arranca): la plantilla de capacitor >= 8.5 lo trae, y el paso "Seleccionar Xcode" corta el
 # build si la app sigue por debajo. una app en capacitor 7 pasa runner: macos-26 (Xcode 26)
@@ -266,7 +262,7 @@ on:
         type: string
         default: 'xcode-27'
       xcode_version:
-        description: 'versión de Xcode a seleccionar (/Applications/Xcode_<v>.app, p.ej. 27.1); vacío → la más nueva publicable instalada (final, o rc cuya final apple aún no ha publicado; a igual versión, la final)'
+        description: 'versión de Xcode a seleccionar (/Applications/Xcode_<v>.app, p.ej. 27.1); vacío → la más nueva no beta instalada (final o rc; a igual versión, la final)'
         required: false
         type: string
         default: ''
@@ -500,9 +496,6 @@ jobs:
         env:
           XCODE_VERSION: ${{ inputs.xcode_version }}
           RUNNER: ${{ inputs.runner }}
-          # feed oficial de releases de apple: lista las finales como "Xcode 27.2 (27B52)" y las
-          # betas con su sufijo; los release candidates no aparecen
-          RELEASES_FEED: https://developer.apple.com/news/releases/rss/releases.rss
         run: |
           ls -d /Applications/Xcode_*.app 2>/dev/null || true
           if [ -n "$XCODE_VERSION" ]; then
@@ -510,62 +503,28 @@ jobs:
             XCODE="/Applications/Xcode_${XCODE_VERSION}.app"
             [ -d "$XCODE" ] || { echo "::error::no hay $XCODE en $RUNNER"; exit 1; }
           else
-            # el más nuevo PUBLICABLE: App Store Connect rechaza builds de betas, y un release
-            # candidate solo vale mientras apple no publique la final de su versión. el 27.1 rc
-            # (27A9275) subió a TestFlight el 2026-10-21 porque su build ES la final; el 27.2 rc
-            # (27B48) siguió en la imagen tras salir la final 27B52 (2026-10-29) y sus builds
-            # subían sin error pero no aparecían nunca en App Store Connect. por eso cada Xcode se
-            # cruza con el feed: si apple publicó la final de su versión con otra build, es un rc
-            # reemplazado y se salta con un aviso. sin feed (apple caído) solo valen las finales.
-            # en xcode-27 los nombres de versión pelada son enlaces: Xcode_27.1.app →
-            # Xcode_27.1_Release_Candidate, Xcode_27.2.app → Xcode_27.2_beta_2. por eso se
-            # resuelve cada enlace y se descarta lo que apunta a una beta, por el nombre o por la
-            # licencia (LicenseInfo.plist; un rc también dice GM, así que no sirve para los rc).
+            # el más nuevo PUBLICABLE: App Store Connect rechaza builds de betas pero no los release
+            # candidates (el 27.1 rc, 27A9275, subió a TestFlight el 2026-10-21), y en xcode-27 los
+            # nombres de versión pelada son enlaces: Xcode_27.1.app → Xcode_27.1_Release_Candidate,
+            # Xcode_27.2.app → Xcode_27.2_beta_2. por eso se resuelve cada enlace y se descarta lo
+            # que apunta a una beta, por el nombre o por la licencia (LicenseInfo.plist).
             # se ordena por la versión REAL del bundle, no por la ruta: hay alias (Xcode_27.app =
             # 27.0, Xcode_27.0.0.app…) y el sort -V de macos pone Xcode_27.app por encima de
             # Xcode_27.1.app. clave = versión con ceros + 1 si es final (a igual versión gana al
-            # rc) y sort plano. el bucle escribe a un fichero en vez de vivir en un $(...): así sus
-            # ::warning:: llegan al log, y de paso se esquiva el bash 3.2 del runner, que cierra
-            # la sustitución en el `)` de un patrón de case
-            # versión con ceros (27 → 027000000): casan la del feed ("Xcode 27") y la del bundle (27.0)
-            norm() { IFS=. read -r major minor patch <<< "$1"; printf '%03d%03d%03d' "$major" "${minor:-0}" "${patch:-0}"; }
-            # "<versión con ceros> <build>" de cada Xcode final publicado por apple
-            FINALS=$(curl -fsSL --max-time 20 --retry 2 "$RELEASES_FEED" \
-              | grep -oE '<title>Xcode [0-9.]+ \([0-9A-Za-z]+\)</title>' \
-              | sed -E 's/<title>Xcode ([0-9.]+) \(([0-9A-Za-z]+)\)<\/title>/\1 \2/' \
-              | while read -r v b; do echo "$(norm "$v") $b"; done || true)
-            [ -n "$FINALS" ] || echo "::warning::sin el feed de releases de apple ($RELEASES_FEED) no se puede saber qué rc sigue vigente: solo se aceptan Xcode finales"
-            CANDIDATES="$RUNNER_TEMP/xcode-candidates.txt"
-            SEEN=""
-            : > "$CANDIDATES"
-            for x in /Applications/Xcode_*.app; do
+            # rc) y sort plano. sin `case` dentro del $(...): el bash 3.2 del runner cierra la
+            # sustitución en el `)` del patrón; el [[ == ]] no lleva paréntesis
+            XCODE=$(for x in /Applications/Xcode_*.app; do
               real=$(readlink -f "$x")
               lic=$(/usr/libexec/PlistBuddy -c 'Print :licenseType' "$real/Contents/Resources/LicenseInfo.plist" 2>/dev/null || true)
               ver=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$real/Contents/Info.plist" 2>/dev/null || true)
-              build=$(/usr/libexec/PlistBuddy -c 'Print :ProductBuildVersion' "$real/Contents/version.plist" 2>/dev/null || true)
-              echo "  $x → $real (versión: ${ver:-?}, build: ${build:-?}, licencia: ${lic:-?})"
-              # cada bundle se evalúa una sola vez aunque tenga varios alias
-              [[ " $SEEN " == *" $real "* ]] && continue
-              SEEN="$SEEN $real"
+              echo "  $x → $real (versión: ${ver:-?}, licencia: ${lic:-?})" >&2
               [[ -z $ver || $real == *[Bb]eta* || $lic == *[Bb]eta* ]] && continue
-              key=$(norm "$ver")
               final=1
               [[ $real == *Release_Candidate* || $real == *_RC* ]] && final=0
-              if [ -n "$FINALS" ] && grep -q "^$key " <<< "$FINALS"; then
-                # apple ya publicó la final de esta versión: solo vale esa build exacta
-                if grep -qx "$key $build" <<< "$FINALS"; then
-                  final=1
-                else
-                  echo "::warning::$real ($ver, build ${build:-?}) es un rc que apple ya reemplazó por la final $(grep "^$key " <<< "$FINALS" | cut -d' ' -f2 | tr '\n' ' ')y App Store Connect no procesaría lo que compile; se salta hasta que la imagen $RUNNER traiga la final"
-                  continue
-                fi
-              elif [ -z "$FINALS" ] && [ "$final" = 0 ]; then
-                continue
-              fi
-              echo "$key$final $real" >> "$CANDIDATES"
-            done
-            XCODE=$(sort -u "$CANDIDATES" | tail -1 | cut -d' ' -f2-)
-            [ -n "$XCODE" ] || { echo "::error::no hay ningún Xcode publicable (ni beta ni rc reemplazado) en $RUNNER"; exit 1; }
+              IFS=. read -r major minor patch <<< "$ver"
+              printf '%03d%03d%03d%d %s\n' "$major" "${minor:-0}" "${patch:-0}" "$final" "$real"
+            done | sort -u | tail -1 | cut -d' ' -f2-)
+            [ -n "$XCODE" ] || { echo "::error::no hay ningún Xcode publicable (no beta) en $RUNNER"; exit 1; }
           fi
           sudo xcode-select -s "$XCODE"
           echo "Xcode: $XCODE"
