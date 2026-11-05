@@ -236,7 +236,13 @@ jobs:
           # para capturar cada pantalla y cada postura en la siguiente iteración.
           xcrun simctl io "$UDID" enumerate > "$OUT/displays.txt" 2>&1 || true
           xcrun simctl help > "$OUT/simctl-help.txt" 2>&1 || true
-          xcrun simctl io "$UDID" screenshot "$OUT/launch.png"
+          # un dispositivo con dos pantallas (el Duo desde el runtime 27.1 final) exige --display y lista las que hay en
+          # el error: se captura cada una.
+          if ! SHOT=$(xcrun simctl io "$UDID" screenshot "$OUT/launch.png" 2>&1); then
+            DISPLAYS=$(printf '%s' "$SHOT" | grep -oE -- '--display=[0-9]+' || true)
+            [ -n "$DISPLAYS" ] || { echo "$SHOT"; exit 1; }
+            for d in $DISPLAYS; do xcrun simctl io "$UDID" screenshot "$d" "$OUT/launch-${d#--display=}.png"; done
+          fi
           xcrun simctl spawn "$UDID" log show --last 3m --style compact \
             --predicate "process == \"App\" OR eventMessage CONTAINS \"$BUNDLE_ID\"" > "$OUT/app.log" 2>&1 || true
           # un crash al lanzar (p.ej. el assert de UIScene del sdk 27) deja la app fuera de launchctl
