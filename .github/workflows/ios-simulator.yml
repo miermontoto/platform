@@ -12,6 +12,15 @@
 #         bundle_id: info.duckhunt.app
 #         device: iPhone Duo            # subcadena del nombre del device type
 #         xcode_version: '27.1'         # el simulador del Duo llega con xcode 27.1
+#         compile_only: true            # opcional: solo compilar (sin arrancar el simulador)
+#         app_sources_dir: ios-intents  # opcionales: los mismos dirs que la release, compilados sin firma
+#         widget_extension_dir: ios-widgets
+#         share_extension_dir: ios-share
+#         app_group: group.info.duckhunt.app
+#         live_activities: true
+#
+# con los dirs es la compuerta de compilación de lo nativo: swift solo compila en un mac, y este
+# workflow lo comprueba sin ops de apple ni secrets (un App ID o un perfil pendiente no lo bloquea).
 #
 # un Xcode beta vale aquí (no se sube nada). el job falla si no hay device type que case con
 # `device`, si la app no se instala o si no sigue viva tras arrancar (crash al lanzar); lo
@@ -45,6 +54,46 @@ on:
         required: false
         type: number
         default: 25
+      compile_only:
+        description: 'solo compilar: sin descargar el runtime ni arrancar el simulador'
+        required: false
+        type: boolean
+        default: false
+      app_sources_dir:
+        description: 'dir (relativo a packages/web) con fuentes del target App; vacío → ninguna'
+        required: false
+        type: string
+        default: ''
+      app_launch_hook:
+        description: 'sentencia swift al principio de didFinishLaunchingWithOptions (exige app_sources_dir)'
+        required: false
+        type: string
+        default: ''
+      live_activities:
+        description: 'NSSupportsLiveActivities en la app'
+        required: false
+        type: boolean
+        default: false
+      widget_extension_dir:
+        description: 'dir (relativo a packages/web) de la extensión de widgets; vacío → sin ella'
+        required: false
+        type: string
+        default: ''
+      share_extension_dir:
+        description: 'dir (relativo a packages/web) de la extensión de compartir; vacío → sin ella'
+        required: false
+        type: string
+        default: ''
+      app_group:
+        description: 'app group de las extensiones'
+        required: false
+        type: string
+        default: ''
+      extension_min_ios_version:
+        description: 'deployment target de las extensiones'
+        required: false
+        type: string
+        default: '17.0'
 
 jobs:
   simulator:
@@ -83,21 +132,51 @@ jobs:
 
       - name: Scaffold proyecto iOS + build web + cap sync
         # mismo scaffold que ios-release.yml (CocoaPods explícito: capacitor 8 usa SPM por
-        # defecto); sin firma, iconos, widgets ni intents: solo hace falta que la app arranque.
+        # defecto); sin firma ni iconos. las extensiones y los intents, solo si el caller los pide.
         working-directory: packages/web
         run: |
           [ -d ios ] || pnpm exec cap add ios --packagemanager CocoaPods
           pnpm run mobile:build:ios
 
+      - name: Añadir fuentes nativas y extensiones
+        working-directory: packages/web/ios/App
+        env:
+          APP_SRC: ${{ inputs.app_sources_dir }}
+          APP_LAUNCH_HOOK: ${{ inputs.app_launch_hook }}
+          LIVE_ACTIVITIES: ${{ inputs.live_activities }}
+          WIDGET_SRC: ${{ inputs.widget_extension_dir }}
+          SHARE_SRC: ${{ inputs.share_extension_dir }}
+          APP_GROUP: ${{ inputs.app_group }}
+          BUNDLE_ID: ${{ inputs.bundle_id }}
+          EXT_MIN_IOS: ${{ inputs.extension_min_ios_version }}
+        run: |
+          TOOLS="$GITHUB_WORKSPACE/platform/tooling/mobile"
+          if [ -n "$APP_SRC" ]; then bash "$TOOLS/ios-add-app-sources.sh"; fi
+          if [ "$LIVE_ACTIVITIES" = "true" ]; then /usr/libexec/PlistBuddy -c "Add :NSSupportsLiveActivities bool true" App/Info.plist; fi
+          if [ -n "$WIDGET_SRC" ]; then EXT_NAME=Widgets EXT_SRC="$WIDGET_SRC" EXT_BUNDLE_ID="$BUNDLE_ID.widgets" bash "$TOOLS/ios-add-extension.sh"; fi
+          if [ -n "$SHARE_SRC" ]; then EXT_NAME=Share EXT_SRC="$SHARE_SRC" EXT_BUNDLE_ID="$BUNDLE_ID.share" bash "$TOOLS/ios-add-extension.sh"; fi
+
       - name: Build para el simulador (sin firma)
         working-directory: packages/web/ios/App
+        env:
+          WIDGET_SRC: ${{ inputs.widget_extension_dir }}
+          SHARE_SRC: ${{ inputs.share_extension_dir }}
         run: |
+          OUT="$RUNNER_TEMP/shots"; mkdir -p "$OUT"
+          # el log entero al artifact; al del job, los errores y el resultado (un tail cortaba los errores de
+          # compilación de swift, que salen mucho antes del final).
           xcodebuild -workspace App.xcworkspace -scheme App -configuration Debug \
             -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' \
-            -derivedDataPath "$RUNNER_TEMP/sim" CODE_SIGNING_ALLOWED=NO build | tail -20
-          test -d "$RUNNER_TEMP/sim/Build/Products/Debug-iphonesimulator/App.app"
+            -derivedDataPath "$RUNNER_TEMP/sim" CODE_SIGNING_ALLOWED=NO build > "$OUT/build.log" 2>&1 || true
+          grep -E "error:|BUILD (SUCCEEDED|FAILED)|\*\* BUILD" "$OUT/build.log" | sort -u | head -80 || true
+          APP="$RUNNER_TEMP/sim/Build/Products/Debug-iphonesimulator/App.app"
+          grep -q "BUILD SUCCEEDED" "$OUT/build.log" || { echo "::error::no compila: ver build.log en el artifact"; exit 1; }
+          test -d "$APP"
+          if [ -n "$WIDGET_SRC" ]; then test -d "$APP/PlugIns/Widgets.appex"; fi
+          if [ -n "$SHARE_SRC" ]; then test -d "$APP/PlugIns/Share.appex"; fi
 
       - name: Descargar el runtime del simulador si falta
+        if: ${{ !inputs.compile_only }}
         # la imagen trae el sdk de simulador de cada Xcode pero no siempre su RUNTIME: en xcode-27
         # (2026-09-30) Xcode 27.1 conoce el device type "iPhone Duo" y solo estaba instalado el
         # runtime ios 27.0, que no lo soporta. se baja el del Xcode seleccionado (varios GB).
@@ -112,6 +191,7 @@ jobs:
           xcrun simctl list runtimes
 
       - name: Crear y arrancar el dispositivo
+        if: ${{ !inputs.compile_only }}
         id: device
         env:
           DEVICE: ${{ inputs.device }}
@@ -142,6 +222,7 @@ jobs:
           echo "udid=$UDID" >> "$GITHUB_OUTPUT"
 
       - name: Instalar, lanzar y capturar
+        if: ${{ !inputs.compile_only }}
         env:
           UDID: ${{ steps.device.outputs.udid }}
           BUNDLE_ID: ${{ inputs.bundle_id }}
