@@ -20,6 +20,7 @@
 #         app_sources_dir: ios-intents       # opcional: swift + .xcstrings extra del target App (ver paso 8)
 #         app_launch_hook: 'Foo.start()'     # opcional: sentencia al principio de didFinishLaunching (ver paso 8)
 #         live_activities: true              # opcional: NSSupportsLiveActivities en la app (ver paso 12)
+#         export_compliance_exempt: true     # opcional: declara cifrado exento (ver "CIFRADO")
 #         share_extension_dir: ios-share     # opcional: extensión de compartir (ver paso 11)
 #         runner: macos-26                   # opcional: imagen del runner (default xcode-27, ver "XCODE")
 #         xcode_version: '27.1'              # opcional: Xcode fijo (default: el más nuevo no beta)
@@ -156,6 +157,10 @@
 # 12. LIVE ACTIVITIES (opcional, input live_activities): sin ops en apple. la vista va en la extensión de
 #     widgets y las pushes salen con la misma clave apns del paso 9 (topic <bundle_id>.push-type.liveactivity).
 #
+# CIFRADO: sin ITSAppUsesNonExemptEncryption, testflight deja cada build en MISSING_EXPORT_COMPLIANCE y NO llega a los
+# testers hasta responderlo a mano en App Store Connect, aunque la subida salga bien. export_compliance_exempt la pone a
+# false, que es una declaración legal ante apple: la decide cada app, en su caller, nunca el reutilizable por defecto.
+#
 # VERSIONADO: CFBundleShortVersionString = input marketing_version > tag ios-vX.Y.Z >
 # AUTOMÁTICA (la pregunta el job `guard` a App Store Connect, ver "TRENES").
 # CFBundleVersion = run_number del caller (único y creciente por run, mismo patrón que
@@ -273,6 +278,11 @@ on:
         default: ''
       live_activities:
         description: 'NSSupportsLiveActivities en la app (la vista va en la extensión de widgets; las pushes, con la clave apns de push_notifications)'
+        required: false
+        type: boolean
+        default: false
+      export_compliance_exempt:
+        description: 'ITSAppUsesNonExemptEncryption=false: declara a apple que la app solo usa cifrado exento (ver "CIFRADO" en la cabecera)'
         required: false
         type: boolean
         default: false
@@ -815,6 +825,14 @@ jobs:
         run: |
           /usr/libexec/PlistBuddy -c "Add :NSSupportsLiveActivities bool true" App/Info.plist
           echo "App/Info.plist: NSSupportsLiveActivities=true"
+
+      - name: Declarar cifrado exento (export compliance)
+        # sin esta clave el build sube bien y se queda sin llegar a los testers: ver "CIFRADO" en la cabecera.
+        if: ${{ inputs.export_compliance_exempt }}
+        working-directory: packages/web/ios/App
+        run: |
+          /usr/libexec/PlistBuddy -c "Add :ITSAppUsesNonExemptEncryption bool false" App/Info.plist
+          echo "App/Info.plist: ITSAppUsesNonExemptEncryption=false"
 
       - name: Añadir extensión WidgetKit (widgets de pantalla de inicio)
         # target :app_extension "Widgets" (bundle <bundle_id>.widgets), firma manual con SU perfil: ver
