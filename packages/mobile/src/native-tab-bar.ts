@@ -23,6 +23,12 @@
 // columna del sistema esquiva el rail. la reserva no cambia al ocultarlo un overlay o el teclado,
 // así nada salta de sitio.
 //
+// encima del rail va la cápsula de acciones, lo que en una app nativa pondría la barra de
+// navegación del sistema: atrás (`backTitle`; lo resuelve el nativo contra el historial del webview
+// y se apaga sin él) y las `actions` de la app (buscar, la cuenta…), cuyo toque llega a `onAction`
+// con la caja del botón. con ellas la app puede quitar su cabecera en modo rail. fuera del Duo no
+// existen: atrás es el gesto del borde, que el nativo enciende en todo iphone.
+//
 // FOOTGUN capacitor: el proxy del plugin nunca sale de una función async (un proxy devuelto desde
 // async lee `.then` y el puente responde "NativeTabBar.then() is not implemented").
 import type { PluginListenerHandle } from '@capacitor/core';
@@ -35,12 +41,26 @@ export interface NativeTab {
   symbol: string;
 }
 
+/** caja del botón tocado en px css del viewport: su alto y el ancho de la cápsula entera, para sacar un menú a su lado sin pisar el cristal. */
+export interface NativeTabAnchor {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
 export interface NativeTabBarParams {
   tabs: NativeTab[];
   // pestaña activa (null = la ruta actual no es de ninguna).
   selected: string | null;
   // toque en una pestaña, también al re-tocar la activa.
   onSelect: (id: string) => void;
+  // título (voiceover) del botón de atrás de la columna del Duo; sin él no hay botón.
+  backTitle?: string;
+  // botones de la columna del Duo detrás de atrás (id propio de la app, no una ruta).
+  actions?: NativeTab[];
+  // toque en una de las `actions`.
+  onAction?: (id: string, anchor: NativeTabAnchor) => void;
   // clase de <html> con el teclado en pantalla abierto: con ella la barra se oculta.
   keyboardClass?: string;
   // media query del layout móvil de una app que no usa html.compact (installCompact): con ella
@@ -55,6 +75,8 @@ export interface NativeTabBarParams {
 // estado completo de cada render: contrato con NativeTabBarPlugin.swift.
 interface NativeTabBarState {
   items: NativeTab[];
+  backTitle: string | null;
+  actions: NativeTab[];
   selected: string | null;
   visible: boolean;
   showTitles: boolean;
@@ -77,6 +99,7 @@ interface NativeTabBarLayout {
 interface NativeTabBarPlugin {
   render(state: NativeTabBarState): Promise<NativeTabBarLayout>;
   addListener(event: 'tabSelect', listener: (e: { id: string }) => void): Promise<PluginListenerHandle>;
+  addListener(event: 'actionSelect', listener: (e: { id: string; anchor: NativeTabAnchor }) => void): Promise<PluginListenerHandle>;
   addListener(event: 'layout', listener: (e: NativeTabBarLayout) => void): Promise<PluginListenerHandle>;
 }
 
@@ -146,6 +169,8 @@ export function nativeTabBar(_node: HTMLElement, params: NativeTabBarParams) {
     const keyboard = root.classList.contains(current.keyboardClass ?? DEFAULT_KEYBOARD_CLASS);
     return {
       items: current.tabs,
+      backTitle: current.backTitle ?? null,
+      actions: current.actions ?? [],
       selected: current.selected,
       visible: (compact || railEdge !== null) && !keyboard && !overlayOpen(),
       showTitles: current.tabs.length <= TITLED_TABS_MAX,
@@ -196,6 +221,7 @@ export function nativeTabBar(_node: HTMLElement, params: NativeTabBarParams) {
     root.classList.add(NATIVE_TABBAR_CLASS);
     listeners.push(
       plugin.addListener('tabSelect', ({ id }) => current.onSelect(id)),
+      plugin.addListener('actionSelect', ({ id, anchor }) => current.onAction?.(id, anchor)),
       plugin.addListener('layout', applyLayout),
     );
     observer.observe(document.body, {

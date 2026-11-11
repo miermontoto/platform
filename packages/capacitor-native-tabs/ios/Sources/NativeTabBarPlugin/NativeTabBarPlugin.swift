@@ -30,6 +30,19 @@ import UIKit
 /// cuenta en `layout` (`edge` físico + `width` que tapa el rail más allá de la safe area) para que
 /// la web reserve ese lado en vez del pie.
 ///
+/// encima del rail va una segunda cápsula, la de acciones: lo que en una app nativa pondría la barra
+/// de navegación que el sistema también lleva a la columna. primero atrás (si la web le da título),
+/// que recorre el historial del webview y se apaga sin él (`canGoBack`), y detrás las acciones de la
+/// web (buscar, la cuenta…), que avisan con `actionSelect` (id + caja del botón, para sacar un menú
+/// a su lado). sin ninguna, solo queda el rail. la barra del pie no las lleva: fuera del Duo atrás es
+/// el gesto del borde y la web conserva su cabecera.
+///
+/// el gesto de atrás del sistema (deslizar desde el borde) se enciende en `load` para todo iphone:
+/// WKWebView lo trae apagado y capacitor no lo expone en su config. la spa navega con pushState y
+/// esas entradas viven en el back-forward list del webview, así que el gesto recorre el historial de
+/// la app (popstate → router) como en safari. android no lo necesita: su atrás lo gestiona
+/// @capacitor/app. duckhunt hace lo mismo en su WebViewGesturesPlugin, que sobra al subir de platform.
+///
 /// el paquete lleva un módulo android vacío (ver android/build.gradle): sin él, `cap sync android`
 /// rompe. capacitor registra la PRIMERA clase anotada con nombre objc de cada .swift, así que la
 /// del plugin va la primera del fichero.
@@ -45,15 +58,21 @@ public class NativeTabBarPlugin: CAPPlugin, CAPBridgedPlugin, UITabBarDelegate {
     private static let fadeDuration: TimeInterval = 0.2
     // hueco mínimo del rail con los bordes de la columna, con el contenido y con el pie de la safe area.
     private static let railMargin: CGFloat = 6
+    // el chevron de atrás del sistema: el mismo en todas las apps, la web solo pone su título.
+    private static let backSymbol = "chevron.backward"
+    private static let backId = "back"
 
     private var tabBar: NativeTabBarView?
-    private var rail: NativeTabRailView?
+    private var rail: NativeRailColumnView?
     // centro del rail a cierta distancia de su borde, uno por borde físico: el que toque se activa
     // al cambiar el trait (girar, abrir, plegar) y su distancia sale de la safe area (placeRail).
     private var railSideConstraints: [RailEdge: NSLayoutConstraint] = [:]
     // borde de la barra vertical del sistema; nil = sin ella (pestañas en el UITabBar del pie).
     private var railEdge: RailEdge?
     private var tabs: [NativeTab] = []
+    // cápsula de acciones de la columna: título de atrás (nil = sin botón) y las de la web.
+    private var backTitle: String?
+    private var actions: [NativeTab] = []
     private var selected: String?
     private var showTitles = true
     private var dark = true
@@ -67,8 +86,16 @@ public class NativeTabBarPlugin: CAPPlugin, CAPBridgedPlugin, UITabBarDelegate {
     private var railWidth: CGFloat = 0
     private var lastLayout: TabLayout?
     private var loadingObservation: NSKeyValueObservation?
+    private var backObservation: NSKeyValueObservation?
 
     override public func load() {
+        // el bridge instancia los plugins en su init, en el hilo principal y con el webview creado.
+        bridge?.webView?.allowsBackForwardNavigationGestures = true
+        // el botón de atrás de la columna se apaga sin historial: lo cuenta el back-forward list,
+        // que la web no puede leer (history.length no baja al volver).
+        backObservation = bridge?.webView?.observe(\.canGoBack, options: [.new]) { [weak self] _, _ in
+            DispatchQueue.main.async { self?.applyState() }
+        }
         // una carga completa de la página (recarga, logout o sesión caducada → /login) arranca
         // sin shell y sin el teardown de la acción web: la barra se oculta hasta otro render.
         loadingObservation = bridge?.webView?.observe(\.isLoading, options: [.new]) { [weak self] webView, _ in
@@ -83,6 +110,8 @@ public class NativeTabBarPlugin: CAPPlugin, CAPBridgedPlugin, UITabBarDelegate {
 
     @objc func render(_ call: CAPPluginCall) {
         let tabs = (call.getArray("items", JSObject.self) ?? []).compactMap(NativeTab.init)
+        let backTitle = call.getString("backTitle")
+        let actions = (call.getArray("actions", JSObject.self) ?? []).compactMap(NativeTab.init)
         let selected = call.getString("selected")
         let visible = call.getBool("visible") ?? false
         let showTitles = call.getBool("showTitles") ?? true
@@ -97,7 +126,12 @@ public class NativeTabBarPlugin: CAPPlugin, CAPBridgedPlugin, UITabBarDelegate {
                 self.tabs = tabs
                 self.showTitles = showTitles
                 bar.items = tabs.enumerated().map { index, tab in tab.item(tag: index, showTitle: showTitles) }
-                self.rail?.setTabs(tabs)
+                self.rail?.tabs.setTabs(tabs)
+            }
+            if backTitle != self.backTitle || actions != self.actions {
+                self.backTitle = backTitle
+                self.actions = actions
+                self.rail?.setActions(self.actionItems)
             }
             self.selected = selected
             self.dark = dark
@@ -118,6 +152,35 @@ public class NativeTabBarPlugin: CAPPlugin, CAPBridgedPlugin, UITabBarDelegate {
         notifyListeners("tabSelect", data: ["id": tabs[index].id])
     }
 
+    // botones de la cápsula de acciones, en orden: atrás (si lo hay) y las de la web.
+    private var actionItems: [NativeTab] {
+        let back = backTitle.map { NativeTab(id: NativeTabBarPlugin.backId, title: $0, symbol: NativeTabBarPlugin.backSymbol) }
+        return (back.map { [$0] } ?? []) + actions
+    }
+
+    // atrás lo resuelve el nativo (el webview sabe si hay historial); el resto va a la web con la
+    // caja del botón en coordenadas del webview (= px css del viewport: la vista del bridge ES el
+    // webview), para que saque su menú al lado.
+    private func selectAction(at index: Int) {
+        let offset = backTitle == nil ? 0 : 1
+        guard index >= offset else {
+            bridge?.webView?.goBack()
+            return
+        }
+        guard actions.indices.contains(index - offset),
+              let host = bridge?.viewController?.view,
+              let anchor = rail?.actions.anchor(of: index, in: host) else { return }
+        notifyListeners("actionSelect", data: [
+            "id": actions[index - offset].id,
+            "anchor": [
+                "x": Double(anchor.minX),
+                "y": Double(anchor.minY),
+                "width": Double(anchor.width),
+                "height": Double(anchor.height)
+            ]
+        ])
+    }
+
     // selección, tema y visibilidad sobre la vista del modo en curso; la otra queda oculta.
     private func applyState() {
         guard let bar = tabBar else { return }
@@ -128,7 +191,10 @@ public class NativeTabBarPlugin: CAPPlugin, CAPBridgedPlugin, UITabBarDelegate {
         let show = wanted && !tabs.isEmpty
         setVisible(show && railEdge == nil, view: bar)
         guard let rail else { return }
-        rail.apply(selected: index, dark: dark, tint: tint)
+        // atrás es el primero de la cápsula: apagado (atenuado y sin toques) sin historial.
+        let backDisabled = backTitle != nil && bridge?.webView?.canGoBack != true
+        rail.tabs.apply(selected: index, dark: dark, tint: tint)
+        rail.actions.apply(selected: nil, dark: dark, tint: tint, disabled: backDisabled ? [0] : [])
         setVisible(show && railEdge != nil, view: rail)
     }
 
@@ -178,17 +244,20 @@ public class NativeTabBarPlugin: CAPPlugin, CAPBridgedPlugin, UITabBarDelegate {
     }
 
     // el rail nace con la primera barra vertical (solo el Duo la tiene). el inset lateral de la safe
-    // area ES la columna del sistema: el rail se centra en ella, al pie (placeRail).
-    private func ensureRail(in host: UIView) -> NativeTabRailView {
+    // area ES la columna del sistema: el rail se centra en ella, al pie (placeRail), con la cápsula
+    // de acciones encima.
+    private func ensureRail(in host: UIView) -> NativeRailColumnView {
         if let rail { return rail }
-        let rail = NativeTabRailView()
+        let rail = NativeRailColumnView()
         rail.translatesAutoresizingMaskIntoConstraints = false
         rail.alpha = 0
         rail.isUserInteractionEnabled = false
         rail.accessibilityElementsHidden = true
-        rail.onSelect = { [weak self] index in self?.selectTab(at: index) }
+        rail.tabs.onSelect = { [weak self] index in self?.selectTab(at: index) }
+        rail.actions.onSelect = { [weak self] index in self?.selectAction(at: index) }
         rail.onSafeAreaChange = { [weak self] in self?.placeRail() }
-        rail.setTabs(tabs)
+        rail.tabs.setTabs(tabs)
+        rail.setActions(actionItems)
         host.addSubview(rail)
         railSideConstraints = [
             .left: rail.centerXAnchor.constraint(equalTo: host.leftAnchor),
@@ -310,13 +379,18 @@ struct NativeTab: Equatable {
     let title: String
     let symbol: String
 
+    // el de atrás lo arma el nativo: la web solo manda su título.
+    init(id: String, title: String, symbol: String) {
+        self.id = id
+        self.title = title
+        self.symbol = symbol
+    }
+
     init?(_ object: JSObject) {
         guard let id = object["id"] as? String,
               let title = object["title"] as? String,
               let symbol = object["symbol"] as? String else { return nil }
-        self.id = id
-        self.title = title
-        self.symbol = symbol
+        self.init(id: id, title: title, symbol: symbol)
     }
 
     // la seleccionada, rellena si el símbolo tiene esa variante; lo comparten barra y rail.
@@ -375,10 +449,53 @@ struct TabLayout: Equatable {
     }
 }
 
+/// columna del Duo: la cápsula de acciones (atrás, buscar…) encima de la de pestañas, las dos al pie
+/// y del mismo ancho. sin acciones la suya se oculta y el stack la pliega: solo queda el rail.
+final class NativeRailColumnView: UIView {
+    // hueco entre las dos cápsulas: separa navegar (atrás, buscar) de las pestañas.
+    private static let capsuleSpacing: CGFloat = 8
+
+    let actions = NativeTabRailView()
+    let tabs = NativeTabRailView()
+    // la safe area cambia al girar, abrir o plegar: el plugin recoloca la columna.
+    var onSafeAreaChange: (() -> Void)?
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        let stack = UIStackView(arrangedSubviews: [actions, tabs])
+        stack.axis = .vertical
+        stack.spacing = NativeRailColumnView.capsuleSpacing
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        actions.isHidden = true
+        addSubview(stack)
+        NSLayoutConstraint.activate([
+            stack.topAnchor.constraint(equalTo: topAnchor),
+            stack.bottomAnchor.constraint(equalTo: bottomAnchor),
+            stack.leadingAnchor.constraint(equalTo: leadingAnchor),
+            stack.trailingAnchor.constraint(equalTo: trailingAnchor)
+        ])
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("NativeRailColumnView no se crea desde un storyboard")
+    }
+
+    override func safeAreaInsetsDidChange() {
+        super.safeAreaInsetsDidChange()
+        onSafeAreaChange?()
+    }
+
+    func setActions(_ items: [NativeTab]) {
+        actions.setTabs(items)
+        actions.isHidden = items.isEmpty
+    }
+}
+
 /// rail vertical de pestañas (iPhone Duo): una cápsula de cristal con un símbolo por pestaña,
 /// la activa con su variante rellena sobre una cápsula del tinte. el cristal es el del sistema
 /// (UIGlassEffect, ios 26) como la cápsula del UITabBar; el rail solo existe con barra vertical
-/// (ios 27.1), así que el desenfoque de respaldo no llega a verse en un Duo.
+/// (ios 27.1), así que el desenfoque de respaldo no llega a verse en un Duo. la cápsula de acciones
+/// es otra instancia, sin selección y con botones que se pueden apagar (atrás sin historial).
 final class NativeTabRailView: UIView {
     // botón cuadrado: el área táctil mínima de la hig.
     private static let itemSize: CGFloat = 44
@@ -390,12 +507,12 @@ final class NativeTabRailView: UIView {
     static let width = itemSize + 2 * padding
 
     var onSelect: ((Int) -> Void)?
-    // la safe area cambia al girar, abrir o plegar: el plugin recoloca el rail en la columna.
-    var onSafeAreaChange: (() -> Void)?
     private let stack = UIStackView()
     private var tabs: [NativeTab] = []
     private var selected: Int?
     private var tint: UIColor?
+    // índices apagados: uikit los atenúa y no reciben toques.
+    private var disabled: Set<Int> = []
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -429,11 +546,6 @@ final class NativeTabRailView: UIView {
         fatalError("NativeTabRailView no se crea desde un storyboard")
     }
 
-    override func safeAreaInsetsDidChange() {
-        super.safeAreaInsetsDidChange()
-        onSafeAreaChange?()
-    }
-
     // un botón por pestaña, solo si cambian (el render llega en cada cambio de la web).
     func setTabs(_ next: [NativeTab]) {
         guard next != tabs else { return }
@@ -443,12 +555,23 @@ final class NativeTabRailView: UIView {
         restyle()
     }
 
-    func apply(selected: Int?, dark: Bool, tint: UIColor?) {
+    func apply(selected: Int?, dark: Bool, tint: UIColor?, disabled: Set<Int> = []) {
         overrideUserInterfaceStyle = dark ? .dark : .light
-        guard selected != self.selected || tint != self.tint else { return }
+        guard selected != self.selected || tint != self.tint || disabled != self.disabled else { return }
         self.selected = selected
         self.tint = tint
+        self.disabled = disabled
         restyle()
+    }
+
+    // caja del botón `index` en `view`: su alto y el ancho de la cápsula entera, para que lo que la
+    // web saque a su lado (un menú) no pise el cristal.
+    func anchor(of index: Int, in view: UIView) -> CGRect? {
+        guard stack.arrangedSubviews.indices.contains(index) else { return nil }
+        let button = stack.arrangedSubviews[index]
+        let item = button.convert(button.bounds, to: view)
+        let capsule = convert(bounds, to: view)
+        return CGRect(x: capsule.minX, y: item.minY, width: capsule.width, height: item.height)
     }
 
     private func button(for tab: NativeTab, at index: Int) -> UIButton {
@@ -474,7 +597,12 @@ final class NativeTabRailView: UIView {
             config.background.backgroundColor = active ? accent.withAlphaComponent(NativeTabRailView.selectedFillAlpha) : .clear
             config.cornerStyle = .capsule
             button.configuration = config
-            button.accessibilityTraits = active ? [.button, .selected] : .button
+            let enabled = !disabled.contains(index)
+            button.isEnabled = enabled
+            // los traits a mano pisan los que uikit calcula: el apagado también se declara aquí.
+            var traits: UIAccessibilityTraits = active ? [.button, .selected] : .button
+            if !enabled { traits.insert(.notEnabled) }
+            button.accessibilityTraits = traits
         }
     }
 
