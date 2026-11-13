@@ -19,8 +19,8 @@ packages/
               openobserve (./browser) con su proxy y la subida de source maps
   auth/       tabla canónica de sesiones + servicio de ciclo de vida
   ui/         componentes svelte compartidos (SettingsTabs, SessionsPanel,
-              PrivacyPolicy, Support, LanguageSwitcher) + http + i18n +
-              base.css (primitivas css móvil/táctil)
+              DocPage + PrivacyPolicy + Support, LanguageSwitcher) + http +
+              i18n + base.css (primitivas css móvil/táctil)
   mobile/     shell capacitor (config factory; spa empaquetada + api remota via
               VITE_API_BASE) + compact + system-bars + connectivity + deep-link
 tooling/
@@ -309,6 +309,17 @@ app.css): sin inflado de texto de iOS en `html` (`text-size-adjust: 100%`; webki
 agranda solo los bloques de varias líneas según el ancho), anti-zoom de iOS en inputs
 (`<16px` dispara zoom al enfocar), utilidad `.u-safe-px` (safe-area lateral en
 landscape) y `.u-touch-show` (reveal-en-táctil).
+
+**páginas secundarias** (`/privacy`, `/support`, guías, documentación): todas sobre
+`@platform/ui/DocPage.svelte` (barra con marca, cabecera, índice fijo en escritorio y chips en
+móvil, secciones `DocSection` numeradas, pie con las demás páginas). lo común de la app se fija
+una vez en el layout de un grupo de rutas `(doc)` con `setDocShell` (`@platform/ui/doc-shell`):
+nombre, contacto, idioma, marca, acciones de la barra, enlaces del pie y el `afterNavigate` de
+sveltekit (inyectado: con él, el enlace de la barra vuelve a la vista de la que se vino). `PrivacyPolicy` y
+`Support` ya montan el armazón; lo propio de la app va en `extra` (secciones con su entrada en
+el índice). el tema sale de los tokens `--ui-*` (además de los de siempre: `--ui-text-strong`,
+`--ui-font-mono`, `--ui-bg-sunken`), y la prosa del contenido tiene especificidad de una clase,
+así que las clases scoped de la página ganan.
 
 **drag & drop**: el drag HTML5 (`draggable`/`dataTransfer`) **no existe en iOS
 Safari/WKWebView**. si una vista lo usa, dale una alternativa táctil (menú/acciones);

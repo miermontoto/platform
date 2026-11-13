@@ -1,11 +1,11 @@
 <script module lang="ts">
-  // página de soporte compartida por todas las herramientas de la plataforma.
-  // App Store y Play exigen una URL de soporte pública; en vez de reescribirla en
-  // cada app (duckhunt, sis, carreterinas), cada una monta esta en /support
-  // pasando su nombre, contacto y un FAQ propio. el copy por defecto (contacto +
-  // borrado de cuenta, comunes a toda la plataforma) es bilingüe es/en; el FAQ
-  // específico de la app se pasa por `faq`. hermana de PrivacyPolicy.svelte.
-  export type SupportLang = 'es' | 'en';
+  // página de soporte compartida por todas las herramientas de la plataforma, sobre el armazón
+  // DocPage (nombre, contacto e idioma salen de setDocShell). App Store y Play exigen una URL de
+  // soporte pública; en vez de reescribirla en cada app (duckhunt, sis, carreterinas), cada una
+  // monta esta en /support con su FAQ propio. el copy por defecto (contacto + borrado de cuenta,
+  // comunes a toda la plataforma) es bilingüe es/en; el FAQ específico de la app se pasa por `faq`
+  // y sus secciones propias por `extra`. hermana de PrivacyPolicy.svelte.
+  import type { DocLang } from './doc-shell';
 
   // pregunta/respuesta; en `a` el token {email} se renderiza como enlace mailto
   export interface SupportFaqItem {
@@ -13,203 +13,199 @@
     a: string;
   }
 
-  // textos de chrome por idioma. {app}/{email}/{days} se interpolan.
-  export const SUPPORT_STRINGS: Record<
-    SupportLang,
+  // textos de croma por idioma
+  const SUPPORT_STRINGS: Record<
+    DocLang,
     {
       title: string;
+      kicker: string;
       intro: (app: string) => string;
-      contactHeading: string;
-      contactLine: string; // contiene {email}
+      contact: string;
       response: (days: string) => string;
-      faqHeading: string;
-      privacyLink: string; // contiene el ancla a la política
+      faq: string;
       defaultResponseDays: string;
+      // FAQ por defecto: solo lo común a toda la plataforma (borrado de cuenta/datos, requisito
+      // RGPD que toda app con cuentas debe ofrecer)
+      defaultFaq: SupportFaqItem[];
     }
   > = {
     es: {
       title: 'Soporte',
+      kicker: 'Ayuda',
       intro: (app) => `¿Necesitas ayuda con ${app}? Escríbenos y te respondemos.`,
-      contactHeading: 'Contacto',
-      contactLine: 'Correo: {email}',
+      contact: 'Escríbenos',
       response: (days) => `Solemos responder en ${days}.`,
-      faqHeading: 'Preguntas frecuentes',
-      privacyLink: 'Consulta también nuestra política de privacidad.',
+      faq: 'Preguntas frecuentes',
       defaultResponseDays: 'uno o dos días laborables',
+      defaultFaq: [
+        {
+          q: '¿Cómo elimino mi cuenta y mis datos?',
+          a: 'Escríbenos a {email} desde el correo de tu cuenta y eliminamos la cuenta y sus datos asociados.',
+        },
+      ],
     },
     en: {
       title: 'Support',
+      kicker: 'Help',
       intro: (app) => `Need help with ${app}? Reach out and we'll get back to you.`,
-      contactHeading: 'Contact',
-      contactLine: 'Email: {email}',
+      contact: 'Write to us',
       response: (days) => `We usually reply within ${days}.`,
-      faqHeading: 'FAQ',
-      privacyLink: 'See also our privacy policy.',
+      faq: 'FAQ',
       defaultResponseDays: 'one or two business days',
+      defaultFaq: [
+        {
+          q: 'How do I delete my account and data?',
+          a: 'Email us at {email} from your account address and we will delete your account and its associated data.',
+        },
+      ],
     },
   };
-
-  // FAQ por defecto: solo lo común a toda la plataforma (borrado de cuenta/datos,
-  // requisito RGPD que toda app con cuentas debe ofrecer). lo específico de la app
-  // (qué hace, cómo se usa) se pasa por `faq` y reemplaza este default.
-  export function defaultSupportFaq(lang: SupportLang): SupportFaqItem[] {
-    return lang === 'en'
-      ? [
-          {
-            q: 'How do I delete my account and data?',
-            a: 'Email us at {email} from your account address and we will delete your account and its associated data.',
-          },
-        ]
-      : [
-          {
-            q: '¿Cómo elimino mi cuenta y mis datos?',
-            a: 'Escríbenos a {email} desde el correo de tu cuenta y eliminamos la cuenta y sus datos asociados.',
-          },
-        ];
-  }
 </script>
 
 <script lang="ts">
-  import type { Snippet } from 'svelte';
+  import DocPage from './DocPage.svelte';
+  import DocSection from './DocSection.svelte';
+  import { getDocShell, type DocExtraSection } from './doc-shell';
   import { emailSegments } from './segments';
 
   let {
-    appName,
-    contactEmail,
-    lang = 'es',
+    lang,
     responseDays = null,
-    privacyHref = '/privacy',
-    title = null,
-    intro = null,
     faq = null,
-    children = null,
+    extra = [],
   }: {
-    appName: string;
-    contactEmail: string;
-    lang?: SupportLang;
+    // override del idioma del shell
+    lang?: DocLang;
     // tiempo de respuesta legible; si null se usa el por defecto del idioma
     responseDays?: string | null;
-    // ancla a la política de privacidad; null oculta la línea
-    privacyHref?: string | null;
-    // override del título/intro por defecto del idioma
-    title?: string | null;
-    intro?: string | null;
-    // FAQ de la app; reemplaza el FAQ por defecto (solo borrado de cuenta). null
-    // usa defaultSupportFaq(lang)
+    // FAQ de la app; reemplaza el por defecto (solo borrado de cuenta)
     faq?: SupportFaqItem[] | null;
-    // contenido extra específico de la app, tras el FAQ y antes del enlace a privacidad
-    children?: Snippet | null;
+    // secciones propias de la app, tras el FAQ
+    extra?: DocExtraSection[];
   } = $props();
 
-  const strings = $derived(SUPPORT_STRINGS[lang]);
-  const resolvedTitle = $derived(title ?? strings.title);
-  const resolvedIntro = $derived(intro ?? strings.intro(appName));
-  const resolvedDays = $derived(responseDays ?? strings.defaultResponseDays);
-  const resolvedFaq = $derived(faq ?? defaultSupportFaq(lang));
-
-  const segments = (text: string) => emailSegments(text, contactEmail);
+  const shell = getDocShell();
+  const resolvedLang = $derived(lang ?? shell.lang ?? 'es');
+  const strings = $derived(SUPPORT_STRINGS[resolvedLang]);
+  const resolvedFaq = $derived(faq ?? strings.defaultFaq);
 </script>
 
-<article class="ui-support">
-  <header>
-    <h1>{resolvedTitle}</h1>
-  </header>
+<DocPage title={strings.title} kicker={strings.kicker} lang={resolvedLang}>
+  {#snippet intro()}<p>{strings.intro(shell.appName)}</p>{/snippet}
 
-  {#if resolvedIntro}<p class="ui-support-intro">{resolvedIntro}</p>{/if}
-
-  <section class="ui-support-contact">
-    <h2>{strings.contactHeading}</h2>
-    <p>
-      {#each segments(strings.contactLine) as seg}
-        {#if seg.kind === 'email'}<a href="mailto:{seg.value}">{seg.value}</a>{:else}{seg.value}{/if}
-      {/each}
-    </p>
-    <p class="ui-support-response">{strings.response(resolvedDays)}</p>
-  </section>
+  {#snippet summary()}
+    <p class="ui-support-label">{strings.contact}</p>
+    <a class="ui-support-mail" href="mailto:{shell.contactEmail}">
+      <svg viewBox="0 0 20 20" aria-hidden="true"><rect x="2.5" y="4.5" width="15" height="11" rx="1.5" /><path d="M3 5.5l7 5.5 7-5.5" /></svg>
+      {shell.contactEmail}
+    </a>
+    <p class="ui-support-response">{strings.response(responseDays ?? strings.defaultResponseDays)}</p>
+  {/snippet}
 
   {#if resolvedFaq.length > 0}
-    <h2 class="ui-support-faq-heading">{strings.faqHeading}</h2>
-    {#each resolvedFaq as item (item.q)}
-      <section class="ui-support-faq">
-        <h3>{item.q}</h3>
-        <p>
-          {#each segments(item.a) as seg}
-            {#if seg.kind === 'email'}<a href="mailto:{seg.value}">{seg.value}</a>{:else}{seg.value}{/if}
-          {/each}
-        </p>
-      </section>
-    {/each}
+    <DocSection id="faq" title={strings.faq}>
+      <div class="ui-support-faq">
+        {#each resolvedFaq as item (item.q)}
+          <details>
+            <summary>{item.q}</summary>
+            <p>
+              {#each emailSegments(item.a, shell.contactEmail) as seg}
+                {#if seg.kind === 'email'}<a href="mailto:{seg.value}">{seg.value}</a>{:else}{seg.value}{/if}
+              {/each}
+            </p>
+          </details>
+        {/each}
+      </div>
+    </DocSection>
   {/if}
 
-  {#if children}{@render children()}{/if}
-
-  {#if privacyHref}
-    <p class="ui-support-privacy">
-      {#each strings.privacyLink.split(/(política de privacidad|privacy policy)/) as part}
-        {#if part === 'política de privacidad' || part === 'privacy policy'}<a href={privacyHref}>{part}</a>{:else}{part}{/if}
-      {/each}
-    </p>
-  {/if}
-</article>
+  {#each extra as section (section.id)}
+    <DocSection id={section.id} title={section.title}>{@render section.body()}</DocSection>
+  {/each}
+</DocPage>
 
 <style>
-  .ui-support {
-    max-width: var(--ui-prose-width, 42rem);
-    color: var(--ui-text, inherit);
-    line-height: 1.6;
+  .ui-support-label {
+    margin: 0 0 0.5rem;
+    font-family: var(--doc-mono);
+    font-size: 0.68rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--doc-muted);
   }
-  .ui-support header {
-    margin-bottom: var(--ui-section-gap, 1.5rem);
+  .ui-support-mail {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.6rem;
+    font-size: 1.2rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    color: var(--doc-accent);
+    text-decoration: none;
+    overflow-wrap: anywhere;
   }
-  .ui-support h1 {
-    margin: 0;
-    font-size: 1.4rem;
+  .ui-support-mail:hover {
+    text-decoration: underline;
+    text-underline-offset: 0.18em;
   }
-  .ui-support-intro {
-    margin: 0 0 var(--ui-section-gap, 1.5rem);
-    color: var(--ui-text-muted, color-mix(in srgb, currentColor 70%, transparent));
-  }
-  .ui-support-contact {
-    margin-bottom: var(--ui-section-gap, 1.5rem);
-    padding: 1rem;
-    border: 1px solid var(--ui-rule, color-mix(in srgb, currentColor 12%, transparent));
-    border-radius: var(--ui-radius, 0.5rem);
-  }
-  .ui-support-contact h2 {
-    margin: 0 0 0.4rem;
-    font-size: 0.95rem;
+  .ui-support-mail svg {
+    flex: none;
+    width: 1.2rem;
+    height: 1.2rem;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.5;
+    stroke-linejoin: round;
   }
   .ui-support-response {
-    color: var(--ui-text-muted, color-mix(in srgb, currentColor 70%, transparent));
+    margin: 0.45rem 0 0;
+    font-size: 0.85rem;
+    color: var(--doc-muted);
   }
-  .ui-support-faq-heading {
-    margin: 0 0 0.75rem;
-    font-size: 0.95rem;
-    letter-spacing: 0.02em;
-  }
+
+  /* acordeón nativo: se abre sin js (la página puede ir prerenderizada) */
   .ui-support-faq {
-    margin-bottom: 1rem;
+    border-top: 1px solid var(--doc-rule);
   }
-  .ui-support-faq h3 {
-    margin: 0 0 0.25rem;
-    font-size: 0.9rem;
+  details {
+    border-bottom: 1px solid var(--doc-rule);
   }
-  .ui-support p {
-    margin: 0 0 0.6rem;
-    font-size: 0.9rem;
+  summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.95rem 0;
+    font-weight: 600;
+    line-height: 1.4;
+    color: var(--doc-strong);
+    list-style: none;
+    cursor: pointer;
   }
-  .ui-support-contact p:last-child,
-  .ui-support-faq p:last-child {
-    margin-bottom: 0;
+  summary::-webkit-details-marker {
+    display: none;
   }
-  .ui-support-privacy {
-    margin-top: var(--ui-section-gap, 1.5rem);
-    font-size: 0.8rem;
-    color: var(--ui-text-muted, color-mix(in srgb, currentColor 70%, transparent));
+  summary::after {
+    content: '+';
+    flex: none;
+    font-family: var(--doc-mono);
+    font-size: 1.1rem;
+    font-weight: 400;
+    color: var(--doc-accent);
+    transition: transform 0.2s ease;
   }
-  .ui-support a {
-    color: var(--ui-accent, inherit);
-    text-decoration: underline;
-    text-underline-offset: 0.15em;
+  details[open] summary::after {
+    transform: rotate(45deg);
+  }
+  summary:hover {
+    color: var(--doc-accent);
+  }
+  summary:focus-visible {
+    outline: 2px solid var(--doc-accent);
+    outline-offset: 2px;
+  }
+  details p {
+    margin: 0;
+    padding: 0 2rem 1.1rem 0;
   }
 </style>

@@ -1,62 +1,75 @@
 <script module lang="ts">
-  // política de privacidad compartida por todas las herramientas de la plataforma.
-  // el copy por defecto refleja lo que las apps tratan de verdad (ver @platform/auth
-  // y @platform/mobile): cuenta + sesiones (token hasheado, fechas, user-agent) en
-  // sqlite local y diagnóstico técnico propio (@platform/observability: errores y rendimiento,
-  // 14 días en el backend), sin analítica ni sdks de terceros. cada app la monta en /privacy
-  // pasando su nombre, contacto y, si usa login de terceros, su proveedor.
+  // política de privacidad compartida por todas las herramientas de la plataforma, sobre el
+  // armazón DocPage (nombre, contacto e idioma salen de setDocShell). el copy por defecto refleja
+  // lo que las apps tratan de verdad (ver @platform/auth y @platform/mobile): cuenta + sesiones
+  // (token hasheado, fechas, user-agent) en sqlite local y diagnóstico técnico propio
+  // (@platform/observability: errores y rendimiento, 14 días en el backend), sin analítica ni
+  // sdks de terceros. cada app la monta en /privacy pasando, si usa login de terceros, su proveedor.
   //
-  // bilingüe (es/en): sis va en inglés, duckhunt/carreterinas en español. para
-  // contenido específico de una app (datos que sincroniza, servicios conectados)
-  // se le pasa un snippet `children` que se renderiza tras las secciones.
-  export type PrivacyLang = 'es' | 'en';
+  // bilingüe (es/en): sis va en inglés, duckhunt/carreterinas en español. el contenido específico
+  // de una app (datos que sincroniza, servicios conectados) va en `extra`: secciones con su
+  // entrada en el índice, tras las de por defecto.
+  import type { DocLang } from './doc-shell';
 
-  export interface PrivacySection {
+  interface PrivacySection {
+    // ancla estable entre idiomas
+    id: string;
     title: string;
     // párrafos en texto plano; el token {email} se renderiza como enlace mailto
     body: string[];
   }
 
-  export interface PrivacyDefaultsOptions {
-    appName: string;
-    lang?: PrivacyLang;
-    // proveedor de login de terceros (ej. 'Spotify'); null si la app gestiona
-    // credenciales propias (email/contraseña)
-    authProvider?: string | null;
-    // true si la app usa analítica o sdks de terceros (default false: el copy
-    // afirma explícitamente que no hay seguimiento)
-    analytics?: boolean;
-  }
+  // días que el backend de observabilidad conserva el diagnóstico técnico (tooling/observability)
+  const DIAGNOSTICS_RETENTION_DAYS = 14;
 
-  // textos de chrome (título, intro, etiqueta de fecha) por idioma
-  export const PRIVACY_STRINGS: Record<PrivacyLang, { title: string; updated: string; intro: (app: string) => string }> = {
+  // textos de croma y resumen "de un vistazo" por idioma
+  const PRIVACY_STRINGS: Record<
+    DocLang,
+    {
+      title: string;
+      kicker: string;
+      glance: string;
+      intro: (app: string) => string;
+      glanceItems: (provider: string | null, analytics: boolean) => string[];
+    }
+  > = {
     es: {
       title: 'Política de privacidad',
-      updated: 'Última actualización',
+      kicker: 'Legal',
+      glance: 'De un vistazo',
       intro: (app) =>
         `En ${app} tratamos los menos datos posibles y solo los necesarios para que la herramienta funcione. Esta página explica qué recogemos, para qué y qué control tienes.`,
+      glanceItems: (provider, analytics) => [
+        provider
+          ? `Entras con ${provider}: nunca vemos tu contraseña.`
+          : 'Tu contraseña se guarda cifrada, nunca en claro.',
+        analytics
+          ? 'Solo medición propia, sin analítica de terceros.'
+          : 'Sin analítica, rastreadores ni SDKs de terceros.',
+        'Nunca vendemos tus datos ni los usamos para publicidad.',
+        `El diagnóstico técnico se borra a los ${DIAGNOSTICS_RETENTION_DAYS} días.`,
+        'Puedes pedir acceso, corrección o borrado cuando quieras.',
+      ],
     },
     en: {
       title: 'Privacy policy',
-      updated: 'Last updated',
+      kicker: 'Legal',
+      glance: 'At a glance',
       intro: (app) =>
         `${app} processes as little data as possible — only what the tool needs to work. This page explains what we collect, why, and what control you have.`,
+      glanceItems: (provider, analytics) => [
+        provider
+          ? `You sign in with ${provider}: we never see your password.`
+          : 'Your password is stored hashed, never in plain text.',
+        analytics
+          ? 'First-party measurement only, no third-party analytics.'
+          : 'No third-party analytics, trackers or SDKs.',
+        'We never sell your data or use it for advertising.',
+        `Diagnostic data is deleted after ${DIAGNOSTICS_RETENTION_DAYS} days.`,
+        'You can ask for access, correction or erasure at any time.',
+      ],
     },
   };
-
-  // secciones por defecto, derivadas de los datos reales que trata la plataforma.
-  // exportada para que una app haga spread y retoque (`defaultPrivacySections(o)`
-  // y luego edita/añade) en vez de reescribir la política entera.
-  export function defaultPrivacySections({
-    appName,
-    lang = 'es',
-    authProvider = null,
-    analytics = false,
-  }: PrivacyDefaultsOptions): PrivacySection[] {
-    return lang === 'en'
-      ? sectionsEn(appName, authProvider, analytics)
-      : sectionsEs(appName, authProvider, analytics);
-  }
 
   function sectionsEs(app: string, provider: string | null, analytics: boolean): PrivacySection[] {
     const login = provider
@@ -69,12 +82,14 @@
 
     return [
       {
+        id: 'controller',
         title: 'Responsable del tratamiento',
         body: [
           `El responsable del tratamiento de los datos que se recogen al usar ${app} es la persona que opera esta herramienta. Puedes contactar para cualquier cuestión de privacidad en {email}.`,
         ],
       },
       {
+        id: 'data',
         title: 'Qué datos tratamos',
         body: [
           login,
@@ -84,6 +99,7 @@
         ],
       },
       {
+        id: 'use',
         title: 'Para qué los usamos',
         body: [
           'Usamos estos datos exclusivamente para autenticarte, mantener tu sesión, prestarte el servicio, mantener su seguridad (por ejemplo, detectar accesos no autorizados) y diagnosticar y corregir sus fallos. No los usamos para ninguna otra finalidad sin tu consentimiento.',
@@ -91,6 +107,7 @@
         ],
       },
       {
+        id: 'storage',
         title: 'Dónde se guardan',
         body: [
           `Los datos se almacenan en la base de datos propia del servicio de ${app}, en su servidor. No se transfieren a terceros, salvo, en su caso, al proveedor de inicio de sesión durante la autenticación.`,
@@ -98,14 +115,16 @@
         ],
       },
       {
+        id: 'retention',
         title: 'Cuánto tiempo los conservamos',
         body: [
           'Las sesiones caducan automáticamente y se eliminan al hacerlo o cuando cierras sesión. Los códigos temporales que se emiten durante el inicio de sesión en la app móvil viven solo unos segundos y se descartan tras un único uso.',
           'Los datos de tu cuenta se conservan mientras la mantengas activa. Si solicitas la baja, se eliminan salvo que debamos conservar algo por una obligación legal.',
-          'Los datos técnicos de diagnóstico se eliminan automáticamente a los 14 días.',
+          `Los datos técnicos de diagnóstico se eliminan automáticamente a los ${DIAGNOSTICS_RETENTION_DAYS} días.`,
         ],
       },
       {
+        id: 'rights',
         title: 'Tus derechos',
         body: [
           'Puedes solicitar el acceso, la rectificación, la supresión y la portabilidad de tus datos, así como oponerte o limitar su tratamiento, conforme al Reglamento General de Protección de Datos (RGPD).',
@@ -113,12 +132,14 @@
         ],
       },
       {
+        id: 'mobile',
         title: 'Aplicaciones móviles',
         body: [
           `Las apps móviles de ${app} empaquetan la misma interfaz que la versión web y se comunican con el mismo servicio. Solicitan los permisos mínimos imprescindibles para funcionar y no recopilan datos del dispositivo más allá de lo descrito en esta política.`,
         ],
       },
       {
+        id: 'changes',
         title: 'Cambios en esta política',
         body: [
           'Si cambiamos esta política, publicaremos la versión actualizada en esta misma página con su nueva fecha de actualización. Te recomendamos revisarla de vez en cuando.',
@@ -138,12 +159,14 @@
 
     return [
       {
+        id: 'controller',
         title: 'Data controller',
         body: [
           `The controller of the data collected when you use ${app} is the person who operates this tool. For any privacy matter you can reach out at {email}.`,
         ],
       },
       {
+        id: 'data',
         title: 'What data we process',
         body: [
           login,
@@ -153,6 +176,7 @@
         ],
       },
       {
+        id: 'use',
         title: 'How we use it',
         body: [
           'We use this data solely to authenticate you, keep your session, provide the service, keep it secure (for example, detecting unauthorized access) and diagnose and fix its problems. We do not use it for any other purpose without your consent.',
@@ -160,6 +184,7 @@
         ],
       },
       {
+        id: 'storage',
         title: 'Where it is stored',
         body: [
           `Data is stored in ${app}'s own service database, on its server. It is not transferred to third parties, except, where applicable, to the sign-in provider during authentication.`,
@@ -167,14 +192,16 @@
         ],
       },
       {
+        id: 'retention',
         title: 'How long we keep it',
         body: [
           'Sessions expire automatically and are deleted when they do, or when you log out. The temporary codes issued during sign-in on the mobile app live for only a few seconds and are discarded after a single use.',
           'Your account data is kept while your account stays active. If you ask to close it, the data is deleted unless we must retain something to meet a legal obligation.',
-          'Technical diagnostic data is deleted automatically after 14 days.',
+          `Technical diagnostic data is deleted automatically after ${DIAGNOSTICS_RETENTION_DAYS} days.`,
         ],
       },
       {
+        id: 'rights',
         title: 'Your rights',
         body: [
           'You may request access, rectification, erasure and portability of your data, and object to or restrict its processing, under the General Data Protection Regulation (GDPR).',
@@ -182,12 +209,14 @@
         ],
       },
       {
+        id: 'mobile',
         title: 'Mobile apps',
         body: [
           `${app}’s mobile apps bundle the same interface as the web version and talk to the same service. They request the minimum permissions required to work and collect no device data beyond what this policy describes.`,
         ],
       },
       {
+        id: 'changes',
         title: 'Changes to this policy',
         body: [
           'If we change this policy, we will publish the updated version on this same page with its new last-updated date. We recommend reviewing it from time to time.',
@@ -198,120 +227,117 @@
 </script>
 
 <script lang="ts">
-  import type { Snippet } from 'svelte';
+  import DocPage from './DocPage.svelte';
+  import DocSection from './DocSection.svelte';
+  import { getDocShell, type DocExtraSection } from './doc-shell';
   import { emailSegments } from './segments';
 
   let {
-    appName,
-    contactEmail,
-    lang = 'es',
     updated = null,
     authProvider = null,
     analytics = false,
-    title = null,
-    intro = null,
-    sections = null,
-    children = null,
+    lang,
+    extra = [],
   }: {
-    appName: string;
-    contactEmail: string;
-    lang?: PrivacyLang;
-    // fecha de última actualización; si se omite no se muestra la línea
-    updated?: Date | string | number | null;
+    // fecha de última actualización (YYYY-MM-DD); si se omite no se muestra la línea
+    updated?: string | Date | null;
+    // proveedor de login de terceros (ej. 'Spotify'); null si la app gestiona credenciales
+    // propias (email/contraseña)
     authProvider?: string | null;
+    // true si la app usa analítica o sdks de terceros (default false: el copy afirma
+    // explícitamente que no hay seguimiento)
     analytics?: boolean;
-    // override del título/intro por defecto del idioma
-    title?: string | null;
-    intro?: string | null;
-    // reemplaza por completo las secciones por defecto; si null se usan las de
-    // defaultPrivacySections() con los props de esta instancia
-    sections?: PrivacySection[] | null;
-    // contenido extra específico de la app, renderizado tras las secciones
-    children?: Snippet | null;
+    // override del idioma del shell
+    lang?: DocLang;
+    // secciones propias de la app, tras las de por defecto
+    extra?: DocExtraSection[];
   } = $props();
 
-  const strings = $derived(PRIVACY_STRINGS[lang]);
-  const resolvedTitle = $derived(title ?? strings.title);
-  const resolvedIntro = $derived(intro ?? strings.intro(appName));
-  const resolved = $derived(
-    sections ?? defaultPrivacySections({ appName, lang, authProvider, analytics }),
+  const shell = getDocShell();
+  const resolvedLang = $derived(lang ?? shell.lang ?? 'es');
+  const strings = $derived(PRIVACY_STRINGS[resolvedLang]);
+  const sections = $derived(
+    (resolvedLang === 'en' ? sectionsEn : sectionsEs)(shell.appName, authProvider, analytics),
   );
-
-  const updatedLabel = $derived.by(() => {
-    if (updated == null) return null;
-    const d = updated instanceof Date ? updated : new Date(updated);
-    return Number.isNaN(d.getTime())
-      ? null
-      : new Intl.DateTimeFormat(lang, { dateStyle: 'long' }).format(d);
-  });
-
-  const segments = (text: string) => emailSegments(text, contactEmail);
+  const glance = $derived(strings.glanceItems(authProvider, analytics));
 </script>
 
-<article class="ui-privacy">
-  <header>
-    <h1>{resolvedTitle}</h1>
-    {#if updatedLabel}<p class="ui-privacy-updated">{strings.updated}: {updatedLabel}</p>{/if}
-  </header>
+<DocPage
+  title={strings.title}
+  kicker={strings.kicker}
+  {updated}
+  lang={resolvedLang}
+  toc={[...sections, ...extra]}
+>
+  {#snippet intro()}<p>{strings.intro(shell.appName)}</p>{/snippet}
 
-  {#if resolvedIntro}<p class="ui-privacy-intro">{resolvedIntro}</p>{/if}
+  {#snippet summary()}
+    <p class="ui-privacy-glance-label">{strings.glance}</p>
+    <ul class="ui-privacy-glance">
+      {#each glance as item (item)}
+        <li>
+          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 8.5l3 3 6-7" /></svg>
+          {item}
+        </li>
+      {/each}
+    </ul>
+  {/snippet}
 
-  {#each resolved as section (section.title)}
-    <section>
-      <h2>{section.title}</h2>
+  {#each sections as section (section.id)}
+    <DocSection id={section.id} title={section.title}>
       {#each section.body as paragraph (paragraph)}
         <p>
-          {#each segments(paragraph) as seg}
+          {#each emailSegments(paragraph, shell.contactEmail) as seg}
             {#if seg.kind === 'email'}<a href="mailto:{seg.value}">{seg.value}</a>{:else}{seg.value}{/if}
           {/each}
         </p>
       {/each}
-    </section>
+    </DocSection>
   {/each}
 
-  {#if children}{@render children()}{/if}
-</article>
+  {#each extra as section (section.id)}
+    <DocSection id={section.id} title={section.title}>{@render section.body()}</DocSection>
+  {/each}
+</DocPage>
 
 <style>
-  .ui-privacy {
-    max-width: var(--ui-prose-width, 42rem);
-    color: var(--ui-text, inherit);
-    line-height: 1.6;
+  .ui-privacy-glance-label {
+    margin: 0 0 0.75rem;
+    font-family: var(--doc-mono);
+    font-size: 0.68rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--doc-muted);
   }
-  .ui-privacy header {
-    margin-bottom: var(--ui-section-gap, 1.5rem);
-  }
-  .ui-privacy h1 {
+  .ui-privacy-glance {
+    display: grid;
+    gap: 0.6rem 1.75rem;
     margin: 0;
-    font-size: 1.4rem;
-  }
-  .ui-privacy-updated {
-    margin: 0.35rem 0 0;
-    font-size: 0.75rem;
-    color: var(--ui-text-muted, color-mix(in srgb, currentColor 55%, transparent));
-  }
-  .ui-privacy-intro {
-    margin: 0 0 var(--ui-section-gap, 1.5rem);
-    color: var(--ui-text-muted, color-mix(in srgb, currentColor 70%, transparent));
-  }
-  .ui-privacy section {
-    margin-bottom: var(--ui-section-gap, 1.5rem);
-  }
-  .ui-privacy h2 {
-    margin: 0 0 0.5rem;
-    font-size: 0.95rem;
-    letter-spacing: 0.02em;
-  }
-  .ui-privacy p {
-    margin: 0 0 0.6rem;
+    padding: 0;
+    list-style: none;
     font-size: 0.9rem;
+    line-height: 1.45;
+    color: var(--ui-text, inherit);
   }
-  .ui-privacy section p:last-child {
-    margin-bottom: 0;
+  .ui-privacy-glance li {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.6rem;
   }
-  .ui-privacy a {
-    color: var(--ui-accent, inherit);
-    text-decoration: underline;
-    text-underline-offset: 0.15em;
+  .ui-privacy-glance svg {
+    flex: none;
+    width: 1rem;
+    height: 1rem;
+    margin-top: 0.1rem;
+    fill: none;
+    stroke: var(--doc-accent);
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+  @media (min-width: 40rem) {
+    .ui-privacy-glance {
+      grid-template-columns: 1fr 1fr;
+    }
   }
 </style>

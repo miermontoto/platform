@@ -11,6 +11,9 @@
     "./i18n": "./src/i18n.ts",
     "./SettingsTabs.svelte": "./src/SettingsTabs.svelte",
     "./SessionsPanel.svelte": "./src/SessionsPanel.svelte",
+    "./doc-shell": "./src/doc-shell.ts",
+    "./DocPage.svelte": "./src/DocPage.svelte",
+    "./DocSection.svelte": "./src/DocSection.svelte",
     "./PrivacyPolicy.svelte": "./src/PrivacyPolicy.svelte",
     "./Support.svelte": "./src/Support.svelte",
     "./LanguageSwitcher.svelte": "./src/LanguageSwitcher.svelte"
