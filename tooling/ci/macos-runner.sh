@@ -25,8 +25,9 @@
 # que dejaría a sudo sin terminal. una línea por repo: "<owner/repo> [token]". el token de registro (1 h de vida)
 # solo hace falta para un repo que aún no tenga runner en este mac:
 #   gh api -X POST repos/<owner/repo>/actions/runners/registration-token -q .token
+# el fichero lleva tokens: tiene que ser de quien ejecuta y con modo 600, y se borra al leerlo.
 #
-#   tooling/ci/macos-runner.sh --user adm-juan --name mac-1 --repos /tmp/repos
+#   tooling/ci/macos-runner.sh --user adm-juan --name mac-1 --repos ~/runner-repos
 
 set -euo pipefail
 
@@ -37,6 +38,8 @@ readonly RUBY_BIN=/opt/homebrew/opt/ruby/bin
 readonly JDK_HOME=/opt/homebrew/opt/openjdk@21
 readonly SDKMANAGER=/opt/homebrew/bin/sdkmanager
 readonly DAEMON_DIR=/Library/LaunchDaemons
+# owner/repo de github: el nombre acaba en rutas y en la etiqueta de launchd
+readonly REPO_RE='^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$'
 
 RUNNER_USER="" REPOS_FILE="" NAME="$(hostname -s)" LABEL=ia01-macos NICE=5
 ANDROID_PACKAGES="cmdline-tools;latest platform-tools platforms;android-36 build-tools;35.0.0 build-tools;36.0.0"
@@ -63,7 +66,9 @@ id "$RUNNER_USER" >/dev/null 2>&1 || die "no existe el usuario $RUNNER_USER: cr�
 [[ -x $BREW && -O /opt/homebrew ]] || die "homebrew en /opt/homebrew, y este script como su dueño ($(stat -f %Su /opt/homebrew 2>/dev/null))"
 xcode-select -p >/dev/null || die "falta Xcode (xcodes install …)"
 
+[[ $(stat -f '%Su %Lp' "$REPOS_FILE") == "$(id -un) 600" ]] || die "$REPOS_FILE lleva tokens: debe ser tuyo y con modo 600"
 REPOS=$(cat "$REPOS_FILE")
+rm -f "$REPOS_FILE"
 UHOME=$(dscl . -read "/Users/$RUNNER_USER" NFSHomeDirectory | awk '{print $2}')
 readonly SDK="$UHOME/Library/Android/sdk" GEMS="$UHOME/.gem" RUNNERS="$UHOME/actions-runner"
 # PATH de los jobs (.path del runner): gems del usuario y ruby de homebrew delante del ruby del sistema
@@ -175,6 +180,7 @@ install_user_toolchain
 TGZ=$(runner_dist)
 while read -r repo token <&3; do
   [[ -n $repo ]] || continue
+  [[ $repo =~ $REPO_RE && $repo != *..* ]] || die "repo inválido: $repo (owner/repo)"
   configure_runner "$repo" "${token:-}" "$TGZ"
   install_daemon "$repo"
 done 3<<< "$REPOS"

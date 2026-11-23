@@ -254,11 +254,13 @@ contraseña:
 
 ```bash
 # token solo para los repos que aún no tienen runner en ese mac (caduca en 1 h)
-(umask 077; for r in duckhunt sis carreterinas; do
+# (el fichero lleva los tokens: 600, en el home del administrador, y el script lo borra al leerlo)
+REPOS=$(umask 077; mktemp)
+for r in duckhunt sis carreterinas; do
   echo "miermontoto/$r $(gh api -X POST repos/miermontoto/$r/actions/runners/registration-token -q .token)"
-done > /tmp/repos)
-scp platform/tooling/ci/macos-runner.sh /tmp/repos mac-1-prep:/tmp/ && rm /tmp/repos
-ssh -t mac-1-prep 'bash /tmp/macos-runner.sh --user adm-juan --name mac-1 --repos /tmp/repos; rm /tmp/repos /tmp/macos-runner.sh'
+done > "$REPOS"
+scp -p "$REPOS" mac-1-prep:runner-repos && scp platform/tooling/ci/macos-runner.sh mac-1-prep: && rm "$REPOS"
+ssh -t mac-1-prep 'bash macos-runner.sh --user adm-juan --name mac-1 --repos ~/runner-repos; rm macos-runner.sh'
 ```
 
 pone homebrew `ruby`, `openjdk@21` y `android-commandlinetools`; para `adm-juan`, cocoapods en `~/.gem` y el
