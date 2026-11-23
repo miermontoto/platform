@@ -249,14 +249,16 @@ with:
   workflows; hecho el 2026-11-23).
 
 alta o mantenimiento de un mac (idempotente: añade repos, rehace `.env`/`.path`, actualiza el toolchain y solo
-recarga un servicio si su plist cambia), como el dueño de homebrew con sudo (`ia`):
+recarga un servicio si su plist cambia), como el dueño de homebrew (`ia`), con `ssh -t` para que sudo pida su
+contraseña:
 
 ```bash
-scp platform/tooling/ci/macos-runner.sh mac-1-prep:/tmp/
 # token solo para los repos que aún no tienen runner en ese mac (caduca en 1 h)
-for r in duckhunt sis carreterinas; do
+(umask 077; for r in duckhunt sis carreterinas; do
   echo "miermontoto/$r $(gh api -X POST repos/miermontoto/$r/actions/runners/registration-token -q .token)"
-done | ssh mac-1-prep 'bash /tmp/macos-runner.sh --user adm-juan --name mac-1'
+done > /tmp/repos)
+scp platform/tooling/ci/macos-runner.sh /tmp/repos mac-1-prep:/tmp/ && rm /tmp/repos
+ssh -t mac-1-prep 'bash /tmp/macos-runner.sh --user adm-juan --name mac-1 --repos /tmp/repos; rm /tmp/repos /tmp/macos-runner.sh'
 ```
 
 pone homebrew `ruby`, `openjdk@21` y `android-commandlinetools`; para `adm-juan`, cocoapods en `~/.gem` y el

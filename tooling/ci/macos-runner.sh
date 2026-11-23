@@ -20,11 +20,13 @@
 #   los gems en el home del runner se actualizan sin tocar homebrew.
 # - un servicio solo se recarga si su plist cambia: recargarlo mataría el job que esté corriendo.
 #
-# uso: como el administrador dueño de homebrew (con sudo), una línea por repo en stdin: "<owner/repo> [token]".
-# el token de registro (1 h de vida) solo hace falta para un repo que aún no tenga runner en este mac:
+# uso: como el administrador dueño de homebrew, con `ssh -t`: sudo pide su contraseña (ningún usuario de los mac
+# tiene sudo sin contraseña desde el 2026-11-23), así que los repos van en un fichero (--repos) y no por stdin,
+# que dejaría a sudo sin terminal. una línea por repo: "<owner/repo> [token]". el token de registro (1 h de vida)
+# solo hace falta para un repo que aún no tenga runner en este mac:
 #   gh api -X POST repos/<owner/repo>/actions/runners/registration-token -q .token
 #
-#   printf '%s\n' "miermontoto/duckhunt $TOKEN" | tooling/ci/macos-runner.sh --user adm-juan --name mac-1
+#   tooling/ci/macos-runner.sh --user adm-juan --name mac-1 --repos /tmp/repos
 
 set -euo pipefail
 
@@ -36,12 +38,13 @@ readonly JDK_HOME=/opt/homebrew/opt/openjdk@21
 readonly SDKMANAGER=/opt/homebrew/bin/sdkmanager
 readonly DAEMON_DIR=/Library/LaunchDaemons
 
-RUNNER_USER="" NAME="$(hostname -s)" LABEL=ia01-macos NICE=5
+RUNNER_USER="" REPOS_FILE="" NAME="$(hostname -s)" LABEL=ia01-macos NICE=5
 ANDROID_PACKAGES="cmdline-tools;latest platform-tools platforms;android-36 build-tools;35.0.0 build-tools;36.0.0"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --user) RUNNER_USER="$2"; shift 2 ;;
+    --repos) REPOS_FILE="$2"; shift 2 ;;
     --name) NAME="$2"; shift 2 ;;
     --label) LABEL="$2"; shift 2 ;;
     --nice) NICE="$2"; shift 2 ;;
@@ -54,13 +57,13 @@ log() { echo "[macos-runner] $*"; }
 die() { echo "[macos-runner] $*" >&2; exit 1; }
 
 [[ -n $RUNNER_USER ]] || die "falta --user (el usuario macOS que corre los jobs)"
-[[ ! -t 0 ]] || die "pasa los repos por stdin: una línea \"<owner/repo> [token]\" por repo"
+[[ -f $REPOS_FILE ]] || die "falta --repos <fichero>: una línea \"<owner/repo> [token]\" por repo"
 [[ $(uname -m) == arm64 ]] || die "solo apple silicon ($RUNNER_ARCH)"
 id "$RUNNER_USER" >/dev/null 2>&1 || die "no existe el usuario $RUNNER_USER: créalo antes (sysadminctl -addUser)"
 [[ -x $BREW && -O /opt/homebrew ]] || die "homebrew en /opt/homebrew, y este script como su dueño ($(stat -f %Su /opt/homebrew 2>/dev/null))"
 xcode-select -p >/dev/null || die "falta Xcode (xcodes install …)"
 
-REPOS=$(cat)
+REPOS=$(cat "$REPOS_FILE")
 UHOME=$(dscl . -read "/Users/$RUNNER_USER" NFSHomeDirectory | awk '{print $2}')
 readonly SDK="$UHOME/Library/Android/sdk" GEMS="$UHOME/.gem" RUNNERS="$UHOME/actions-runner"
 # PATH de los jobs (.path del runner): gems del usuario y ruby de homebrew delante del ruby del sistema
