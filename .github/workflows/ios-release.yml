@@ -837,6 +837,7 @@ jobs:
         env:
           CERT_B64: ${{ secrets.IOS_DIST_CERT_P12_BASE64 }}
           CERT_PASS: ${{ secrets.IOS_DIST_CERT_PASSWORD }}
+          WWDR_G3_SHA256: dcf21878c77f4198e4b4614f03d696d89c66c66008d4244e1b99161aac91601f
         run: |
           # umask 077: en un mac propio otros usuarios locales (grupo staff) podrían leer el .p12 a media build
           umask 077
@@ -848,6 +849,14 @@ jobs:
           security set-keychain-settings -lut 21600 "$KEYCHAIN"
           security unlock-keychain -p "$KC_PW" "$KEYCHAIN"
           security import "$CERT_PATH" -P "$CERT_PASS" -A -t cert -f pkcs12 -k "$KEYCHAIN"
+          # el intermedio de apple que firma los certificados de distribución (WWDR G3): las imágenes de
+          # github lo traen en el System keychain, un mac propio recién instalado solo el G1 (caducado en
+          # 2023), y sin él codesign no construye la cadena ("unable to build chain to self-signed root")
+          # y muere con errSecInternalComponent. fijado por sha256; caduca el 2030-02-20.
+          WWDR="$RUNNER_TEMP/AppleWWDRCAG3.cer"
+          curl -fsSL -o "$WWDR" https://www.apple.com/certificateauthority/AppleWWDRCAG3.cer
+          echo "$WWDR_G3_SHA256  $WWDR" | shasum -a 256 -c --quiet
+          security add-certificates -k "$KEYCHAIN" "$WWDR"
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KC_PW" "$KEYCHAIN" >/dev/null
           # se antepone al search list en vez de sustituirlo: en un mac propio otras apps firman a la
           # vez con el mismo usuario y pisarles la lista les quitaría su keychain a media firma.
