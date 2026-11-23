@@ -118,7 +118,11 @@ jobs:
     # merece un release. NO se usa el filtro `paths` nativo de github porque en push
     # de TAG el evento no trae commits y el workflow entero se saltaría, matando el
     # release manual por tag. aquí en cambio dispatch y tag pasan siempre.
-    runs-on: ubuntu-latest
+    # con un runner de github el guard va en ubuntu; con uno propio (ia01-macos), en ese mismo: ahí no
+    # hay minutos que ahorrar, y un repo privado sin cupo de github no llega ni a arrancar el ubuntu
+    # (2026-11-23: "recent account payments have failed"). github-hosted = etiquetas xcode-*, macos-*,
+    # ubuntu-*.
+    runs-on: ${{ (startsWith(inputs.runner, 'xcode-') || startsWith(inputs.runner, 'macos-') || startsWith(inputs.runner, 'ubuntu-')) && 'ubuntu-latest' || inputs.runner }}
     timeout-minutes: 5
     outputs:
       build: ${{ steps.decide.outputs.build }}

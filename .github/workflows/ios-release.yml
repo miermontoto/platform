@@ -324,7 +324,11 @@ jobs:
     # cambio dispatch y tag pasan siempre. corre en ubuntu: ~20s frente a los ~5 min
     # de macOS que evita. por lo mismo resuelve aquí la versión de marketing: un tren
     # cerrado se detecta en segundos y no tras el build entero.
-    runs-on: ubuntu-latest
+    # con un runner de github el guard va en ubuntu; con uno propio (ia01-macos), en ese mismo: ahí no
+    # hay minutos que ahorrar, y un repo privado sin cupo de github no llega ni a arrancar el ubuntu
+    # (2026-11-23: "recent account payments have failed"). github-hosted = etiquetas xcode-*, macos-*,
+    # ubuntu-*.
+    runs-on: ${{ (startsWith(inputs.runner, 'xcode-') || startsWith(inputs.runner, 'macos-') || startsWith(inputs.runner, 'ubuntu-')) && 'ubuntu-latest' || inputs.runner }}
     timeout-minutes: 5
     outputs:
       build: ${{ steps.decide.outputs.build }}
@@ -365,6 +369,13 @@ jobs:
             echo "build=false" >> "$GITHUB_OUTPUT"
             echo "el push no toca ninguno de estos pathspecs → se omite el release:"; echo "$FILTER"
           fi
+
+      - name: Setup Node (runner propio)
+        # la imagen ubuntu de github trae node; un mac propio no lo tiene en el PATH de los jobs
+        if: runner.environment == 'self-hosted' && steps.decide.outputs.build == 'true'
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
 
       - name: Resolver versión de marketing (App Store Connect)
         # explícita (input > tag ios-v*) o automática contra la api de ASC; ver "TRENES"
