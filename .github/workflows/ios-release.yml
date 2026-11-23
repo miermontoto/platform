@@ -21,7 +21,7 @@
 #         app_sources_dir: ios-intents       # opcional: swift + .xcstrings extra del target App (ver paso 8)
 #         app_launch_hook: 'Foo.start()'     # opcional: sentencia al principio de didFinishLaunching (ver paso 8)
 #         live_activities: true              # opcional: NSSupportsLiveActivities en la app (ver paso 12)
-#         export_compliance_exempt: true     # opcional: declara cifrado exento (ver "CIFRADO")
+#         export_compliance_exempt: false    # opcional: solo si la app usa cifrado NO exento (ver "CIFRADO")
 #         share_extension_dir: ios-share     # opcional: extensión de compartir (ver paso 11)
 #         runner: ia01-macos                 # opcional: mac propio, o imagen de github (default xcode-27, ver "XCODE")
 #         xcode_version: '27.1'              # opcional: Xcode fijo (default: el más nuevo no beta)
@@ -158,9 +158,12 @@
 # 12. LIVE ACTIVITIES (opcional, input live_activities): sin ops en apple. la vista va en la extensión de
 #     widgets y las pushes salen con la misma clave apns del paso 9 (topic <bundle_id>.push-type.liveactivity).
 #
-# CIFRADO: sin ITSAppUsesNonExemptEncryption, testflight deja cada build en MISSING_EXPORT_COMPLIANCE y NO llega a los
-# testers hasta responderlo a mano en App Store Connect, aunque la subida salga bien. export_compliance_exempt la pone a
-# false, que es una declaración legal ante apple: la decide cada app, en su caller, nunca el reutilizable por defecto.
+# CIFRADO: sin ITSAppUsesNonExemptEncryption, testflight deja cada build en MISSING_EXPORT_COMPLIANCE ("Falta
+# información de exportación") y NO llega a los testers hasta responderlo a mano en App Store Connect, aunque la subida
+# salga bien. export_compliance_exempt (por defecto true) la pone a false: declara a apple que la app solo usa cifrado
+# exento (el https y el keychain del sistema). es una declaración legal; por defecto desde el 2026-11-23 (Juan) porque
+# todas las apps de la plataforma son webviews sobre https. una app con cifrado propio pasa false en su caller y
+# contesta en App Store Connect.
 #
 # VERSIONADO: CFBundleShortVersionString = input marketing_version > tag ios-vX.Y.Z >
 # AUTOMÁTICA (la pregunta el job `guard` a App Store Connect, ver "TRENES").
@@ -283,10 +286,10 @@ on:
         type: boolean
         default: false
       export_compliance_exempt:
-        description: 'ITSAppUsesNonExemptEncryption=false: declara a apple que la app solo usa cifrado exento (ver "CIFRADO" en la cabecera)'
+        description: 'ITSAppUsesNonExemptEncryption=false: declara a apple que la app solo usa cifrado exento (ver "CIFRADO" en la cabecera); false en una app con cifrado propio'
         required: false
         type: boolean
-        default: false
+        default: true
       share_extension_dir:
         description: 'dir (relativo a packages/web) con las fuentes swift + Info.plist + entitlements de una extensión de compartir; vacío → sin ella (ver SETUP, paso 11)'
         required: false
@@ -817,8 +820,10 @@ jobs:
         if: ${{ inputs.export_compliance_exempt }}
         working-directory: packages/web/ios/App
         run: |
-          /usr/libexec/PlistBuddy -c "Add :ITSAppUsesNonExemptEncryption bool false" App/Info.plist
-          echo "App/Info.plist: ITSAppUsesNonExemptEncryption=false"
+          # Set || Add: idempotente si la plantilla de la app ya trae la clave
+          /usr/libexec/PlistBuddy -c "Set :ITSAppUsesNonExemptEncryption false" App/Info.plist 2>/dev/null \
+            || /usr/libexec/PlistBuddy -c "Add :ITSAppUsesNonExemptEncryption bool false" App/Info.plist
+          echo "App/Info.plist: ITSAppUsesNonExemptEncryption=$(/usr/libexec/PlistBuddy -c 'Print :ITSAppUsesNonExemptEncryption' App/Info.plist)"
 
       - name: Añadir extensión WidgetKit (widgets de pantalla de inicio)
         # target :app_extension "Widgets" (bundle <bundle_id>.widgets), firma manual con SU perfil: ver
