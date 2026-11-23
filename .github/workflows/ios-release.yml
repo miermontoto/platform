@@ -827,6 +827,8 @@ jobs:
           CERT_B64: ${{ secrets.IOS_DIST_CERT_P12_BASE64 }}
           CERT_PASS: ${{ secrets.IOS_DIST_CERT_PASSWORD }}
         run: |
+          # umask 077: en un mac propio otros usuarios locales (grupo staff) podrían leer el .p12 a media build
+          umask 077
           CERT_PATH="$RUNNER_TEMP/dist.p12"
           KEYCHAIN="$RUNNER_TEMP/app-signing.keychain-db"
           KC_PW="$(openssl rand -base64 24)"
@@ -854,6 +856,8 @@ jobs:
           SHARE_DIR: ${{ inputs.share_extension_dir }}
           BUNDLE_ID: ${{ inputs.bundle_id }}
         run: |
+          # umask 077: la api key y los perfiles, solo legibles por el usuario del runner
+          umask 077
           # asc api key (la usa altool en el upload) en ./private_keys del RUNNER_TEMP, la primera
           # ruta que mira altool: el runner vacía RUNNER_TEMP al acabar el job, así que en un mac
           # propio la clave no se queda en el home como en ~/.appstoreconnect.

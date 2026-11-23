@@ -242,6 +242,8 @@ jobs:
           # build.gradle lee la firma de ~/Android/keystores/<app>.properties → storeFile. el .jks
           # va al RUNNER_TEMP (el runner lo vacía al acabar) y con el nombre de la app: en un mac
           # propio el home persiste y lo comparten las apps; el .properties lo borra el último paso.
+          # umask 077: en un mac propio otros usuarios locales (grupo staff) podrían leer la firma a media build
+          umask 077
           KS_DIR="$HOME/Android/keystores"
           KS="$RUNNER_TEMP/$APP-upload.jks"
           mkdir -p "$KS_DIR"
