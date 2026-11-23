@@ -11,7 +11,8 @@
 #       with:
 #         bundle_id: info.duckhunt.app
 #         device: iPhone Duo            # subcadena del nombre del device type
-#         xcode_version: '27.1'         # el simulador del Duo llega con xcode 27.1
+#         runner: ia01-macos            # opcional: mac propio (ver "runners propios" en el README)
+#         xcode_version: '27.1'         # opcional: el simulador del Duo llega con xcode 27.1
 #         compile_only: true            # opcional: solo compilar (sin arrancar el simulador)
 #         app_sources_dir: ios-intents  # opcionales: los mismos dirs que la release, compilados sin firma
 #         widget_extension_dir: ios-widgets
@@ -22,7 +23,7 @@
 # con los dirs es la compuerta de compilación de lo nativo: swift solo compila en un mac, y este
 # workflow lo comprueba sin ops de apple ni secrets (un App ID o un perfil pendiente no lo bloquea).
 #
-# un Xcode beta vale aquí (no se sube nada). el job falla si no hay device type que case con
+# un Xcode beta vale aquí (no se sube nada): sin xcode_version, el más nuevo instalado aunque sea beta. el job falla si no hay device type que case con
 # `device`, si la app no se instala o si no sigue viva tras arrancar (crash al lanzar); lo
 # demás (displays del dispositivo, subcomandos de simctl para posturas) solo se registra en el
 # log para la siguiente iteración.
@@ -41,14 +42,15 @@ on:
         required: true
         type: string
       runner:
-        description: 'imagen del runner macOS'
+        description: 'runner macOS: imagen de github o la etiqueta de los mac propios (ia01-macos, ver README)'
         required: false
         type: string
         default: 'xcode-27'
       xcode_version:
-        description: 'versión de Xcode a seleccionar (/Applications/Xcode_<v>.app)'
-        required: true
+        description: 'versión de Xcode a seleccionar (p.ej. 27.1: la más nueva de esa serie); vacío → la más nueva instalada, betas incluidas'
+        required: false
         type: string
+        default: ''
       settle_seconds:
         description: 'segundos de espera tras lanzar antes de comprobar y capturar'
         required: false
@@ -114,21 +116,21 @@ jobs:
         uses: actions/setup-node@v7
         with:
           node-version: 22
-          cache: pnpm
+          # en un mac propio el store de pnpm ya persiste: la caché de github, solo en los suyos
+          cache: ${{ runner.environment == 'github-hosted' && 'pnpm' || '' }}
 
       - name: Install deps
         run: pnpm install --frozen-lockfile
 
       - name: Seleccionar Xcode
-        env:
-          XCODE_VERSION: ${{ inputs.xcode_version }}
-          RUNNER: ${{ inputs.runner }}
-        run: |
-          XCODE="/Applications/Xcode_${XCODE_VERSION}.app"
-          [ -d "$XCODE" ] || { ls -d /Applications/Xcode_*.app; echo "::error::no hay $XCODE en $RUNNER"; exit 1; }
-          sudo xcode-select -s "$XCODE"
-          xcodebuild -version
-          pod --version || sudo gem install cocoapods --no-document
+        # DEVELOPER_DIR del job, sin xcode-select (ver la action): en un mac propio no toca a los demás jobs
+        uses: miermontoto/platform/.github/actions/xcode@main
+        with:
+          version: ${{ inputs.xcode_version }}
+          allow_beta: 'true'
+
+      - name: Comprobar cocoapods
+        run: pod --version || sudo gem install cocoapods --no-document
 
       - name: Scaffold proyecto iOS + build web + cap sync
         # mismo scaffold que ios-release.yml (CocoaPods explícito: capacitor 8 usa SPM por
@@ -249,6 +251,15 @@ jobs:
           if ! xcrun simctl spawn "$UDID" launchctl list | grep -q "$BUNDLE_ID"; then
             echo "::error::la app no sigue viva tras ${SETTLE}s: ver app.log en el artifact"; exit 1
           fi
+
+      - name: Borrar el dispositivo del simulador
+        # en un mac propio el simulador persiste entre jobs: sin esto cada run deja un "preview" más
+        if: always() && steps.device.outputs.udid != ''
+        env:
+          UDID: ${{ steps.device.outputs.udid }}
+        run: |
+          xcrun simctl shutdown "$UDID" 2>/dev/null || echo "el dispositivo ya estaba apagado"
+          xcrun simctl delete "$UDID"
 
       - name: Guardar capturas y logs
         if: always()

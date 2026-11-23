@@ -1,6 +1,8 @@
 # workflow REUTILIZABLE (workflow_call): build + firma del Android App Bundle (.aab)
-# en un runner linux, con subida opcional a Google Play. vive en el repo platform y lo
-# invocan las apps que usan platform como submódulo, desde un caller fino:
+# en un runner linux de github o en un mac propio del clúster ia01 (runner: ia01-macos, ver
+# "runners propios" en el README de platform), con subida opcional a Google Play. vive en
+# el repo platform y lo invocan las apps que usan platform como submódulo, desde un caller
+# fino:
 #
 #   jobs:
 #     release:
@@ -10,6 +12,7 @@
 #         package_name: info.duckhunt.app  # applicationId en Google Play
 #         upload: true                     # subir a Play (requiere service account)
 #         track: internal
+#         runner: ia01-macos               # opcional: default ubuntu-latest
 #       secrets: inherit
 #
 # REQUISITO: el package.json raíz de la app declara `"packageManager": "pnpm@<v>"`.
@@ -29,7 +32,7 @@
 #
 # SECRETS esperados en el repo de la app (Settings → Secrets and variables → Actions),
 # heredados con `secrets: inherit`:
-#   ANDROID_KEYSTORE_BASE64           ← base64 del upload keystore (~/Android/keystores/upload.jks)
+#   ANDROID_KEYSTORE_BASE64           ← base64 del upload keystore
 #   ANDROID_KEYSTORE_PASSWORD         ← storePassword
 #   ANDROID_KEY_ALIAS                 ← keyAlias
 #   ANDROID_KEY_PASSWORD              ← keyPassword
@@ -91,6 +94,11 @@ on:
         required: false
         type: string
         default: packages/api/src/constants.ts
+      runner:
+        description: 'runner del build: ubuntu-latest o la etiqueta de los mac propios (ia01-macos, ver README)'
+        required: false
+        type: string
+        default: ubuntu-latest
       path_filter:
         description: 'pathspecs de git (uno por línea) que disparan el build en push a rama; vacío → siempre'
         # el default deja fuera pnpm-lock.yaml y packages/api a propósito: el lockfile
@@ -154,7 +162,9 @@ jobs:
   build:
     needs: guard
     if: needs.guard.outputs.build == 'true'
-    runs-on: ubuntu-latest
+    # los pasos son portables entre linux y macos (sed -i.bak, sin grep -P). en un mac propio el
+    # android sdk lo pone el runner (ANDROID_HOME en su .env, ver tooling/ci/macos-runner.sh).
+    runs-on: ${{ inputs.runner }}
     timeout-minutes: 30
     steps:
       - name: Checkout (con submódulo platform)
@@ -197,7 +207,8 @@ jobs:
         uses: actions/setup-node@v7
         with:
           node-version: 22
-          cache: pnpm
+          # en un mac propio el store de pnpm ya persiste: la caché de github, solo en los suyos
+          cache: ${{ runner.environment == 'github-hosted' && 'pnpm' || '' }}
 
       - name: Setup JDK 21
         # capacitor 7 (módulo capacitor-android) compila con source release 21
@@ -228,16 +239,20 @@ jobs:
           KEY_PASS: ${{ secrets.ANDROID_KEY_PASSWORD }}
           APP: ${{ inputs.app }}
         run: |
-          # build.gradle lee la firma de ~/Android/keystores/<app>.properties → storeFile.
+          # build.gradle lee la firma de ~/Android/keystores/<app>.properties → storeFile. el .jks
+          # va al RUNNER_TEMP (el runner lo vacía al acabar) y con el nombre de la app: en un mac
+          # propio el home persiste y lo comparten las apps; el .properties lo borra el último paso.
           KS_DIR="$HOME/Android/keystores"
+          KS="$RUNNER_TEMP/$APP-upload.jks"
           mkdir -p "$KS_DIR"
-          echo -n "$KS_B64" | base64 -d > "$KS_DIR/upload.jks"
+          printf '%s' "$KS_B64" | base64 --decode > "$KS"
           {
-            printf 'storeFile=%s\n' "$KS_DIR/upload.jks"
+            printf 'storeFile=%s\n' "$KS"
             printf 'storePassword=%s\n' "$KS_PASS"
             printf 'keyAlias=%s\n' "$KEY_ALIAS"
             printf 'keyPassword=%s\n' "$KEY_PASS"
           } > "$KS_DIR/$APP.properties"
+          echo "KS_PROPERTIES=$KS_DIR/$APP.properties" >> "$GITHUB_ENV"
           echo "keystore + properties listos en $KS_DIR/$APP.properties"
 
       - name: Fijar versionCode único (evita colisión de aab en Play)
@@ -251,13 +266,14 @@ jobs:
           # aquí le sumamos el run_number del workflow CALLER para garantizar un código único
           # y monótono en cada run sin recommittear. cap sync no toca defaultConfig, así que
           # el override persiste hasta bundleRelease.
+          # sed -i.bak y sin grep -P: portable entre el sed de gnu (ubuntu) y el de bsd (macos).
           GRADLE=app/build.gradle
-          BASE=$(grep -oP 'versionCode \K[0-9]+' "$GRADLE")
+          BASE=$(sed -n 's/.*versionCode \([0-9][0-9]*\).*/\1/p' "$GRADLE" | head -n1)
           if [ -z "$BASE" ]; then
             echo "::error::no se encontró versionCode en $GRADLE"; exit 1
           fi
           NEW=$((BASE + RUN_NUMBER))
-          sed -i "s/versionCode [0-9]\+/versionCode $NEW/" "$GRADLE"
+          sed -i.bak "s/versionCode [0-9][0-9]*/versionCode $NEW/" "$GRADLE" && rm "$GRADLE.bak"
           echo "versionCode $BASE → $NEW (floor committeado + run_number $RUN_NUMBER)"
 
       - name: Sincronizar versionName con la versión de la app
@@ -274,13 +290,13 @@ jobs:
           if [ ! -f "$SRC" ]; then
             echo "::warning::no existe $VERSION_FILE — se mantiene el versionName committeado"; exit 0
           fi
-          VERSION=$(grep -oP "export const VERSION = '\K[^']+" "$SRC" | head -n1)
+          VERSION=$(sed -n "s/.*export const VERSION = '\([^']*\)'.*/\1/p" "$SRC" | head -n1)
           if [ -z "$VERSION" ]; then
             echo "::warning::no hay 'export const VERSION' en $VERSION_FILE — se mantiene el versionName committeado"; exit 0
           fi
           GRADLE=app/build.gradle
-          OLD=$(grep -oP 'versionName "\K[^"]+' "$GRADLE")
-          sed -i "s/versionName \"[^\"]*\"/versionName \"$VERSION\"/" "$GRADLE"
+          OLD=$(sed -n 's/.*versionName "\([^"]*\)".*/\1/p' "$GRADLE" | head -n1)
+          sed -i.bak "s/versionName \"[^\"]*\"/versionName \"$VERSION\"/" "$GRADLE" && rm "$GRADLE.bak"
           echo "versionName $OLD → $VERSION (desde $VERSION_FILE)"
 
       - name: Build AAB (firmado)
@@ -311,3 +327,9 @@ jobs:
           # separada por comas, un solo track es una string normal).
           tracks: ${{ inputs.track }}
           status: completed
+
+      - name: Borrar la firma del home
+        # el .jks se va con el RUNNER_TEMP; el .properties (con las contraseñas) vive en el home, que en
+        # un mac propio persiste entre jobs.
+        if: always() && env.KS_PROPERTIES != ''
+        run: rm -f "$KS_PROPERTIES"

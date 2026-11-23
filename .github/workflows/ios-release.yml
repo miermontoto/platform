@@ -1,7 +1,8 @@
 # workflow REUTILIZABLE (workflow_call): build + firma + subida del ipa a App Store
-# Connect desde un runner macOS de github. objetivo: nunca tocar un mac — el runner es
-# una vm efímera; tú solo añades secrets. vive en el repo platform y lo invocan las
-# apps que usan platform como submódulo, desde un caller fino:
+# Connect desde un runner macOS: el de github (una vm efímera; tú solo añades secrets) o
+# un mac propio del clúster ia01 (runner: ia01-macos, ver "runners propios" en el README
+# de platform). vive en el repo platform y lo invocan las apps que usan platform como
+# submódulo, desde un caller fino:
 #
 #   jobs:
 #     release:
@@ -21,7 +22,7 @@
 #         app_launch_hook: 'Foo.start()'     # opcional: sentencia al principio de didFinishLaunching (ver paso 8)
 #         live_activities: true              # opcional: NSSupportsLiveActivities en la app (ver paso 12)
 #         share_extension_dir: ios-share     # opcional: extensión de compartir (ver paso 11)
-#         runner: macos-26                   # opcional: imagen del runner (default xcode-27, ver "XCODE")
+#         runner: ia01-macos                 # opcional: mac propio, o imagen de github (default xcode-27, ver "XCODE")
 #         xcode_version: '27.1'              # opcional: Xcode fijo (default: el más nuevo no beta)
 #         upload: true
 #       secrets: inherit
@@ -292,12 +293,12 @@ on:
         type: string
         default: ''
       runner:
-        description: 'imagen del runner macOS (xcode-27 = Xcode 27, exige UIScene / capacitor >= 8.5; macos-26 = Xcode 26 para una app que siga en capacitor 7)'
+        description: 'runner macOS: imagen de github (xcode-27 = Xcode 27, exige UIScene / capacitor >= 8.5; macos-26 = Xcode 26 para una app que siga en capacitor 7) o la etiqueta de los mac propios (ia01-macos, ver README)'
         required: false
         type: string
         default: 'xcode-27'
       xcode_version:
-        description: 'versión de Xcode a seleccionar (/Applications/Xcode_<v>.app, p.ej. 27.1); vacío → la más nueva no beta instalada (final o rc; a igual versión, la final)'
+        description: 'versión de Xcode a seleccionar (p.ej. 27.1: la más nueva de esa serie); vacío → la más nueva no beta instalada (final o rc; a igual versión, la final)'
         required: false
         type: string
         default: ''
@@ -529,48 +530,22 @@ jobs:
         uses: actions/setup-node@v7
         with:
           node-version: 22
-          cache: pnpm
+          # en un mac propio el store de pnpm ya persiste entre jobs: la caché de github solo
+          # gastaría cuota y minutos bajándolo encima de sí mismo.
+          cache: ${{ runner.environment == 'github-hosted' && 'pnpm' || '' }}
 
       - name: Install deps
         run: pnpm install --frozen-lockfile
 
       - name: Seleccionar Xcode (fijo o el más nuevo publicable)
-        env:
-          XCODE_VERSION: ${{ inputs.xcode_version }}
-          RUNNER: ${{ inputs.runner }}
+        # la elección (y por qué se descartan las betas) vive en la action: DEVELOPER_DIR del job,
+        # sin xcode-select, para que en un mac propio no cambie el Xcode de los demás jobs.
+        uses: miermontoto/platform/.github/actions/xcode@main
+        with:
+          version: ${{ inputs.xcode_version }}
+
+      - name: Comprobar sdk, UIScene y cocoapods
         run: |
-          ls -d /Applications/Xcode_*.app 2>/dev/null || true
-          if [ -n "$XCODE_VERSION" ]; then
-            # versión fija: muere si la imagen no la trae, en vez de caer a otra en silencio
-            XCODE="/Applications/Xcode_${XCODE_VERSION}.app"
-            [ -d "$XCODE" ] || { echo "::error::no hay $XCODE en $RUNNER"; exit 1; }
-          else
-            # el más nuevo PUBLICABLE: App Store Connect rechaza builds de betas pero no los release
-            # candidates (el 27.1 rc, 27A9275, subió a TestFlight el 2026-10-21), y en xcode-27 los
-            # nombres de versión pelada son enlaces: Xcode_27.1.app → Xcode_27.1_Release_Candidate,
-            # Xcode_27.2.app → Xcode_27.2_beta_2. por eso se resuelve cada enlace y se descarta lo
-            # que apunta a una beta, por el nombre o por la licencia (LicenseInfo.plist).
-            # se ordena por la versión REAL del bundle, no por la ruta: hay alias (Xcode_27.app =
-            # 27.0, Xcode_27.0.0.app…) y el sort -V de macos pone Xcode_27.app por encima de
-            # Xcode_27.1.app. clave = versión con ceros + 1 si es final (a igual versión gana al
-            # rc) y sort plano. sin `case` dentro del $(...): el bash 3.2 del runner cierra la
-            # sustitución en el `)` del patrón; el [[ == ]] no lleva paréntesis
-            XCODE=$(for x in /Applications/Xcode_*.app; do
-              real=$(readlink -f "$x")
-              lic=$(/usr/libexec/PlistBuddy -c 'Print :licenseType' "$real/Contents/Resources/LicenseInfo.plist" 2>/dev/null || true)
-              ver=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$real/Contents/Info.plist" 2>/dev/null || true)
-              echo "  $x → $real (versión: ${ver:-?}, licencia: ${lic:-?})" >&2
-              [[ -z $ver || $real == *[Bb]eta* || $lic == *[Bb]eta* ]] && continue
-              final=1
-              [[ $real == *Release_Candidate* || $real == *_RC* ]] && final=0
-              IFS=. read -r major minor patch <<< "$ver"
-              printf '%03d%03d%03d%d %s\n' "$major" "${minor:-0}" "${patch:-0}" "$final" "$real"
-            done | sort -u | tail -1 | cut -d' ' -f2-)
-            [ -n "$XCODE" ] || { echo "::error::no hay ningún Xcode publicable (no beta) en $RUNNER"; exit 1; }
-          fi
-          sudo xcode-select -s "$XCODE"
-          echo "Xcode: $XCODE"
-          xcodebuild -version
           SDK=$(xcrun --sdk iphoneos --show-sdk-version)
           echo "iOS SDK: $SDK"
           # el sdk ios 27+ EXIGE el ciclo de vida UIScene (TN3187: sin él la app no arranca), que
@@ -861,7 +836,10 @@ jobs:
           security unlock-keychain -p "$KC_PW" "$KEYCHAIN"
           security import "$CERT_PATH" -P "$CERT_PASS" -A -t cert -f pkcs12 -k "$KEYCHAIN"
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KC_PW" "$KEYCHAIN" >/dev/null
-          security list-keychains -d user -s "$KEYCHAIN" login.keychain-db
+          # se antepone al search list en vez de sustituirlo: en un mac propio otras apps firman a la
+          # vez con el mismo usuario y pisarles la lista les quitaría su keychain a media firma.
+          # delete-keychain (último paso) lo saca de la lista.
+          security list-keychains -d user -s "$KEYCHAIN" $(security list-keychains -d user | xargs)
           echo "KEYCHAIN=$KEYCHAIN" >> "$GITHUB_ENV"
 
       - name: Preparar API key, provisioning profile y ExportOptions
@@ -876,13 +854,17 @@ jobs:
           SHARE_DIR: ${{ inputs.share_extension_dir }}
           BUNDLE_ID: ${{ inputs.bundle_id }}
         run: |
-          # asc api key (la usa altool en el upload) en la ruta por defecto
-          mkdir -p "$HOME/.appstoreconnect/private_keys"
-          ASC_KEY_PATH="$HOME/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8"
+          # asc api key (la usa altool en el upload) en ./private_keys del RUNNER_TEMP, la primera
+          # ruta que mira altool: el runner vacía RUNNER_TEMP al acabar el job, así que en un mac
+          # propio la clave no se queda en el home como en ~/.appstoreconnect.
+          mkdir -p "$RUNNER_TEMP/private_keys"
+          ASC_KEY_PATH="$RUNNER_TEMP/private_keys/AuthKey_${ASC_KEY_ID}.p8"
           printf '%s' "$ASC_API_KEY_P8" > "$ASC_KEY_PATH"
           echo "ASC_KEY_PATH=$ASC_KEY_PATH" >> "$GITHUB_ENV"
           # provisioning profile de App Store → firma MANUAL (sin cloud signing, que
-          # quiere gestionar cert/perfil en la nube).
+          # quiere gestionar cert/perfil en la nube). en un mac propio los perfiles se quedan
+          # instalados a propósito: no son secretos y borrarlos al acabar podría quitárselo a otro
+          # run de la misma app (tag y main a la vez) a media firma.
           PP="$RUNNER_TEMP/pp.mobileprovision"
           echo -n "$IOS_PROVISIONING_PROFILE_BASE64" | base64 --decode -o "$PP"
           PROF_DIR="$HOME/Library/MobileDevice/Provisioning Profiles"
@@ -1056,6 +1038,9 @@ jobs:
         env:
           ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
           ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+        # altool busca AuthKey_<id>.p8 en ./private_keys: se lanza desde RUNNER_TEMP (ver
+        # "Preparar API key").
+        working-directory: ${{ runner.temp }}
         run: |
           xcrun altool --upload-app -t ios -f "$IPA_PATH" \
             --apiKey "$ASC_KEY_ID" --apiIssuer "$ASC_ISSUER_ID"

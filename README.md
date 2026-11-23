@@ -34,9 +34,12 @@ tooling/
   store/      capturas de tienda: renderer html → png por cdp + specs de app store y
               google play + checker (tamaños, alpha, límites, safe areas)
   version/    bump snapshot (<yy>w<ww><letra>) + plantilla de hook pre-commit
+  ci/         macos-runner.sh — prepara un mac como runner propio de github actions
 .github/workflows/
               android-release.yml · ios-release.yml — releases móviles reutilizables
               (workflow_call) que invocan las apps desde un caller fino
+.github/actions/
+              xcode — elige el Xcode del job (DEVELOPER_DIR) para los workflows ios
 ```
 
 ## consumo desde una app
@@ -217,6 +220,49 @@ platform/tooling/mobile/ios-sim.sh                  # desde la raíz de la app: 
 platform/tooling/mobile/ios-sim.sh --skip-web       # solo nativo (~5s si nada cambió)
 platform/tooling/mobile/ios-sim.sh --device "iPhone 18 Pro" --fresh
 ```
+
+## runners propios (mac studio del clúster ia01)
+
+los workflows móviles corren en un runner de github por defecto o en los dos Mac Studio del clúster ia01
+(`mac-1` = `macstudkm5u2561`, `mac-2` = `macstudkm5u2562`) si el caller pasa la etiqueta:
+
+```yaml
+uses: miermontoto/platform/.github/workflows/ios-release.yml@main   # y android-release, ios-simulator
+with:
+  runner: ia01-macos
+```
+
+- **por qué**: los minutos de macOS de github se facturan ×10 en un repo privado (el cupo del mes se agotó el
+  2026-11-05) y un M5 Ultra compila más rápido. sin un mac encendido el job espera en cola (hasta 24 h): para
+  volver a github basta quitar `runner` del caller.
+- **un runner por repo y mac**: en una cuenta personal de github no hay runners de cuenta, solo de repo (hoy
+  duckhunt, sis y carreterinas, 3 por mac). cada uno corre un job a la vez, todos como el usuario `adm-juan`
+  (administrador con contraseña propia: los jobs no tienen sudo) y como LaunchDaemon con `Nice` 5, para ceder
+  cpu a exo.
+- **lo que asumen los workflows de un mac propio**: nada de `sudo` ni `xcode-select` (Xcode por
+  `DEVELOPER_DIR`, action `xcode`), keychain de firma antepuesto al search list (otra app puede estar firmando a
+  la vez), secretos en `RUNNER_TEMP` (el runner lo vacía al acabar) y pasos portables entre linux y macos en
+  android (`sed -i.bak`, sin `grep -P`). la caché de pnpm de github solo en sus runners: en el mac el store ya
+  persiste. un paso nuevo cumple lo mismo.
+- **repo público** (sis): un fork podría lanzar código en el mac con un pull request que añada un workflow con
+  la etiqueta, así que exige aprobación de todo colaborador externo (Settings → Actions → Fork pull request
+  workflows; hecho el 2026-11-23).
+
+alta o mantenimiento de un mac (idempotente: añade repos, rehace `.env`/`.path`, actualiza el toolchain y solo
+recarga un servicio si su plist cambia), como el dueño de homebrew con sudo (`ia`):
+
+```bash
+scp platform/tooling/ci/macos-runner.sh mac-1-prep:/tmp/
+# token solo para los repos que aún no tienen runner en ese mac (caduca en 1 h)
+for r in duckhunt sis carreterinas; do
+  echo "miermontoto/$r $(gh api -X POST repos/miermontoto/$r/actions/runners/registration-token -q .token)"
+done | ssh mac-1-prep 'bash /tmp/macos-runner.sh --user adm-juan --name mac-1'
+```
+
+pone homebrew `ruby`, `openjdk@21` y `android-commandlinetools`; para `adm-juan`, cocoapods en `~/.gem` y el
+android sdk en `~/Library/Android/sdk` (`ANDROID_HOME` en el `.env` de cada runner); y el runner de cada repo en
+`~adm-juan/actions-runner/<repo>` (logs en `~adm-juan/Library/Logs/actions.runner.*`). node, pnpm y el jdk los
+pone cada job. una app nueva: su línea en el bucle y `runner: ia01-macos` en sus callers.
 
 ## capturas de tienda
 

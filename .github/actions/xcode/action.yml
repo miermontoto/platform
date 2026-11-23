@@ -1,0 +1,79 @@
+# action compuesta: elige el Xcode de un job ios y lo deja en DEVELOPER_DIR para el resto del job. la comparten
+# ios-release.yml e ios-simulator.yml; vive aquí y no en tooling/ porque se carga de @main, igual que los
+# workflows, y no del pin del submódulo platform de la app, que puede ir por detrás.
+#
+# sin sudo ni xcode-select a propósito: en un mac propio (runner ia01-macos, ver "runners propios" en el
+# README) xcode-select cambiaría el Xcode de todo el equipo, también el de los jobs de otras apps que corren a
+# la vez; DEVELOPER_DIR solo toca a este job. entiende los nombres de las imágenes de github (Xcode_27.1.app,
+# enlaces a Xcode_27.1_Release_Candidate…), los de xcodes (Xcode-27.2.0.app) y Xcode.app.
+
+name: Xcode
+description: elige el Xcode del job (fijo o el más nuevo) y exporta DEVELOPER_DIR
+
+inputs:
+  version:
+    description: 'versión a elegir (27.1 → el más nuevo de la serie 27.1: 27.1, 27.1.1…); vacío → el más nuevo'
+    required: false
+    default: ''
+  allow_beta:
+    description: 'contar también las betas (simulador); una release no: App Store Connect rechaza builds de betas'
+    required: false
+    default: 'false'
+
+outputs:
+  developer_dir:
+    description: 'DEVELOPER_DIR del Xcode elegido'
+    value: ${{ steps.pick.outputs.developer_dir }}
+
+runs:
+  using: composite
+  steps:
+    - id: pick
+      shell: bash
+      env:
+        WANT: ${{ inputs.version }}
+        ALLOW_BETA: ${{ inputs.allow_beta }}
+      run: |
+        # el más nuevo PUBLICABLE: App Store Connect rechaza builds de betas pero no los release
+        # candidates (el 27.1 rc, 27A9275, subió a TestFlight el 2026-10-21), y en xcode-27 los
+        # nombres de versión pelada son enlaces: Xcode_27.1.app → Xcode_27.1_Release_Candidate,
+        # Xcode_27.2.app → Xcode_27.2_beta_2. por eso se resuelve cada enlace y se descarta lo
+        # que apunta a una beta, por el nombre o por la licencia (LicenseInfo.plist).
+        # se ordena por la versión REAL del bundle, no por la ruta: hay alias (Xcode_27.app =
+        # 27.0, Xcode_27.0.0.app…) y el sort -V de macos pone Xcode_27.app por encima de
+        # Xcode_27.1.app. clave = versión con ceros + 1 si es final (a igual versión gana al
+        # rc) y sort plano. el bucle va en una función y no dentro del $(...): el bash 3.2 del
+        # runner cierra la sustitución en el `)` de un patrón de `case`.
+        candidates() {
+          for x in /Applications/Xcode*.app; do
+            [[ -d $x ]] || continue
+            real=$(readlink -f "$x")
+            lic=$(/usr/libexec/PlistBuddy -c 'Print :licenseType' "$real/Contents/Resources/LicenseInfo.plist" 2>/dev/null || true)
+            ver=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$real/Contents/Info.plist" 2>/dev/null || true)
+            echo "  $x → $real (versión: ${ver:-?}, licencia: ${lic:-?})" >&2
+            [[ -n $ver ]] || continue
+            beta=0
+            [[ $real == *[Bb]eta* || $lic == *[Bb]eta* ]] && beta=1
+            [[ $beta == 1 && $ALLOW_BETA != true ]] && continue
+            IFS=. read -r major minor patch <<< "$ver"
+            minor=${minor:-0} patch=${patch:-0}
+            # versión fija por componentes: 27.1 casa con 27.1.0 y 27.1.1, no con 27.10. sin ninguna que
+            # case, muere abajo en vez de caer a otra en silencio
+            # filtro de betas antes que el de versión: una release fijada a una beta muere aquí y no en el upload
+            [[ -z $WANT || $major.$minor.$patch. == "$WANT".* ]] || continue
+            final=1
+            [[ $beta == 1 || $real == *Release_Candidate* || $real == *_RC* ]] && final=0
+            printf '%03d%03d%03d%d %s\n' "$major" "$minor" "$patch" "$final" "$real"
+          done
+        }
+        XCODE=$(candidates | sort -u | tail -1 | cut -d' ' -f2-)
+        if [[ -z $XCODE ]]; then
+          kind=$([[ $ALLOW_BETA == true ]] && echo 'Xcode' || echo 'Xcode publicable (no beta)')
+          echo "::error::no hay ningún $kind${WANT:+ $WANT} en el runner $RUNNER_NAME"
+          exit 1
+        fi
+        DEV="$XCODE/Contents/Developer"
+        echo "DEVELOPER_DIR=$DEV" >> "$GITHUB_ENV"
+        echo "developer_dir=$DEV" >> "$GITHUB_OUTPUT"
+        echo "Xcode: $XCODE"
+        DEVELOPER_DIR="$DEV" xcodebuild -version
