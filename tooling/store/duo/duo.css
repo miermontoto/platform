@@ -26,8 +26,10 @@
   flex-direction: column;
   align-items: center;
   justify-content: space-between;
-  /* el padding derecho lleva el centro de la columna al eje del sistema */
-  padding: 14px calc(2 * var(--duo-axis) - var(--duo-col)) calc(var(--duo-bottom) + 6px) 0;
+  /* el padding derecho lleva el centro de la columna al eje del sistema. el rail va a 6px del pie
+     de la pantalla, no de la safe area (--duo-bottom es del indicador de inicio, centrado), como
+     NativeTabBarPlugin */
+  padding: 14px calc(2 * var(--duo-axis) - var(--duo-col)) 6px 0;
   pointer-events: none;
 }
 .duo-status {

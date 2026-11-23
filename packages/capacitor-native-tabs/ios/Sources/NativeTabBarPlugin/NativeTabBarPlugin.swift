@@ -56,7 +56,7 @@ public class NativeTabBarPlugin: CAPPlugin, CAPBridgedPlugin, UITabBarDelegate {
 
     // fundido al mostrar/ocultar (overlay abierto, teclado, layout de escritorio).
     private static let fadeDuration: TimeInterval = 0.2
-    // hueco mínimo del rail con los bordes de la columna, con el contenido y con el pie de la safe area.
+    // hueco mínimo del rail con los bordes de la columna, con el contenido y con el pie de la pantalla.
     private static let railMargin: CGFloat = 6
     // el chevron de atrás del sistema: el mismo en todas las apps, la web solo pone su título.
     private static let backSymbol = "chevron.backward"
@@ -264,7 +264,12 @@ public class NativeTabBarPlugin: CAPPlugin, CAPBridgedPlugin, UITabBarDelegate {
             .right: rail.centerXAnchor.constraint(equalTo: host.rightAnchor)
         ]
         // sin scroll edge effect: el rail vive en la columna del sistema, nada scrollea por debajo.
-        rail.bottomAnchor.constraint(equalTo: host.safeAreaLayoutGuide.bottomAnchor, constant: -NativeTabBarPlugin.railMargin).isActive = true
+        // al pie de la PANTALLA, no de la safe area: su inset inferior es del indicador de inicio, que
+        // va centrado y no pasa por la columna. sobre él la columna perdía 22pt y, en el Duo cerrado,
+        // la pila de las dos cápsulas subía hasta la hora, la batería y las live activities. con el
+        // centro a ~47pt del lado y 34pt del pie, la cápsula cabe en la esquina redondeada de la
+        // pantalla con radios de hasta ~69pt.
+        rail.bottomAnchor.constraint(equalTo: host.bottomAnchor, constant: -NativeTabBarPlugin.railMargin).isActive = true
         self.rail = rail
         return rail
     }
