@@ -1,7 +1,7 @@
 #!/bin/bash
 # prepara un mac como runner propio de github actions para las apps de la plataforma: toolchain de ios y
-# android para el usuario del runner y un runner por repo como LaunchDaemon. idempotente: se relanza igual
-# para añadir un repo, rehacer el .env/.path o actualizar el toolchain.
+# android para el usuario del runner y un runner por repo como LaunchAgent de su dominio de usuario.
+# idempotente: se relanza igual para añadir un repo, rehacer el .env/.path o actualizar el toolchain.
 #
 # lo que los workflows de .github/workflows esperan de un mac propio (etiqueta --label, ia01-macos por
 # defecto): Xcode instalado (lo elige la action xcode por DEVELOPER_DIR, sin xcode-select), cocoapods y el gem
@@ -12,9 +12,11 @@
 # - un runner POR REPO: en una cuenta personal de github los runners propios solo se registran por repo. cada
 #   uno corre un job a la vez, así que un mac hace como mucho un job por app a la vez, todos con el mismo
 #   usuario: por eso los workflows anteponen su keychain al search list y dejan los secretos en RUNNER_TEMP.
-# - LaunchDaemon con UserName y SessionCreate, no el LaunchAgent de svc.sh: el agente solo arranca con el
-#   usuario logueado en la consola, y el del runner no lo está nunca. SessionCreate da la sesión de seguridad
-#   que necesitan el keychain temporal y codesign.
+# - LaunchAgent en el dominio user/<uid> (sesión Background, la misma que una sesión ssh), no LaunchDaemon: en
+#   el dominio System codesign muere con errSecInternalComponent aunque el daemon lleve UserName y SessionCreate
+#   (2026-11-23: la misma firma pasaba por ssh y fallaba en el daemon). tampoco el LaunchAgent de svc.sh: es de
+#   sesión Aqua y solo arranca con el usuario en la consola, y el del runner no entra nunca. sin login el
+#   dominio user/<uid> no existe, así que un LaunchDaemon de arranque (root) le carga los agentes.
 # - Nice: los mac comparten equipo con exo (inferencia) y los builds le ceden cpu.
 # - ruby de homebrew + GEM_HOME del usuario: el ruby del sistema (2.6) no instala el cocoapods actual, y con
 #   los gems en el home del runner se actualizan sin tocar homebrew.
@@ -38,6 +40,7 @@ readonly RUBY_BIN=/opt/homebrew/opt/ruby/bin
 readonly JDK_HOME=/opt/homebrew/opt/openjdk@21
 readonly SDKMANAGER=/opt/homebrew/bin/sdkmanager
 readonly DAEMON_DIR=/Library/LaunchDaemons
+readonly BOOT_LABEL_PREFIX=actions.runner.bootstrap
 # owner/repo de github: el nombre acaba en rutas y en la etiqueta de launchd
 readonly REPO_RE='^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$'
 
@@ -71,6 +74,7 @@ REPOS=$(cat "$REPOS_FILE")
 rm -f "$REPOS_FILE"
 UHOME=$(dscl . -read "/Users/$RUNNER_USER" NFSHomeDirectory | awk '{print $2}')
 readonly SDK="$UHOME/Library/Android/sdk" GEMS="$UHOME/.gem" RUNNERS="$UHOME/actions-runner"
+readonly UID_N=$(id -u "$RUNNER_USER") AGENT_DIR="$UHOME/Library/LaunchAgents"
 # PATH de los jobs (.path del runner): gems del usuario y ruby de homebrew delante del ruby del sistema
 readonly JOB_PATH="$GEMS/bin:$RUBY_BIN:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:$SDK/platform-tools"
 
@@ -130,11 +134,17 @@ configure_runner() {
   as_user cp "$dir/bin/runsvc.sh" "$dir/runsvc.sh"
 }
 
-# LaunchDaemon del runner (plantilla bin/actions.runner.plist.template del propio runner, de sistema)
-install_daemon() {
+# LaunchAgent del runner en user/<uid> (plantilla bin/actions.runner.plist.template del propio runner, con
+# sesión Background). retira el LaunchDaemon de sistema que instalaban las primeras versiones de este script
+install_agent() {
   local repo="$1" dir="$RUNNERS/${1#*/}" label="actions.runner.${1/\//-}.$NAME" new
-  local plist="$DAEMON_DIR/$label.plist" logs="$UHOME/Library/Logs/$label"
-  as_user mkdir -p "$logs"
+  local plist="$AGENT_DIR/$label.plist" logs="$UHOME/Library/Logs/$label" legacy="$DAEMON_DIR/$label.plist"
+  if sudo launchctl print "system/$label" >/dev/null 2>&1; then
+    sudo launchctl bootout "system/$label"
+    log "$repo: LaunchDaemon $label de sistema descargado"
+  fi
+  if sudo test -f "$legacy"; then sudo rm "$legacy"; fi
+  as_user mkdir -p "$logs" "$AGENT_DIR"
   new=$(mktemp)
   cat > "$new" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
@@ -143,34 +153,64 @@ install_daemon() {
   <dict>
     <key>Label</key><string>$label</string>
     <key>ProgramArguments</key><array><string>$dir/runsvc.sh</string></array>
-    <key>UserName</key><string>$RUNNER_USER</string>
-    <key>GroupName</key><string>staff</string>
     <key>WorkingDirectory</key><string>$dir</string>
+    <key>LimitLoadToSessionType</key><string>Background</string>
     <key>RunAtLoad</key><true/>
     <key>KeepAlive</key><true/>
     <key>StandardOutPath</key><string>$logs/stdout.log</string>
     <key>StandardErrorPath</key><string>$logs/stderr.log</string>
     <key>EnvironmentVariables</key>
-    <dict>
-      <key>ACTIONS_RUNNER_SVC</key><string>1</string>
-      <key>HOME</key><string>$UHOME</string>
-      <key>USER</key><string>$RUNNER_USER</string>
-      <key>LOGNAME</key><string>$RUNNER_USER</string>
-    </dict>
+    <dict><key>ACTIONS_RUNNER_SVC</key><string>1</string></dict>
     <key>ProcessType</key><string>Interactive</string>
     <key>Nice</key><integer>$NICE</integer>
-    <key>SessionCreate</key><true/>
   </dict>
 </plist>
 PLIST
   plutil -lint -s "$new" || die "plist inválido para $label"
-  if sudo cmp -s "$new" "$plist" && sudo launchctl print "system/$label" >/dev/null 2>&1; then
-    log "$repo: servicio $label sin cambios"
+  # el home del runner no lo lee quien ejecuta: la comparación pasa por el usuario
+  if as_user cat "$plist" 2>/dev/null | cmp -s "$new" - && sudo launchctl print "user/$UID_N/$label" >/dev/null 2>&1; then
+    log "$repo: agente $label sin cambios"
+  else
+    as_user tee "$plist" < "$new" >/dev/null
+    as_user chmod 644 "$plist"
+    if sudo launchctl print "user/$UID_N/$label" >/dev/null 2>&1; then sudo launchctl bootout "user/$UID_N/$label"; fi
+    sudo launchctl bootstrap "user/$UID_N" "$plist"
+    log "$repo: agente $label cargado en user/$UID_N"
+  fi
+  rm -f "$new"
+}
+
+# LaunchDaemon de arranque: crea el dominio user/<uid> (sin login no existe) y le carga los agentes de los
+# runners. los errores (p.ej. un agente ya cargado) van a su log en /var/log
+install_boot_daemon() {
+  local label="$BOOT_LABEL_PREFIX.$RUNNER_USER" new
+  local plist="$DAEMON_DIR/$label.plist"
+  new=$(mktemp)
+  cat > "$new" <<PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+  <dict>
+    <key>Label</key><string>$label</string>
+    <key>ProgramArguments</key>
+    <array>
+      <string>/bin/sh</string><string>-c</string>
+      <string>for p in $AGENT_DIR/actions.runner.*.plist; do /bin/launchctl bootstrap user/$UID_N "\$p"; done; exit 0</string>
+    </array>
+    <key>RunAtLoad</key><true/>
+    <key>StandardOutPath</key><string>/var/log/$label.log</string>
+    <key>StandardErrorPath</key><string>/var/log/$label.log</string>
+  </dict>
+</plist>
+PLIST
+  plutil -lint -s "$new" || die "plist inválido para $label"
+  if sudo cmp -s "$new" "$plist"; then
+    log "arranque: $label sin cambios"
   else
     sudo install -m 644 -o root -g wheel "$new" "$plist"
     if sudo launchctl print "system/$label" >/dev/null 2>&1; then sudo launchctl bootout "system/$label"; fi
     sudo launchctl bootstrap system "$plist"
-    log "$repo: servicio $label cargado"
+    log "arranque: $label instalado (carga los agentes de user/$UID_N al encender)"
   fi
   rm -f "$new"
 }
@@ -182,6 +222,7 @@ while read -r repo token <&3; do
   [[ -n $repo ]] || continue
   [[ $repo =~ $REPO_RE && $repo != *..* ]] || die "repo inválido: $repo (owner/repo)"
   configure_runner "$repo" "${token:-}" "$TGZ"
-  install_daemon "$repo"
+  install_agent "$repo"
 done 3<<< "$REPOS"
-log "listo: $(sudo launchctl list | grep -c "actions.runner\..*\.$NAME$") runners de $NAME cargados"
+install_boot_daemon
+log "listo: $(sudo launchctl print "user/$UID_N" | grep -c "actions\.runner\..*\.$NAME") runners de $NAME en user/$UID_N"

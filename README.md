@@ -237,8 +237,11 @@ with:
   volver a github basta quitar `runner` del caller.
 - **un runner por repo y mac**: en una cuenta personal de github no hay runners de cuenta, solo de repo (hoy
   duckhunt, sis y carreterinas, 3 por mac). cada uno corre un job a la vez, todos como el usuario `adm-juan`
-  (administrador con contraseña propia: los jobs no tienen sudo) y como LaunchDaemon con `Nice` 5, para ceder
-  cpu a exo.
+  (administrador con contraseña propia: los jobs no tienen sudo), con `Nice` 5 para ceder cpu a exo.
+- **LaunchAgent del dominio `user/<uid>`, no LaunchDaemon**: en el dominio System codesign muere con
+  `errSecInternalComponent` aunque el daemon lleve `UserName` y `SessionCreate`; en el de usuario (sesión
+  Background, la de una sesión ssh) firma. sin login ese dominio no existe: un LaunchDaemon de arranque
+  (`actions.runner.bootstrap.<usuario>`) le carga los agentes.
 - **lo que asumen los workflows de un mac propio**: nada de `sudo` ni `xcode-select` (Xcode por
   `DEVELOPER_DIR`, action `xcode`), keychain de firma antepuesto al search list (otra app puede estar firmando a
   la vez), secretos en `RUNNER_TEMP` (el runner lo vacía al acabar) y pasos portables entre linux y macos en
@@ -265,8 +268,8 @@ ssh -t mac-1-prep 'bash macos-runner.sh --user adm-juan --name mac-1 --repos ~/r
 
 pone homebrew `ruby`, `openjdk@21` y `android-commandlinetools`; para `adm-juan`, cocoapods en `~/.gem` y el
 android sdk en `~/Library/Android/sdk` (`ANDROID_HOME` en el `.env` de cada runner); y el runner de cada repo en
-`~adm-juan/actions-runner/<repo>` (logs en `~adm-juan/Library/Logs/actions.runner.*`). node, pnpm y el jdk los
-pone cada job. una app nueva: su línea en el bucle y `runner: ia01-macos` en sus callers.
+`~adm-juan/actions-runner/<repo>` (agente en `~adm-juan/Library/LaunchAgents`, logs en
+`~adm-juan/Library/Logs/actions.runner.*`). node, pnpm y el jdk los pone cada job. una app nueva: su línea en el bucle y `runner: ia01-macos` en sus callers.
 
 ## capturas de tienda
 
