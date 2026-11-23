@@ -884,7 +884,10 @@ jobs:
           echo -n "$IOS_PROVISIONING_PROFILE_BASE64" | base64 --decode -o "$PP"
           PROF_DIR="$HOME/Library/MobileDevice/Provisioning Profiles"
           mkdir -p "$PROF_DIR"
-          UUID=$(security cms -D -i "$PP" | plutil -extract UUID raw -)
+          # el UUID se lee con openssl y no con `security cms -D`: cms importa los certs del perfil al keychain
+          # por defecto del usuario, y el de un mac propio no tiene ("A default keychain could not be found";
+          # nunca entra en la consola). -noverify salta la cadena de apple, la firma del perfil sí se comprueba.
+          UUID=$(openssl smime -inform der -verify -noverify -in "$PP" | plutil -extract UUID raw -)
           cp "$PP" "$PROF_DIR/$UUID.mobileprovision"
           echo "provisioning profile instalado UUID=$UUID"
           # perfil de la extensión de widgets (bundle <bundle_id>.widgets), si hay widgets.
@@ -892,7 +895,7 @@ jobs:
           if [ -n "$WIDGET_DIR" ]; then
             WPP="$RUNNER_TEMP/widget.mobileprovision"
             echo -n "$IOS_WIDGET_PROVISIONING_PROFILE_BASE64" | base64 --decode -o "$WPP"
-            WUUID=$(security cms -D -i "$WPP" | plutil -extract UUID raw -)
+            WUUID=$(openssl smime -inform der -verify -noverify -in "$WPP" | plutil -extract UUID raw -)
             cp "$WPP" "$PROF_DIR/$WUUID.mobileprovision"
             echo "provisioning profile de widgets instalado UUID=$WUUID"
             WIDGET_MAPPING="<key>${BUNDLE_ID}.widgets</key><string>${WIDGET_PROFILE_NAME}</string>"
@@ -902,7 +905,7 @@ jobs:
           if [ -n "$SHARE_DIR" ]; then
             SPP="$RUNNER_TEMP/share.mobileprovision"
             echo -n "$IOS_SHARE_PROVISIONING_PROFILE_BASE64" | base64 --decode -o "$SPP"
-            SUUID=$(security cms -D -i "$SPP" | plutil -extract UUID raw -)
+            SUUID=$(openssl smime -inform der -verify -noverify -in "$SPP" | plutil -extract UUID raw -)
             cp "$SPP" "$PROF_DIR/$SUUID.mobileprovision"
             echo "provisioning profile de compartir instalado UUID=$SUUID"
             SHARE_MAPPING="<key>${BUNDLE_ID}.share</key><string>${SHARE_PROFILE_NAME}</string>"
