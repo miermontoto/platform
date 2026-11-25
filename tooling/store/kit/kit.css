@@ -1,0 +1,167 @@
+/* layouts del kit de composición de las capturas de tienda (lo sirve render.mjs en /platform/kit/,
+   junto a kit.js). solo geometría: dónde van titular, dispositivo y fragmento, y cómo sangran. el
+   aspecto es de cada app, por variables:
+     --kit-bg, --kit-ink, --kit-em        fondo, texto y énfasis (<em>) de la slide; por tono en .tone-<x>
+     --kit-head-font, --kit-head-weight,  tipografía del titular
+     --kit-head-track, --kit-head-lh
+     --kit-figure-font, --kit-figure-ink  la cifra de poster
+     --kit-device-shadow                  sombra del dispositivo (sobre fondos de color)
+   las calcula kit.js por marco: --kit-pad, --kit-gap, --kit-head (tamaño del titular), --kit-col
+   (columna del texto). el dispositivo sangra a propósito: el flujo lo empuja fuera y la slide recorta.
+   todo va bajo .kit: el reset de la app (.slide * { margin: 0; padding: 0 }) se carga después y, a
+   igual especificidad, anularía los márgenes del layout */
+/* .slide.kit (kit.js pone las dos): gana al .slide de la app, que lleva su fondo y se carga después */
+.slide.kit {
+  position: relative;
+  overflow: hidden;
+  background: var(--kit-bg, var(--bg));
+  color: var(--kit-ink, var(--text));
+}
+.kit .kit-art,
+.kit .kit-pano {
+  position: absolute;
+  pointer-events: none;
+}
+.kit .kit-art {
+  inset: 0;
+  overflow: hidden;
+}
+.kit .kit-pano {
+  top: 0;
+}
+.kit .kit-flow {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--kit-gap);
+  padding: calc(var(--kit-pad) * 1.9) var(--kit-pad) 0;
+}
+/* flex-end con contenido de más: lo que sobra sale por arriba, el dispositivo entra cortado */
+.kit .kit-flow.end {
+  justify-content: flex-end;
+  padding: 0 var(--kit-pad) calc(var(--kit-pad) * 1.7);
+}
+.kit .kit-head {
+  margin: 0;
+  max-width: var(--kit-col);
+  font: var(--kit-head-weight, 700) var(--kit-head) / var(--kit-head-lh, 1.06) var(--kit-head-font, var(--font-sans));
+  letter-spacing: var(--kit-head-track, -0.025em);
+  text-wrap: balance;
+  color: var(--kit-ink, var(--text));
+}
+.kit .kit-head em {
+  font-style: normal;
+  color: var(--kit-em, var(--accent));
+}
+/* bajo .kit: el .device de la app (absoluto, en su store.css cargado después) no lo saca del flujo */
+.kit .kit-device {
+  position: relative;
+  flex: none;
+  align-self: center;
+  box-sizing: border-box;
+  box-shadow: var(--kit-device-shadow, none);
+}
+.kit .kit-device .screen {
+  position: absolute;
+  overflow: hidden;
+}
+.kit .kit-device .vp {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: 0 0;
+}
+.kit .kit-lens {
+  position: absolute;
+  z-index: 2;
+  right: calc(var(--kit-pad) * 0.6);
+  top: 50%;
+  transform-origin: 100% 0;
+}
+.kit .kit-figure {
+  font: var(--kit-figure-weight, 700) calc(var(--kit-col) / var(--ch)) / 0.9 var(--kit-figure-font, var(--font-mono));
+  letter-spacing: -0.02em;
+  color: var(--kit-figure-ink, var(--kit-em, var(--accent)));
+  white-space: nowrap;
+}
+
+/* ---------- vertical ---------- */
+/* lens: el dispositivo cede sitio al fragmento y sangra por la izquierda */
+.tall.kit-lens .kit-device {
+  align-self: flex-start;
+  margin-left: calc(var(--kit-pad) * -0.9);
+}
+/* poster: la cifra arriba y el dispositivo pequeño, pegado a la derecha y sangrando */
+.tall.kit-poster .kit-flow {
+  gap: calc(var(--kit-gap) * 0.45);
+}
+.tall.kit-poster .kit-device {
+  align-self: flex-end;
+  margin: calc(var(--kit-gap) * 0.6) calc(var(--kit-pad) * -0.6) 0 0;
+}
+.tall.kit-scene .kit-flow {
+  justify-content: flex-end;
+  padding: 0 var(--kit-pad) calc(var(--kit-pad) * 1.4);
+}
+
+/* ---------- apaisado ---------- */
+/* rise: columna de texto a la izquierda, el dispositivo a la derecha sangrando por la derecha y abajo */
+.wide.kit-rise .kit-flow {
+  flex-direction: row;
+  align-items: flex-start;
+  padding: calc(var(--kit-pad) * 1.4) 0 0 var(--kit-pad);
+  gap: calc(var(--kit-gap) * 1.2);
+}
+.wide .kit-head {
+  flex: none;
+  width: var(--kit-col);
+}
+.wide.kit-rise .kit-device {
+  align-self: flex-start;
+  margin-top: calc(var(--kit-pad) * 0.5);
+}
+/* fall: el dispositivo entra por la izquierda (lo que sobra sale por ese lado) y el texto abajo a la derecha */
+.wide.kit-fall .kit-flow {
+  flex-direction: row;
+  justify-content: flex-end;
+  align-items: flex-end;
+  padding: 0 var(--kit-pad) calc(var(--kit-pad) * 1.2) 0;
+  gap: calc(var(--kit-gap) * 1.2);
+}
+.wide.kit-fall .kit-device {
+  align-self: flex-start;
+  margin-top: var(--kit-pad);
+}
+/* lens: titular arriba a lo ancho, el dispositivo abajo a la izquierda y el fragmento a la derecha */
+.wide.kit-lens .kit-head {
+  width: auto;
+  max-width: 62%;
+}
+.wide.kit-lens .kit-device {
+  align-self: flex-start;
+}
+.wide.kit-lens .kit-lens {
+  top: 34%;
+  right: var(--kit-pad);
+}
+/* poster: cifra y titular en la columna izquierda, el dispositivo a la derecha */
+.wide.kit-poster .kit-flow {
+  display: grid;
+  grid-template-columns: var(--kit-col) auto;
+  grid-template-rows: auto 1fr;
+  align-content: start;
+  column-gap: calc(var(--kit-gap) * 1.4);
+  row-gap: calc(var(--kit-gap) * 0.4);
+  padding-top: calc(var(--kit-pad) * 1.6);
+}
+.wide.kit-poster .kit-device {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  align-self: start;
+}
+.wide.kit-scene .kit-flow {
+  justify-content: flex-end;
+  padding: 0 var(--kit-pad) calc(var(--kit-pad) * 1.2);
+}

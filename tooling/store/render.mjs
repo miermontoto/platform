@@ -4,7 +4,8 @@
 // las specs de app store / google play (check.mjs) y sale con error si la tienda rechazaría alguno.
 // cada app lo invoca desde un assets/store/render.mjs fino con su config:
 //   renderStore({ dir, port, fonts: { families, dir?, files? }, routes?, pages?, chromeArgs?, modes? })
-// además sirve el cromo compartido en /platform/duo/ (duo/duo.js + duo.css: el iPhone Duo).
+// además sirve las piezas compartidas: /platform/duo/ (duo.js + duo.css: el iPhone Duo) y
+// /platform/kit/ (kit.js + kit.css: marcos y layouts de composición de las slides).
 // uso: node assets/store/render.mjs [filtro-de-ruta] [--out <dir>]   (CHROME_PATH / CDP_PORT opcionales)
 //      node assets/store/render.mjs --check    (valida los png ya exportados, sin re-exportar)
 //      node assets/store/render.mjs --serve    (solo sirve la galería, para revisarla en un navegador)
@@ -27,9 +28,10 @@ const BOOT_POLL_MS = 100;
 const CHROME_FLAGS = ['--headless=new', '--no-sandbox', '--hide-scrollbars', '--force-color-profile=srgb'];
 const GOOGLE_FONTS_LINK = /<link[^>]+fonts\.g[^>]+>\n?/g;
 const FONTS_ROUTE = '/fonts/';
-// cromo compartido de las réplicas (duo/: iPhone Duo), servido a toda app en esta ruta
-const SHARED_ROUTE = '/platform/duo/';
-const SHARED_DIR = join(dirname(fileURLToPath(import.meta.url)), 'duo');
+// piezas compartidas de las réplicas, servidas a toda app: duo/ (el cromo del iPhone Duo) y kit/
+// (geometría de los marcos y layouts de composición)
+const HERE = dirname(fileURLToPath(import.meta.url));
+const SHARED_ROUTES = Object.fromEntries(['duo', 'kit'].map((d) => [`/platform/${d}/`, join(HERE, d)]));
 const FONT_PROBE_PX = 16;
 const NEXT_FRAME = 'document.fonts.ready.then(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))))';
 const IMAGES_READY = 'Promise.all([...document.images].map((i) => i.complete ? 0 : new Promise((r) => { i.onload = i.onerror = r; })))';
@@ -203,7 +205,7 @@ const report = ({ count, issues }) => {
 
 export const renderStore = async ({ dir, port = DEFAULT_CDP_PORT, fonts = {}, routes = {}, pages = {}, chromeArgs = [], modes = {} }) => {
   const args = parseArgs(process.argv.slice(2), resolve(dir, '..'));
-  const shared = { [SHARED_ROUTE]: SHARED_DIR, ...routes };
+  const shared = { ...SHARED_ROUTES, ...routes };
   const srv = await serve({ dir, pages, fontFiles: fonts.files ?? {}, routes: fonts.dir ? { ...shared, [FONTS_ROUTE]: fonts.dir } : shared });
   const base = `http://127.0.0.1:${srv.address().port}/`;
   if (args.flags.has('--serve')) {
