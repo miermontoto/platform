@@ -11,6 +11,8 @@
 //           poster una cifra o palabra enorme (figure) manda; el dispositivo, pequeño, en una esquina
 //           scene  sin dispositivo: el arte de la app (art) es la pieza
 //   tone    clase .tone-<tono> en la slide; la app define sus colores (--kit-bg, --kit-ink, --kit-em)
+//   scale   ancho del dispositivo en fracción del lienzo (alto, si es vertical en un lienzo apaisado)
+// un marco puede traer screen { w, h } si la pantalla no es el lienzo (una app de columna en tablet)
 //   art     html detrás de todo, recibe { f, dev, i, n, wide }; panorama() para un motivo continuo
 (() => {
   'use strict';
@@ -44,6 +46,9 @@
   const HEAD_K = { rise: 1, fall: 1, lens: 1, poster: 0.78, scene: 1.18 };
   // ancho del dispositivo por layout, en fracción del ancho del lienzo
   const DEVICE_W = { tall: { rise: 0.96, fall: 1.02, lens: 0.84, poster: 0.66 }, wide: { rise: 0.74, fall: 0.72, lens: 0.6, poster: 0.56 } };
+  // dispositivo vertical en un lienzo apaisado (una app de columna en tablet): alto en fracción del
+  // alto del lienzo, en vez de ancho
+  const DEVICE_H_PORTRAIT = { rise: 1.06, fall: 1.06, lens: 0.98, poster: 0.92 };
   // ancho visible del fragmento ampliado de lens
   const LENS_W = { tall: 0.66, wide: 0.4 };
   // ancho de una cifra monoespaciada en em: lo que usa poster para que la cifra llene su columna
@@ -58,14 +63,17 @@
     return { wide, pad: u * PAD, gap: u * GAP, head: u * HEAD[wide ? 'wide' : 'tall'] * (HEAD_K[layout] ?? 1) };
   };
 
+  // la pantalla del dispositivo: la del marco (screen) o, por defecto, el lienzo entero
+  const screenOf = (f) => f.screen ?? { w: f.w, h: f.h };
   // el dispositivo a un ancho dado: bisel, pantalla escalada y su viewport al tamaño real
   const device = (f, html, width) => {
-    const s = (width - 2 * f.bezel) / f.w;
+    const sc = screenOf(f);
+    const s = (width - 2 * f.bezel) / sc.w;
     const rIn = f.rLog * s;
-    return `<div class="device kit-device" style="width:${width}px;height:${f.h * s + 2 * f.bezel}px;border-radius:${rIn + f.bezel}px">
+    return `<div class="device kit-device" style="width:${width}px;height:${sc.h * s + 2 * f.bezel}px;border-radius:${rIn + f.bezel}px">
         ${f.hinge ? '<i class="hinge"></i>' : ''}
-        <div class="screen" style="left:${f.bezel - 1}px;top:${f.bezel - 1}px;width:${f.w * s}px;height:${f.h * s}px;border-radius:${rIn}px">
-          <div class="vp" style="width:${f.w}px;height:${f.h}px;transform:scale(${s})">${html}</div>
+        <div class="screen" style="left:${f.bezel - 1}px;top:${f.bezel - 1}px;width:${sc.w * s}px;height:${sc.h * s}px;border-radius:${rIn}px">
+          <div class="vp" style="width:${sc.w}px;height:${sc.h}px;transform:scale(${s})">${html}</div>
         </div>
       </div>`;
   };
@@ -94,7 +102,8 @@
     const dev = f.base ?? f.key;
     const layout = sl.layout ?? 'rise';
     const m = metrics(f, layout);
-    const dw = f.w * (sl.scale ?? DEVICE_W[m.wide ? 'wide' : 'tall'][layout] ?? 1);
+    const sc = screenOf(f);
+    const dw = m.wide && sc.h > sc.w ? f.h * (sl.scale ?? DEVICE_H_PORTRAIT[layout] ?? 1) * (sc.w / sc.h) : f.w * (sl.scale ?? DEVICE_W[m.wide ? 'wide' : 'tall'][layout] ?? 1);
     const col = m.wide ? f.w * WIDE_COL : f.w - 2 * m.pad;
     const head = `<h1 class="kit-head">${sl.head(dev)}</h1>`;
     const art = sl.art ? `<div class="kit-art">${sl.art({ f, dev, i, n, wide: m.wide })}</div>` : '';
