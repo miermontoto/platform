@@ -3,10 +3,10 @@
 // manifiesto (window.STORE.manifest) a su tamaño y escala de tienda. después valida cada png contra
 // las specs de app store / google play (check.mjs) y sale con error si la tienda rechazaría alguno.
 // cada app lo invoca desde un assets/store/render.mjs fino con su config:
-//   renderStore({ dir, port, fonts: { families, dir?, files? }, routes?, pages?, chromeArgs?, modes? })
+//   renderStore({ dir, fonts: { families, dir?, files? }, routes?, pages?, chromeArgs?, modes? })
 // además sirve las piezas compartidas: /platform/duo/ (duo.js + duo.css: el iPhone Duo) y
 // /platform/kit/ (kit.js + kit.css: marcos y layouts de composición de las slides).
-// uso: node assets/store/render.mjs [filtro-de-ruta] [--out <dir>]   (CHROME_PATH / CDP_PORT opcionales)
+// uso: node assets/store/render.mjs [filtro-de-ruta] [--out <dir>]   (CHROME_PATH opcional)
 //      node assets/store/render.mjs --check    (valida los png ya exportados, sin re-exportar)
 //      node assets/store/render.mjs --serve    (solo sirve la galería, para revisarla en un navegador)
 //      node assets/store/render.mjs --<modo>   (modos propios de la app, p.ej. --maps en carreterinas)
@@ -21,10 +21,7 @@ import { fileURLToPath } from 'node:url';
 import { checkFile, checkSafe, checkSet } from './check.mjs';
 
 const MIME = { '.html': 'text/html', '.css': 'text/css', '.js': 'text/javascript', '.json': 'application/json', '.geojson': 'application/json', '.png': 'image/png', '.woff2': 'font/woff2' };
-const DEFAULT_CDP_PORT = 9470;
 const SETTLE_MS = 150;
-const BOOT_TRIES = 50;
-const BOOT_POLL_MS = 100;
 const CHROME_FLAGS = ['--headless=new', '--no-sandbox', '--hide-scrollbars', '--force-color-profile=srgb'];
 const GOOGLE_FONTS_LINK = /<link[^>]+fonts\.g[^>]+>\n?/g;
 const FONTS_ROUTE = '/fonts/';
@@ -99,65 +96,77 @@ const serve = ({ dir, pages, routes, fontFiles }) =>
     srv.listen(0, '127.0.0.1', () => ok(srv));
   });
 
-// cliente cdp mínimo sobre el WebSocket global de node 22
-const cdp = async (wsUrl) => {
-  const ws = new WebSocket(wsUrl);
-  await new Promise((ok, ko) => {
-    ws.onopen = ok;
-    ws.onerror = ko;
-  });
+// cliente cdp por pipe (--remote-debugging-pipe): json terminado en \0, órdenes por el fd 3 de chromium y
+// respuestas por el 4. no por websocket: el de node (undici) corta con 1006 todo mensaje comprimido de más
+// de 4 MB (kDefaultMaxDecompressedSize, fijo), y una captura a escala 2 con fotos lo pasa. si el canal se
+// cierra, lo pendiente falla con su motivo en vez de quedarse colgado
+const MSG_END = '\0';
+const cdp = (chrome) => {
+  const [input, output] = [chrome.stdio[3], chrome.stdio[4]];
   let id = 0;
+  let rest = '';
   const pending = new Map();
-  const waiters = [];
-  ws.onmessage = ({ data }) => {
-    const msg = JSON.parse(data);
+  const waiters = new Set();
+  const fail = (reason) => {
+    pending.forEach(({ ko }) => ko(new Error(reason)));
+    pending.clear();
+  };
+  const dispatch = (msg) => {
     if (msg.id && pending.has(msg.id)) {
       const { ok, ko } = pending.get(msg.id);
       pending.delete(msg.id);
       msg.error ? ko(new Error(`${msg.error.message}`)) : ok(msg.result);
     } else if (msg.method) {
-      waiters.filter((w) => w.method === msg.method).forEach((w) => w.ok(msg.params));
+      [...waiters].filter((w) => w.method === msg.method && w.sessionId === msg.sessionId).forEach((w) => {
+        waiters.delete(w);
+        w.ok(msg.params);
+      });
     }
   };
-  const send = (method, params = {}) =>
+  output.setEncoding('utf8');
+  output.on('data', (chunk) => {
+    const parts = (rest + chunk).split(MSG_END);
+    rest = parts.pop();
+    parts.forEach((raw) => dispatch(JSON.parse(raw)));
+  });
+  output.on('close', () => fail('chromium cerró el canal cdp'));
+  chrome.on('exit', (code, signal) => fail(`chromium salió (${signal ?? code})`));
+  const send = (method, params = {}, sessionId) =>
     new Promise((ok, ko) => {
       pending.set(++id, { ok, ko });
-      ws.send(JSON.stringify({ id, method, params }));
+      input.write(`${JSON.stringify({ id, method, params, ...(sessionId && { sessionId }) })}${MSG_END}`);
     });
-  const once = (method) => new Promise((ok) => waiters.push({ method, ok }));
-  return { send, once, close: () => ws.close() };
+  const once = (method, sessionId) => new Promise((ok) => waiters.add({ method, sessionId, ok }));
+  return { send, once };
 };
 
-// la pestaña de chromium por cdp: navegar, evaluar, emular el tamaño y capturar
-const openPage = async (port) => {
-  let targets = [];
-  for (let i = 0; i < BOOT_TRIES && !targets.length; i++) {
-    await sleep(BOOT_POLL_MS);
-    targets = await fetch(`http://127.0.0.1:${port}/json/list`).then((r) => r.json(), () => []);
-  }
-  const tab = targets.find((t) => t.type === 'page');
-  if (!tab) throw new Error('chromium arrancó sin pestaña');
-  const c = await cdp(tab.webSocketDebuggerUrl);
-  await c.send('Page.enable');
-  await c.send('Runtime.enable');
+// la pestaña de chromium por cdp (una sesión plana sobre la conexión del navegador): navegar, evaluar,
+// emular el tamaño y capturar
+const openPage = async (chrome) => {
+  const c = cdp(chrome);
+  const { targetId } = await c.send('Target.createTarget', { url: 'about:blank' });
+  const { sessionId } = await c.send('Target.attachToTarget', { targetId, flatten: true });
+  const send = (method, params) => c.send(method, params, sessionId);
+  await send('Page.enable');
+  await send('Runtime.enable');
   const evaluate = async (expression) => {
-    const r = await c.send('Runtime.evaluate', { expression, awaitPromise: true, returnByValue: true });
+    const r = await send('Runtime.evaluate', { expression, awaitPromise: true, returnByValue: true });
     if (r.exceptionDetails) throw new Error(r.exceptionDetails.exception?.description ?? r.exceptionDetails.text);
     return r.result.value;
   };
   const load = async (url) => {
-    const loaded = c.once('Page.loadEventFired');
-    await c.send('Page.navigate', { url });
+    const loaded = c.once('Page.loadEventFired', sessionId);
+    await send('Page.navigate', { url });
     await loaded;
     await evaluate(NEXT_FRAME);
   };
-  const size = (width, height, deviceScaleFactor) => c.send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor, mobile: false });
+  const size = (width, height, deviceScaleFactor) => send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor, mobile: false });
   const shoot = async (file, width, height) => {
-    const { data } = await c.send('Page.captureScreenshot', { format: 'png', clip: { x: 0, y: 0, width, height, scale: 1 } });
+    const { data } = await send('Page.captureScreenshot', { format: 'png', clip: { x: 0, y: 0, width, height, scale: 1 } });
     await mkdir(dirname(file), { recursive: true });
     await writeFile(file, Buffer.from(data, 'base64'));
   };
-  return { send: c.send, evaluate, load, size, shoot, close: c.close };
+  return { send, evaluate, load, size, shoot, close: () => c.send('Target.closeTarget', { targetId }) };
 };
 
 // exporta (o con checkOnly solo valida) cada entrada del manifiesto; devuelve las incidencias
@@ -203,7 +212,7 @@ const report = ({ count, issues }) => {
   return !errors;
 };
 
-export const renderStore = async ({ dir, port = DEFAULT_CDP_PORT, fonts = {}, routes = {}, pages = {}, chromeArgs = [], modes = {} }) => {
+export const renderStore = async ({ dir, fonts = {}, routes = {}, pages = {}, chromeArgs = [], modes = {} }) => {
   const args = parseArgs(process.argv.slice(2), resolve(dir, '..'));
   const shared = { ...SHARED_ROUTES, ...routes };
   const srv = await serve({ dir, pages, fontFiles: fonts.files ?? {}, routes: fonts.dir ? { ...shared, [FONTS_ROUTE]: fonts.dir } : shared });
@@ -212,15 +221,15 @@ export const renderStore = async ({ dir, port = DEFAULT_CDP_PORT, fonts = {}, ro
     console.log(`galería en ${base}`);
     return;
   }
-  const cdpPort = Number(process.env.CDP_PORT ?? port);
   let chrome;
   try {
-    chrome = spawn(await findChrome(), [...CHROME_FLAGS, ...chromeArgs, `--remote-debugging-port=${cdpPort}`, 'about:blank'], { stdio: 'ignore' });
-    const page = await openPage(cdpPort);
+    // stdio 3 y 4: el pipe de cdp (--remote-debugging-pipe); el resto, a ningún sitio
+    chrome = spawn(await findChrome(), [...CHROME_FLAGS, ...chromeArgs, '--remote-debugging-pipe'], { stdio: ['ignore', 'ignore', 'ignore', 'pipe', 'pipe'] });
+    const page = await openPage(chrome);
     const mode = Object.keys(modes).find((m) => args.flags.has(`--${m}`));
     if (mode) await modes[mode]({ ...page, base, filter: args.filter });
     else if (!report(await exportJobs(page, { base, out: args.out, filter: args.filter, checkOnly: args.flags.has('--check'), families: fonts.families ?? Object.keys(fonts.files ?? {}) }))) process.exitCode = 1;
-    page.close();
+    await page.close();
   } catch (e) {
     console.error(`[store] export fallido: ${e.message}`);
     process.exitCode = 1;
