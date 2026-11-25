@@ -171,7 +171,10 @@ const openPage = async (chrome) => {
 
 // exporta (o con checkOnly solo valida) cada entrada del manifiesto; devuelve las incidencias
 const exportJobs = async (page, { base, out, filter, checkOnly, families }) => {
-  const fontsReady = `[${families.map((f) => JSON.stringify(`${FONT_PROBE_PX}px "${f}"`))}].every((f) => document.fonts.check(f))`;
+  // cada familia se pide antes de comprobarla: una slide que no usa una (una escena sin la ui de la app,
+  // sin su mono) nunca la descargaría por sí sola y la comprobación fallaría sin que falte nada
+  const probes = `[${families.map((f) => JSON.stringify(`${FONT_PROBE_PX}px "${f}"`))}]`;
+  const fontsReady = `Promise.all(${probes}.map((f) => document.fonts.load(f))).then(() => ${probes}.every((f) => document.fonts.check(f)))`;
   await page.load(base);
   const manifest = await page.evaluate('window.STORE.manifest()');
   // lang y variant (marco + salida, = tipo de dispositivo en play) salen del hash x.<marco>.<n>.<lang>
