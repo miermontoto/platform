@@ -31,8 +31,9 @@ tooling/
               y logs desde terminal, salida json
   mobile/     generadores de icons/splash android+ios desde el logo de la app +
               ios-sim.sh — build de simulador y arranque en un mac local
-  store/      capturas de tienda: renderer html → png por cdp + specs de app store y
-              google play + checker (tamaños, alpha, límites, safe areas)
+  store/      capturas de tienda: renderer html → png por cdp (pipe) + specs de app store y
+              google play + checker (tamaños, alpha, límites, safe areas) + kit de composición
+              de las slides (marcos, layouts, tonos, panorama) + cromo del iPhone Duo
   version/    bump snapshot (<yy>w<ww><letra>) + plantilla de hook pre-commit
   ci/         macos-runner.sh — prepara un mac como runner propio de github actions
 .github/workflows/
@@ -279,7 +280,7 @@ un `assets/store/render.mjs` fino:
 
 ```js
 import { renderStore } from '../../platform/tooling/store/render.mjs';
-renderStore({ dir: HERE, port: 9471, fonts: { families: ['Inter', 'JetBrains Mono'] } });
+renderStore({ dir: HERE, fonts: { families: ['Inter', 'JetBrains Mono'] } });
 // fuentes locales: fonts: { dir, files: { Geist: 'Geist-Variable.woff2' } } · extra: routes,
 // pages, chromeArgs y modes ({ maps: async (page) => … } se lanza con --maps)
 ```
@@ -300,6 +301,15 @@ tienda, si tiene alpha, si un slot pasa del máximo por idioma (10 app store, 8 
 uno obligatorio (iphone dynamic island mediano 1206×2622, ipad 13"). en los creative de ios 27
 (header 21:9 3840×1646, búsqueda 3:2 hasta 3840×2560) lo que marca `[data-safe]` debe caer en la
 safe area de las plantillas de apple, que es pequeña y centrada: el fondo va a sangre.
+
+composición: `tooling/store/kit` (`window.StoreKit`, servido en `/platform/kit/`) pone la geometría
+de cada marco (`StoreKit.frames({ '<marco>': { slides, out, screen? } })`) y pinta cada slide
+(`StoreKit.slide(frame, slide, i, n)`) con su layout: `rise` (titular arriba, dispositivo que sangra
+por abajo), `fall` (el dispositivo entra por arriba, titular al pie), `lens` (un fragmento de la ui
+ampliado), `poster` (una cifra enorme) o `scene` (sin dispositivo). la app pone la dirección de
+arte: tono (`.tone-<x>` con `--kit-bg/ink/em`), tipografía (`--kit-head-*`), arte de fondo y
+`StoreKit.panorama()` para un motivo que cruza toda la serie (la curva de escuchas de sis, el radar
+de duckhunt, la carretera de carreterinas). así las apps comparten la mecánica y no el aspecto.
 
 ## convenciones
 
